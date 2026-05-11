@@ -1,0 +1,141 @@
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { User, Session } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+
+interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  isLoading: boolean;
+  isSigningOut: boolean;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setIsLoading(false);
+        
+        // Invalidate user-role cache on login/signup to force refetch
+        if (event === 'SIGNED_IN' && session?.user?.id) {
+          queryClient.invalidateQueries({ queryKey: ['user-role', session.user.id] });
+        }
+        
+        // Clear cache on logout
+        if (event === 'SIGNED_OUT') {
+          queryClient.removeQueries({ queryKey: ['user-role'] });
+        }
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const signIn = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    if (error) {
+      return { error: error as Error };
+    }
+    
+    // Check if user is blocked
+    if (data.user) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('blocked')
+        .eq('id', data.user.id)
+        .single();
+      
+      if (profileError) {
+        console.error('Error checking blocked status:', profileError);
+      }
+      
+      if (profile?.blocked) {
+        // Sign out the user immediately
+        await supabase.auth.signOut({ scope: 'local' });
+        return { error: new Error('Your account has been blocked. Please contact an administrator.') };
+      }
+    }
+    
+    return { error: null };
+  };
+
+  const signUp = async (email: string, password: string, fullName: string) => {
+    const redirectUrl = `${window.location.origin}/`;
+    
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectUrl,
+        data: {
+          full_name: fullName,
+        },
+      },
+    });
+
+    if (error) {
+      return { error: error as Error };
+    }
+
+    // Supabase returns a fake user with empty identities for duplicate signups
+    if (data?.user?.identities && data.user.identities.length === 0) {
+      return { error: new Error("User already registered") };
+    }
+
+    return { error: null };
+  };
+
+  const signOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (error) {
+      console.error('Sign out error:', error);
+    } finally {
+      // Clear local state regardless of server response
+      setSession(null);
+      setUser(null);
+      queryClient.clear();
+      setIsSigningOut(false);
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, session, isLoading, isSigningOut, signIn, signUp, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+}

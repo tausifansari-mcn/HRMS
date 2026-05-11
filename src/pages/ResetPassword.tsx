@@ -1,0 +1,120 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Lock } from "lucide-react";
+import hrHubLogo from "@/assets/hr-hub-logo.svg";
+
+const ResetPassword = () => {
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [isValidSession, setIsValidSession] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
+        setIsValidSession(true);
+        setChecking(false);
+      }
+    });
+
+    // Check if there's already a valid session (recovery token already processed)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setIsValidSession(true);
+      }
+      setChecking(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (password.length < 6) {
+      toast({ title: "Error", description: "Password must be at least 6 characters.", variant: "destructive" });
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast({ title: "Error", description: "Passwords don't match.", variant: "destructive" });
+      return;
+    }
+
+    setIsLoading(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    setIsLoading(false);
+
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Password Updated", description: "Your password has been reset successfully." });
+      navigate("/dashboard", { replace: true });
+    }
+  };
+
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isValidSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <Card className="w-full max-w-md border-border">
+          <CardHeader className="text-center">
+            <img src={hrHubLogo} alt="Peoplo" className="mx-auto mb-4 h-12 w-auto" />
+            <CardTitle className="text-2xl">Invalid or Expired Link</CardTitle>
+            <CardDescription>This password reset link is invalid or has expired. Please request a new one.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button className="w-full" onClick={() => navigate("/auth")}>Back to Login</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-6">
+      <Card className="w-full max-w-md border-border">
+        <CardHeader className="text-center">
+          <img src={hrHubLogo} alt="Peoplo" className="mx-auto mb-4 h-12 w-auto" />
+          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <Lock className="h-6 w-6 text-primary" />
+          </div>
+          <CardTitle className="text-2xl">Set New Password</CardTitle>
+          <CardDescription>Enter your new password below.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleReset} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input id="new-password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} disabled={isLoading} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <Input id="confirm-password" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={isLoading} />
+            </div>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Updating...</>) : "Update Password"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default ResetPassword;

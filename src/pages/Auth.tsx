@@ -1,0 +1,439 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Shield, Users, Calendar, Eye, EyeOff } from "lucide-react";
+import { z } from "zod";
+import hrHubLogo from "@/assets/hr-hub-logo.svg";
+import hrHubLogoLight from "@/assets/hr-hub-logo-light.svg";
+import { supabase } from "@/integrations/supabase/client";
+
+const loginSchema = z.object({
+  email: z.string().trim().email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+const signupSchema = z.object({
+  fullName: z.string().trim().min(2, "Name must be at least 2 characters").max(100, "Name is too long"),
+  email: z.string().trim().email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
+const Auth = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [signupName, setSignupName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
+
+  const { signIn, signUp, user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, navigate]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
+
+    const result = loginSchema.safeParse({ email: loginEmail, password: loginPassword });
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          fieldErrors[`login_${err.path[0]}`] = err.message;
+        }
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
+    setIsLoading(true);
+    const { error } = await signIn(loginEmail, loginPassword);
+    setIsLoading(false);
+
+    if (error) {
+      if (error.message.includes("Invalid login credentials")) {
+        toast({
+          title: "Login Failed",
+          description: "Invalid email or password. Please try again.",
+          variant: "destructive",
+        });
+      } else if (error.message.includes("Email not confirmed")) {
+        toast({
+          title: "Email Not Verified",
+          description: "Please check your email and verify your account first.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Login Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) {
+      toast({ title: "Error", description: "Please enter your email address.", variant: "destructive" });
+      return;
+    }
+    setIsLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setIsLoading(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Email Sent", description: "Check your email for the password reset link." });
+      setShowForgotPassword(false);
+    }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
+
+    const result = signupSchema.safeParse({
+      fullName: signupName,
+      email: signupEmail,
+      password: signupPassword,
+      confirmPassword: signupConfirmPassword,
+    });
+
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          fieldErrors[`signup_${err.path[0]}`] = err.message;
+        }
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
+    setIsLoading(true);
+
+    // Check domain whitelist before signup
+    try {
+      const { data: settings } = await supabase
+        .from('organization_settings')
+        .select('setting_value')
+        .eq('setting_key', 'domain_whitelist')
+        .single();
+
+      if (settings?.setting_value) {
+        const whitelist = settings.setting_value as unknown as { enabled: boolean; domains: string[] };
+        
+        if (whitelist.enabled && whitelist.domains.length > 0) {
+          const emailDomain = signupEmail.split('@')[1]?.toLowerCase();
+          const isAllowed = whitelist.domains.some(domain => 
+            emailDomain === domain.toLowerCase()
+          );
+          
+          if (!isAllowed) {
+            setIsLoading(false);
+            toast({
+              title: "Registration Restricted",
+              description: `Only email addresses from approved domains are allowed to register. Please contact your administrator.`,
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+      }
+    } catch (error) {
+      // If we can't fetch settings, allow signup to continue
+      console.error("Error checking domain whitelist:", error);
+    }
+
+    const { error } = await signUp(signupEmail, signupPassword, signupName);
+    setIsLoading(false);
+
+    if (error) {
+      if (error.message.includes("User already registered")) {
+        toast({
+          title: "Account Exists",
+          description: "An account with this email already exists. Please log in instead.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Signup Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    } else {
+      toast({
+        title: "Account Created",
+        description: "Please check your email to verify your account.",
+      });
+    }
+  };
+
+  const features = [
+    { icon: <Users className="h-5 w-5" />, text: "Employee Management" },
+    { icon: <Calendar className="h-5 w-5" />, text: "Leave Tracking" },
+    { icon: <Shield className="h-5 w-5" />, text: "Role-Based Access" },
+  ];
+
+  return (
+    <div className="flex min-h-screen">
+      {/* Left side - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-primary p-12 text-primary-foreground">
+        <div>
+          <div className="flex items-center gap-3">
+            <img src={hrHubLogoLight} alt="Peoplo" className="h-12 w-auto" />
+            <h1 className="text-3xl font-bold">Peoplo</h1>
+          </div>
+        </div>
+        
+        <div className="space-y-6">
+          <h2 className="text-4xl font-bold leading-tight">
+            Streamline Your HR Operations
+          </h2>
+          <p className="text-lg opacity-90">
+            Manage employees, track leaves, handle payroll, and more — all in one powerful platform.
+          </p>
+          <div className="space-y-4">
+            {features.map((feature, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="rounded-lg bg-primary-foreground/10 p-2">
+                  {feature.icon}
+                </div>
+                <span className="text-lg">{feature.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-sm opacity-70">
+          © 2025 Peoplo. All rights reserved.
+        </p>
+      </div>
+
+      {/* Right side - Auth Forms */}
+      <div className="flex w-full lg:w-1/2 items-center justify-center bg-background p-6">
+        <Card className="w-full max-w-md border-border">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 lg:hidden">
+              <img src={hrHubLogo} alt="Peoplo" className="h-12 w-auto" />
+            </div>
+            <CardTitle className="text-2xl">Welcome to Peoplo</CardTitle>
+            <CardDescription>Sign in to your account or create a new one</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="login" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="login">Login</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="login" className="mt-6">
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="login-email">Email</Label>
+                    <Input
+                      id="login-email"
+                      type="email"
+                      placeholder="name@company.com"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      disabled={isLoading}
+                    />
+                    {errors.login_email && (
+                      <p className="text-sm text-destructive">{errors.login_email}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="login-password">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="login-password"
+                        type={showLoginPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        disabled={isLoading}
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        tabIndex={-1}
+                      >
+                        {showLoginPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                      </Button>
+                    </div>
+                    {errors.login_password && (
+                      <p className="text-sm text-destructive">{errors.login_password}</p>
+                    )}
+                  </div>
+                  <div className="flex justify-end">
+                    <Button type="button" variant="link" className="h-auto p-0 text-sm" onClick={() => { setShowForgotPassword(true); setResetEmail(loginEmail); }}>
+                      Forgot password?
+                    </Button>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Signing in...
+                      </>
+                    ) : (
+                      "Sign In"
+                    )}
+                  </Button>
+                </form>
+
+                {showForgotPassword && (
+                  <div className="mt-6 border-t pt-6">
+                    <h3 className="mb-2 text-sm font-medium">Reset Password</h3>
+                    <form onSubmit={handleForgotPassword} className="space-y-3">
+                      <Input type="email" placeholder="Enter your email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} disabled={isLoading} />
+                      <div className="flex gap-2">
+                        <Button type="submit" className="flex-1" disabled={isLoading}>
+                          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Reset Link"}
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setShowForgotPassword(false)}>Cancel</Button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="signup" className="mt-6">
+                <form onSubmit={handleSignup} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-name">Full Name</Label>
+                    <Input
+                      id="signup-name"
+                      type="text"
+                      placeholder="John Doe"
+                      value={signupName}
+                      onChange={(e) => setSignupName(e.target.value)}
+                      disabled={isLoading}
+                    />
+                    {errors.signup_fullName && (
+                      <p className="text-sm text-destructive">{errors.signup_fullName}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email">Email</Label>
+                    <Input
+                      id="signup-email"
+                      type="email"
+                      placeholder="name@company.com"
+                      value={signupEmail}
+                      onChange={(e) => setSignupEmail(e.target.value)}
+                      disabled={isLoading}
+                    />
+                    {errors.signup_email && (
+                      <p className="text-sm text-destructive">{errors.signup_email}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="signup-password"
+                        type={showSignupPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={signupPassword}
+                        onChange={(e) => setSignupPassword(e.target.value)}
+                        disabled={isLoading}
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowSignupPassword(!showSignupPassword)}
+                        tabIndex={-1}
+                      >
+                        {showSignupPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                      </Button>
+                    </div>
+                    {errors.signup_password && (
+                      <p className="text-sm text-destructive">{errors.signup_password}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-confirm">Confirm Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="signup-confirm"
+                        type={showSignupConfirmPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={signupConfirmPassword}
+                        onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                        disabled={isLoading}
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowSignupConfirmPassword(!showSignupConfirmPassword)}
+                        tabIndex={-1}
+                      >
+                        {showSignupConfirmPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                      </Button>
+                    </div>
+                    {errors.signup_confirmPassword && (
+                      <p className="text-sm text-destructive">{errors.signup_confirmPassword}</p>
+                    )}
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating account...
+                      </>
+                    ) : (
+                      "Create Account"
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default Auth;
+

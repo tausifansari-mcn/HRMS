@@ -1,0 +1,307 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+
+export interface Asset {
+  id: string;
+  name: string;
+  type: "laptop" | "monitor" | "phone" | "accessory";
+  serialNumber: string;
+  purchaseDate: string;
+  cost: number;
+  status: "available" | "assigned" | "maintenance" | "retired";
+  notes?: string;
+  assignedTo?: {
+    name: string;
+    avatar?: string;
+  };
+}
+
+export function useAssets() {
+  return useQuery({
+    queryKey: ["assets"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("assets")
+        .select(`
+          id,
+          name,
+          category,
+          serial_number,
+          purchase_date,
+          purchase_cost,
+          status,
+          notes
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      // Get current assignments
+      const { data: assignments } = await supabase
+        .from("asset_assignments")
+        .select(`
+          asset_id,
+          employee:employees(first_name, last_name, avatar_url)
+        `)
+        .is("returned_date", null);
+
+      type EmployeeAssignment = {
+        first_name: string;
+        last_name: string;
+        avatar_url: string | null;
+      };
+
+      const assignmentMap = new Map<string, EmployeeAssignment | null>(
+        (assignments || []).map((a) => [a.asset_id, a.employee as EmployeeAssignment | null])
+      );
+
+      return (data || []).map((asset): Asset => {
+        const assignedEmployee = assignmentMap.get(asset.id);
+        return {
+          id: asset.id,
+          name: asset.name,
+          type: asset.category.toLowerCase() as Asset["type"],
+          serialNumber: asset.serial_number || "",
+          purchaseDate: asset.purchase_date
+            ? format(new Date(asset.purchase_date), "MMM d, yyyy")
+            : "Unknown",
+          cost: Number(asset.purchase_cost) || 0,
+          status: asset.status as Asset["status"],
+          notes: asset.notes || undefined,
+          assignedTo: assignedEmployee
+            ? {
+                name: `${assignedEmployee.first_name} ${assignedEmployee.last_name}`,
+                avatar: assignedEmployee.avatar_url || undefined,
+              }
+            : undefined,
+        };
+      });
+    },
+  });
+}
+
+export function useAssetStats() {
+  return useQuery({
+    queryKey: ["asset-stats"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("assets")
+        .select("id, category, status");
+
+      if (error) throw error;
+
+      const total = data?.length || 0;
+      const laptops = data?.filter((a) => a.category.toLowerCase() === "laptop").length || 0;
+      const monitors = data?.filter((a) => a.category.toLowerCase() === "monitor").length || 0;
+      const phones = data?.filter((a) => a.category.toLowerCase() === "phone").length || 0;
+
+      return { total, laptops, monitors, phones };
+    },
+  });
+}
+
+export interface CreateAssetData {
+  name: string;
+  category: string;
+  serial_number?: string;
+  purchase_date?: string;
+  purchase_cost?: number;
+  vendor?: string;
+  warranty_end_date?: string;
+  notes?: string;
+}
+
+export function useCreateAsset() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: CreateAssetData) => {
+      // Generate asset code
+      const prefix = data.category.substring(0, 3).toUpperCase();
+      const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
+      const asset_code = `${prefix}-${randomNum}`;
+
+      const { error } = await supabase.from("assets").insert({
+        ...data,
+        asset_code,
+        status: "available",
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["asset-stats"] });
+    },
+  });
+}
+
+export interface UpdateAssetData {
+  id: string;
+  name?: string;
+  category?: string;
+  serial_number?: string;
+  purchase_date?: string;
+  purchase_cost?: number;
+  vendor?: string;
+  notes?: string;
+  status?: "available" | "assigned" | "maintenance" | "retired";
+}
+
+export function useUpdateAsset() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...data }: UpdateAssetData) => {
+      const { error } = await supabase
+        .from("assets")
+        .update(data)
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["asset-stats"] });
+    },
+  });
+}
+
+export function useDeleteAsset() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("assets")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["asset-stats"] });
+    },
+  });
+}
+
+export interface AssignAssetData {
+  assetId: string;
+  employeeId: string;
+  notes?: string;
+}
+
+export function useAssignAsset() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ assetId, employeeId, notes }: AssignAssetData) => {
+      // Create assignment record
+      const { error: assignError } = await supabase
+        .from("asset_assignments")
+        .insert({
+          asset_id: assetId,
+          employee_id: employeeId,
+          notes: notes || null,
+        });
+
+      if (assignError) throw assignError;
+
+      // Update asset status to assigned
+      const { error: updateError } = await supabase
+        .from("assets")
+        .update({ status: "assigned" })
+        .eq("id", assetId);
+
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["asset-stats"] });
+    },
+  });
+}
+
+export function useReturnAsset() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (assetId: string) => {
+      // Update assignment record with returned date
+      const { error: assignError } = await supabase
+        .from("asset_assignments")
+        .update({ returned_date: new Date().toISOString().split("T")[0] })
+        .eq("asset_id", assetId)
+        .is("returned_date", null);
+
+      if (assignError) throw assignError;
+
+      // Update asset status to available
+      const { error: updateError } = await supabase
+        .from("assets")
+        .update({ status: "available" })
+        .eq("id", assetId);
+
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["asset-stats"] });
+    },
+  });
+}
+
+export interface AssetAssignment {
+  id: string;
+  assignedDate: string;
+  returnedDate: string | null;
+  notes: string | null;
+  employee: {
+    name: string;
+    avatar?: string;
+  };
+}
+
+export function useAssetHistory(assetId: string | null) {
+  return useQuery({
+    queryKey: ["asset-history", assetId],
+    queryFn: async () => {
+      if (!assetId) return [];
+
+      const { data, error } = await supabase
+        .from("asset_assignments")
+        .select(`
+          id,
+          assigned_date,
+          returned_date,
+          notes,
+          employee:employees(first_name, last_name, avatar_url)
+        `)
+        .eq("asset_id", assetId)
+        .order("assigned_date", { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []).map((assignment): AssetAssignment => {
+        const emp = assignment.employee as { first_name: string; last_name: string; avatar_url: string | null } | null;
+        return {
+          id: assignment.id,
+          assignedDate: format(new Date(assignment.assigned_date), "MMM d, yyyy"),
+          returnedDate: assignment.returned_date
+            ? format(new Date(assignment.returned_date), "MMM d, yyyy")
+            : null,
+          notes: assignment.notes,
+          employee: emp
+            ? {
+                name: `${emp.first_name} ${emp.last_name}`,
+                avatar: emp.avatar_url || undefined,
+              }
+            : { name: "Unknown" },
+        };
+      });
+    },
+    enabled: !!assetId,
+  });
+}
