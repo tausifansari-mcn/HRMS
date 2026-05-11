@@ -74,7 +74,7 @@ const ResetPassword = () => {
       <div className="flex min-h-screen items-center justify-center bg-background p-6">
         <Card className="w-full max-w-md border-border">
           <CardHeader className="text-center">
-            <img src={hrHubLogo} alt="Peoplo" className="mx-auto mb-4 h-12 w-auto" />
+            <img src={hrHubLogo} alt="Mas Callnet HRMS" className="mx-auto mb-4 h-12 w-auto" />
             <CardTitle className="text-2xl">Invalid or Expired Link</CardTitle>
             <CardDescription>This password reset link is invalid or has expired. Please request a new one.</CardDescription>
           </CardHeader>
@@ -90,7 +90,7 @@ const ResetPassword = () => {
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <Card className="w-full max-w-md border-border">
         <CardHeader className="text-center">
-          <img src={hrHubLogo} alt="Peoplo" className="mx-auto mb-4 h-12 w-auto" />
+          <img src={hrHubLogo} alt="Mas Callnet HRMS" className="mx-auto mb-4 h-12 w-auto" />
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <Lock className="h-6 w-6 text-primary" />
           </div>

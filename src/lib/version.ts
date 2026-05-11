@@ -1,10 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 
 // Current application version - update this when releasing new versions
-export const APP_VERSION = "1.0.0";
+export const APP_VERSION = "1.0.5";
 
 // Production API URL for version checking (used by self-hosted instances)
-export const VERSION_API_URL = "https://peoplo.redmonk.in/functions/v1/version-check";
+export const VERSION_API_URL = "https://mas-callnet-hrms.vercel.app/functions/v1/version-check";
 
 export interface ChangelogEntry {
   version: string;
@@ -34,7 +34,7 @@ const LOCAL_CHANGELOG: ChangelogEntry[] = [
     date: "2025-01-19",
     type: "major",
     title: "Initial Release",
-    description: "First stable release of Peoplo HR Management System",
+    description: "First stable release of Mas Callnet HRMS",
     changes: [
       { type: "feature", text: "Complete employee management with CRUD operations" },
       { type: "feature", text: "Leave management with approval workflows" },
@@ -58,8 +58,8 @@ export const FALLBACK_VERSION_RESPONSE: VersionResponse = {
   releaseDate: "2025-01-19",
   changelog: LOCAL_CHANGELOG,
   hasUpdate: false,
-  updateUrl: "https://github.com/redmonkin/core-hr-hub/releases",
-  documentationUrl: "https://peoplo.redmonk.in",
+  updateUrl: "https://github.com/shivamgiri-sudo/mas-callnet-hrms",
+  documentationUrl: "https://mas-callnet-hrms.vercel.app",
 };
 
 // Detect if running in an auto-updating environment (Lovable Cloud / production)
@@ -68,8 +68,8 @@ export function isAutoUpdatingEnvironment(): boolean {
   const hostname = window.location.hostname;
   return (
     hostname.includes("lovable") ||
-    hostname === "peoplo.redmonk.in" ||
-    hostname.endsWith(".redmonk.in")
+    hostname === "mas-callnet-hrms.vercel.app" ||
+    hostname.endsWith(".mas-callnet-hrms.vercel.app")
   );
 }
 

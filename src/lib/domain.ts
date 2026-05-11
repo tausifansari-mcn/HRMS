@@ -1,5 +1,5 @@
 // Production domain for the official SaaS offering
-export const PRODUCTION_DOMAIN = "peoplo.redmonk.in";
+export const PRODUCTION_DOMAIN = "mas-callnet-hrms.vercel.app";
 
 // Check if the current site is the production/SaaS domain
 export function isProductionDomain(): boolean {

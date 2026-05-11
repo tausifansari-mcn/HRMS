@@ -85,8 +85,8 @@ const PrivacyPolicy = () => {
       <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src={hrHubLogo} alt="Peoplo" className="h-8 w-auto" />
-            <span className="text-xl font-bold">Peoplo</span>
+            <img src={hrHubLogo} alt="Mas Callnet HRMS" className="h-8 w-auto" />
+            <span className="text-xl font-bold">Mas Callnet HRMS</span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
             <Link to="/features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Features</Link>
@@ -131,7 +131,7 @@ const PrivacyPolicy = () => {
           <Card className="max-w-4xl mx-auto">
             <CardContent className="p-8">
               <p className="text-muted-foreground leading-relaxed">
-                This Privacy Policy describes how Peoplo ("we", "us", or "our") collects, uses, and shares 
+                This Privacy Policy describes how Mas Callnet HRMS ("we", "us", or "our") collects, uses, and shares 
                 information about you when you use our HR management platform and related services. By using 
                 our services, you agree to the collection and use of information in accordance with this policy. 
                 We encourage you to read this policy carefully to understand our practices regarding your 

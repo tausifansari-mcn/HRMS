@@ -124,7 +124,7 @@ export default function Changelog() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">Changelog</h1>
             <p className="text-muted-foreground">
-              View the latest updates and improvements to Peoplo
+              View the latest updates and improvements to Mas Callnet HRMS
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -139,7 +139,7 @@ export default function Changelog() {
             </Button>
             <Button size="sm" asChild>
               <a
-                href="https://github.com/redmonk-org/peoplo/releases"
+                href="https://github.com/shivamgiri-sudo/mas-callnet-hrms"
                 target="_blank"
                 rel="noopener noreferrer"
               >

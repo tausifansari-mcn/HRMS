@@ -128,8 +128,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Logo */}
           <div className="flex h-20 items-center justify-between border-b border-border px-6">
             <Link to="/dashboard" className="flex items-center gap-3">
-              <img src={hrHubLogo} alt="Peoplo" className="h-10 w-auto" />
-              <span className="text-xl font-bold text-foreground">Peoplo</span>
+              <img src={hrHubLogo} alt="Mas Callnet HRMS" className="h-10 w-auto" />
+              <span className="text-xl font-bold text-foreground">Mas Callnet HRMS</span>
             </Link>
             <Button
               variant="ghost"

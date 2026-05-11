@@ -47,7 +47,7 @@ export function PWAInstallBanner() {
       <div className="flex items-center gap-3 rounded-lg border bg-card p-4 shadow-lg">
         <Download className="h-5 w-5 shrink-0 text-primary" />
         <p className="flex-1 text-sm text-card-foreground">
-          Install Peoplo for a faster, app-like experience!
+          Install Mas Callnet HRMS for a faster, app-like experience!
         </p>
         <Button size="sm" onClick={handleInstall}>
           Install

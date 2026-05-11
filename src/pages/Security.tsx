@@ -96,8 +96,8 @@ const Security = () => {
       <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src={hrHubLogo} alt="Peoplo" className="h-8 w-auto" />
-            <span className="text-xl font-bold">Peoplo</span>
+            <img src={hrHubLogo} alt="Mas Callnet HRMS" className="h-8 w-auto" />
+            <span className="text-xl font-bold">Mas Callnet HRMS</span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
             <Link to="/features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Features</Link>
@@ -219,7 +219,7 @@ const Security = () => {
                 responsibly. We appreciate your help in keeping our platform and users safe.
               </p>
               <Button asChild>
-                <a href="https://redmonk.in/contact-us/" target="_blank" rel="noopener noreferrer">
+                <a href="#" target="_blank" rel="noopener noreferrer">
                   Contact Security Team
                 </a>
               </Button>

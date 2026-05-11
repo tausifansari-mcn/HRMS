@@ -92,8 +92,8 @@ const HowItWorks = () => {
       <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src={hrHubLogo} alt="Peoplo" className="h-8 w-auto" />
-            <span className="text-xl font-bold">Peoplo</span>
+            <img src={hrHubLogo} alt="Mas Callnet HRMS" className="h-8 w-auto" />
+            <span className="text-xl font-bold">Mas Callnet HRMS</span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
             <Link to="/features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
@@ -200,7 +200,7 @@ const HowItWorks = () => {
             <Badge variant="outline" className="mb-4">Deployment</Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Flexible Deployment Options</h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Choose how you want to run Peoplo. Your data, your rules, your infrastructure.
+              Choose how you want to run Mas Callnet HRMS. Your data, your rules, your infrastructure.
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">

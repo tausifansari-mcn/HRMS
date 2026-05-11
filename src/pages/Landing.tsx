@@ -82,7 +82,7 @@ const Landing = () => {
 
   const testimonials = [
     {
-      quote: "Peoplo transformed how we manage our workforce. The automation alone saved us 20+ hours per week.",
+      quote: "Mas Callnet HRMS transformed how we manage our workforce. The automation alone saved us 20+ hours per week.",
       author: "Sarah Chen",
       role: "VP of People Operations",
       company: "TechScale Inc."
@@ -107,8 +107,8 @@ const Landing = () => {
       <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src={hrHubLogo} alt="Peoplo" className="h-8 w-auto" />
-            <span className="text-xl font-bold">Peoplo</span>
+            <img src={hrHubLogo} alt="Mas Callnet HRMS" className="h-8 w-auto" />
+            <span className="text-xl font-bold">Mas Callnet HRMS</span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
             <Link to="/features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
@@ -251,12 +251,12 @@ const Landing = () => {
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
-              <Badge variant="outline" className="mb-4">Why Peoplo</Badge>
+              <Badge variant="outline" className="mb-4">Why Mas Callnet HRMS</Badge>
               <h2 className="text-3xl md:text-4xl font-bold mb-6">
                 Built for Scale, Designed for Simplicity
               </h2>
               <p className="text-lg text-muted-foreground mb-8">
-                Whether you're a growing startup or a global enterprise, Peoplo adapts 
+                Whether you're a growing startup or a global enterprise, Mas Callnet HRMS adapts 
                 to your needs with flexible workflows and powerful automation.
               </p>
               <ul className="space-y-4">
@@ -304,7 +304,7 @@ const Landing = () => {
             Trusted by HR Leaders Worldwide
           </h2>
           <p className="text-lg text-muted-foreground">
-            See how companies are transforming their HR operations with Peoplo.
+            See how companies are transforming their HR operations with Mas Callnet HRMS.
           </p>
         </div>
         
@@ -339,7 +339,7 @@ const Landing = () => {
               Ready to Transform Your HR Operations?
             </h2>
             <p className="text-primary-foreground/80 text-lg">
-              Join thousands of companies that have modernized their HR with Peoplo. 
+              Join thousands of companies that have modernized their HR with Mas Callnet HRMS. 
               Start your free trial today — no credit card required.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">

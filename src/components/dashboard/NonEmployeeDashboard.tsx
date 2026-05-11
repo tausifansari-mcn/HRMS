@@ -61,7 +61,7 @@ export function NonEmployeeDashboard() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
             <UserPlus className="h-8 w-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl">Welcome to HR Hub!</CardTitle>
+          <CardTitle className="text-2xl">Welcome to Mas Callnet HRMS!</CardTitle>
           <CardDescription>
             {request
               ? "Your onboarding request has been submitted."

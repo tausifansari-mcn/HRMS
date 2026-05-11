@@ -194,8 +194,8 @@ const Features = () => {
       <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src={hrHubLogo} alt="Peoplo" className="h-8 w-auto" />
-            <span className="text-xl font-bold">Peoplo</span>
+            <img src={hrHubLogo} alt="Mas Callnet HRMS" className="h-8 w-auto" />
+            <span className="text-xl font-bold">Mas Callnet HRMS</span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
             <Link to="/features" className="text-sm font-medium text-foreground transition-colors">
@@ -301,7 +301,7 @@ const Features = () => {
               Ready to Transform Your HR Operations?
             </h2>
             <p className="text-primary-foreground/80 text-lg">
-              Join thousands of companies that have modernized their HR with Peoplo. 
+              Join thousands of companies that have modernized their HR with Mas Callnet HRMS. 
               Start your free trial today — no credit card required.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">

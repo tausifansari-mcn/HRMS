@@ -7,7 +7,7 @@ const Footer = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div className="col-span-2 md:col-span-1">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <img src={logo} alt="Peoplo" className="h-8 w-auto" />
+              <img src={logo} alt="Mas Callnet HRMS" className="h-8 w-auto" />
             </Link>
             <p className="text-sm text-muted-foreground">
               Modern HR management for growing teams. Streamline your workforce operations.
@@ -24,9 +24,9 @@ const Footer = () => {
           <div>
             <h4 className="font-semibold mb-4 text-sm">Company</h4>
             <ul className="space-y-3 text-sm text-muted-foreground">
-              <li><a href="https://redmonk.in/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">About Us</a></li>
-              <li><a href="https://in.linkedin.com/company/redmonkin" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Careers</a></li>
-              <li><a href="https://redmonk.in/contact-us/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Contact Us</a></li>
+              <li><a href="#" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">About Us</a></li>
+              <li><a href="#" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Careers</a></li>
+              <li><a href="#" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Contact Us</a></li>
             </ul>
           </div>
           <div>
@@ -40,11 +40,11 @@ const Footer = () => {
         </div>
         <div className="border-t pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Peoplo. All rights reserved.
+            © {new Date().getFullYear()} Mas Callnet HRMS. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             
-            <a href="https://github.com/redmonkin/core-hr-hub" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+            <a href="https://github.com/shivamgiri-sudo/mas-callnet-hrms" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
               <Github className="h-5 w-5" />
             </a>
           </div>
