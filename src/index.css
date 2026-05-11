@@ -164,3 +164,297 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+/* =========================================================
+   MCN HRMS Premium UI Enhancement Layer
+   Safe global visual upgrade - no logic changes
+   ========================================================= */
+
+:root {
+  --mcn-bg-main: #f4f7fb;
+  --mcn-bg-soft: #eef3f9;
+  --mcn-surface: rgba(255, 255, 255, 0.92);
+  --mcn-surface-solid: #ffffff;
+  --mcn-border: rgba(15, 23, 42, 0.08);
+  --mcn-border-strong: rgba(15, 23, 42, 0.14);
+  --mcn-text-main: #0f172a;
+  --mcn-text-muted: #64748b;
+  --mcn-primary: #174ea6;
+  --mcn-primary-dark: #0f3777;
+  --mcn-primary-soft: rgba(23, 78, 166, 0.11);
+  --mcn-success: #0f9f6e;
+  --mcn-warning: #d97706;
+  --mcn-danger: #dc2626;
+  --mcn-radius-xl: 22px;
+  --mcn-shadow-card: 0 18px 45px rgba(15, 23, 42, 0.08);
+  --mcn-shadow-hover: 0 24px 65px rgba(15, 23, 42, 0.13);
+}
+
+/* Page foundation */
+body {
+  background:
+    radial-gradient(circle at top left, rgba(23, 78, 166, 0.14), transparent 34%),
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 32%),
+    linear-gradient(135deg, #f8fbff 0%, #eef3f9 42%, #f7f9fc 100%) !important;
+  color: var(--mcn-text-main);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Better text rendering */
+* {
+  text-rendering: geometricPrecision;
+}
+
+main {
+  background: transparent !important;
+}
+
+/* App shell */
+aside,
+[class*="sidebar"],
+[data-sidebar],
+nav {
+  backdrop-filter: blur(18px);
+}
+
+/* Header / top bar feel */
+header {
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--mcn-border) !important;
+}
+
+/* Cards - applies to shadcn-style cards */
+.rounded-lg.border.bg-card,
+.bg-card,
+[class*="Card"] {
+  border-color: var(--mcn-border) !important;
+}
+
+.bg-card {
+  background: var(--mcn-surface) !important;
+}
+
+/* Common premium card effect */
+.bg-card,
+.rounded-lg.border,
+[class*="shadow-sm"] {
+  box-shadow: var(--mcn-shadow-card);
+}
+
+/* Hover lift for cards */
+.rounded-lg.border.bg-card,
+.bg-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.rounded-lg.border.bg-card:hover,
+.bg-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--mcn-shadow-hover);
+  border-color: rgba(23, 78, 166, 0.18) !important;
+}
+
+/* Dashboard metric cards */
+[class*="grid"] > .rounded-lg.border,
+[class*="grid"] > .bg-card {
+  border-radius: var(--mcn-radius-xl) !important;
+}
+
+/* Buttons */
+button,
+[role="button"],
+a[class*="button"] {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+button:hover,
+[role="button"]:hover {
+  transform: translateY(-1px);
+}
+
+/* Primary buttons */
+button[class*="bg-primary"],
+.bg-primary {
+  background: linear-gradient(135deg, var(--mcn-primary), #2563eb) !important;
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.22);
+}
+
+button[class*="bg-primary"]:hover,
+.bg-primary:hover {
+  background: linear-gradient(135deg, var(--mcn-primary-dark), #1d4ed8) !important;
+  box-shadow: 0 16px 36px rgba(37, 99, 235, 0.3);
+}
+
+/* Inputs/selects/textareas */
+input,
+select,
+textarea,
+[role="combobox"] {
+  border-radius: 14px !important;
+  border-color: var(--mcn-border-strong) !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+[role="combobox"]:focus {
+  border-color: rgba(37, 99, 235, 0.55) !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12) !important;
+  outline: none !important;
+}
+
+/* Tables */
+table {
+  border-collapse: separate !important;
+  border-spacing: 0 8px !important;
+}
+
+thead tr {
+  background: transparent !important;
+}
+
+thead th {
+  color: var(--mcn-text-muted) !important;
+  font-size: 11px !important;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 800 !important;
+  border-bottom: none !important;
+}
+
+tbody tr {
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.045);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+tbody tr:hover {
+  transform: translateY(-1px);
+  background: #ffffff;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+}
+
+tbody td {
+  border-bottom: none !important;
+}
+
+tbody td:first-child {
+  border-top-left-radius: 14px;
+  border-bottom-left-radius: 14px;
+}
+
+tbody td:last-child {
+  border-top-right-radius: 14px;
+  border-bottom-right-radius: 14px;
+}
+
+/* Badges */
+[class*="badge"],
+[class*="Badge"],
+.inline-flex.items-center.rounded-full {
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em;
+}
+
+/* Tabs */
+[role="tablist"] {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid var(--mcn-border) !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  border-radius: 18px !important;
+  padding: 5px !important;
+}
+
+[role="tab"] {
+  border-radius: 14px !important;
+  font-weight: 700 !important;
+}
+
+[role="tab"][data-state="active"] {
+  background: #ffffff !important;
+  color: var(--mcn-primary) !important;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+/* Dropdowns / popovers / dialogs */
+[role="dialog"],
+[role="menu"],
+[data-radix-popper-content-wrapper] > * {
+  border-radius: 20px !important;
+  border-color: var(--mcn-border) !important;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.18) !important;
+}
+
+/* Auth/login visual upgrade */
+.min-h-screen {
+  background:
+    radial-gradient(circle at 18% 15%, rgba(37, 99, 235, 0.16), transparent 30%),
+    radial-gradient(circle at 80% 20%, rgba(14, 165, 233, 0.14), transparent 28%),
+    linear-gradient(135deg, #f8fbff 0%, #eef4fb 100%);
+}
+
+.min-h-screen .bg-card,
+.min-h-screen .rounded-lg.border {
+  border-radius: 28px !important;
+}
+
+/* Logo polish */
+img[alt*="Mas"],
+img[alt*="MCN"],
+img[alt*="HRMS"],
+img[alt*="Peoplo"] {
+  object-fit: contain;
+  filter: drop-shadow(0 8px 18px rgba(15, 23, 42, 0.12));
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.38);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(37, 99, 235, 0.48);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Softer animations */
+@media (prefers-reduced-motion: no-preference) {
+  .bg-card,
+  .rounded-lg.border,
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    transition-duration: 180ms;
+  }
+}
+
+/* Mobile polish */
+@media (max-width: 768px) {
+  .bg-card,
+  .rounded-lg.border {
+    border-radius: 18px !important;
+  }
+
+  table {
+    border-spacing: 0 6px !important;
+  }
+}
+
