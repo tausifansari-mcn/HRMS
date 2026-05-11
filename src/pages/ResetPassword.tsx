@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Lock } from "lucide-react";
-import hrHubLogo from "@/assets/hr-hub-logo.svg";
+import hrHubLogo from "@/assets/brand/mcn-logo.png";
 
 const ResetPassword = () => {
   const [password, setPassword] = useState("");

@@ -27,7 +27,7 @@ import {
   User,
   Sparkles,
 } from "lucide-react";
-import hrHubLogo from "@/assets/hr-hub-logo.svg";
+import hrHubLogo from "@/assets/brand/mcn-logo.png";
 import { APP_VERSION, isAutoUpdatingEnvironment } from "@/lib/version";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { Button } from "@/components/ui/button";

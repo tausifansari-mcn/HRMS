@@ -14,7 +14,7 @@ import {
   Cloud,
   Sparkles
 } from "lucide-react";
-import hrHubLogo from "@/assets/hr-hub-logo.svg";
+import hrHubLogo from "@/assets/brand/mcn-logo.png";
 import Footer from "@/components/layout/Footer";
 import { isProductionDomain } from "@/lib/domain";
 

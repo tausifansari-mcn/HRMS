@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Github } from "lucide-react";
-import logo from "@/assets/hr-hub-logo.svg";
+import logo from "@/assets/brand/mcn-logo.png";
 const Footer = () => {
   return <footer className="bg-background border-t py-16">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">

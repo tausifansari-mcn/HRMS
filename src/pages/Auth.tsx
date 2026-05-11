@@ -9,8 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Shield, Users, Calendar, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
-import hrHubLogo from "@/assets/hr-hub-logo.svg";
-import hrHubLogoLight from "@/assets/hr-hub-logo-light.svg";
+import hrHubLogo from "@/assets/brand/mcn-logo.png";
+import hrHubLogoLight from "@/assets/brand/mcn-logo-light.png";
 import { supabase } from "@/integrations/supabase/client";
 
 const loginSchema = z.object({

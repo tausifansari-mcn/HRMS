@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Shield, Eye, Lock, UserCheck, Database, Mail } from "lucide-react";
-import hrHubLogo from "@/assets/hr-hub-logo.svg";
+import hrHubLogo from "@/assets/brand/mcn-logo.png";
 import Footer from "@/components/layout/Footer";
 import { isProductionDomain } from "@/lib/domain";
 
