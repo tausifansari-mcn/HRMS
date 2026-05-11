@@ -48,7 +48,7 @@ const App = () => (
           <ScrollToTop />
           <Routes>
             {/* Public marketing pages */}
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<Navigate to="/auth" replace />} />
             <Route path="/features" element={<Features />} />
             <Route path="/how-it-works" element={<HowItWorks />} />
             <Route path="/pricing" element={<Pricing />} />
