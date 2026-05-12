@@ -1,4 +1,4 @@
-import { ReactNode, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
@@ -27,6 +27,7 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,7 +61,7 @@ interface DashboardLayoutProps {
   children: ReactNode;
 }
 
-const companyLogo = "/company-logo.png?v=101";
+const companyLogo = "/company-logo.png?v=200";
 
 const navGroups: NavGroup[] = [
   {
@@ -179,12 +180,19 @@ const navGroups: NavGroup[] = [
         adminOnly: true,
         description: "System settings",
       },
+      {
+        label: "Notifications",
+        href: "/notification-preferences",
+        icon: <Bell className="h-4 w-4" />,
+        description: "Notification preferences",
+      },
     ],
   },
 ];
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -211,6 +219,30 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       }))
       .filter((group) => group.items.length > 0);
   }, [isAdminOrHR]);
+
+  const searchableItems = useMemo(() => {
+    return filteredNavGroups.flatMap((group) =>
+      group.items.map((item) => ({
+        ...item,
+        groupTitle: group.title,
+      }))
+    );
+  }, [filteredNavGroups]);
+
+  const searchResults = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    if (!query) return [];
+
+    return searchableItems
+      .filter((item) => {
+        const labelMatch = item.label.toLowerCase().includes(query);
+        const groupMatch = item.groupTitle.toLowerCase().includes(query);
+        const descriptionMatch = item.description?.toLowerCase().includes(query);
+        return labelMatch || groupMatch || descriptionMatch;
+      })
+      .slice(0, 6);
+  }, [searchQuery, searchableItems]);
 
   const activeItem = useMemo(() => {
     return filteredNavGroups
@@ -255,6 +287,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     navigate("/auth");
   };
 
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (searchResults.length > 0) {
+      navigate(searchResults[0].href);
+      setSearchQuery("");
+    }
+  };
+
   const pageTitle = activeItem?.label || "Dashboard";
   const pageDescription =
     activeItem?.description || "Modern HRMS workspace for daily operations.";
@@ -262,7 +303,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const SidebarContent = () => {
     return (
       <div className="flex h-full flex-col bg-[#0f172a] text-slate-100">
-        {/* Brand */}
         <div className="relative border-b border-white/10 px-4 py-4">
           <div className="absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.24),transparent_48%)]" />
 
@@ -286,7 +326,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </div>
 
-        {/* Navigation */}
         <nav className="mcn-sidebar-scroll flex-1 overflow-y-auto px-3 py-4">
           <div className="space-y-5">
             {filteredNavGroups.map((group) => (
@@ -342,7 +381,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </nav>
 
-        {/* Sidebar user */}
         <div className="border-t border-white/10 p-3">
           <Link
             to="/profile"
@@ -445,10 +483,69 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
             </div>
 
-            <div className="hidden w-full max-w-xs items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-400 xl:flex">
-              <Search className="h-4 w-4" />
-              <span>Search HRMS...</span>
-            </div>
+            <form
+              onSubmit={handleSearchSubmit}
+              className="relative hidden w-full max-w-xs xl:block"
+            >
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+              <Input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search HRMS..."
+                autoComplete="off"
+                className="h-10 rounded-2xl border-slate-200 bg-slate-50 pl-10 pr-10 text-xs text-slate-700 shadow-none placeholder:text-slate-400 focus-visible:border-sky-300 focus-visible:bg-white focus-visible:ring-sky-100"
+              />
+
+              {searchQuery && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+
+              {searchQuery.trim() && (
+                <div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                  {searchResults.length > 0 ? (
+                    <div className="max-h-80 overflow-y-auto p-2">
+                      {searchResults.map((item) => (
+                        <Link
+                          key={`${item.groupTitle}-${item.href}-${item.label}`}
+                          to={item.href}
+                          onClick={() => setSearchQuery("")}
+                          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-slate-50"
+                        >
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                            {item.icon}
+                          </span>
+
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs font-semibold text-slate-950">
+                              {item.label}
+                            </span>
+                            <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                              {item.groupTitle}
+                              {item.description ? ` • ${item.description}` : ""}
+                            </span>
+                          </span>
+
+                          <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center text-xs text-slate-500">
+                      No matching page found.
+                    </div>
+                  )}
+                </div>
+              )}
+            </form>
 
             <div className="flex shrink-0 items-center gap-2">
               {isAdminOrHR ? (
@@ -479,12 +576,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <NotificationBell />
               ) : (
                 <Button
-                  type="button"
+                  asChild
                   variant="outline"
                   size="icon"
                   className="h-9 w-9 rounded-xl border-slate-200 bg-white text-slate-500 shadow-sm"
                 >
-                  <Bell className="h-4 w-4" />
+                  <Link to="/notification-preferences" aria-label="Notification preferences">
+                    <Bell className="h-4 w-4" />
+                  </Link>
                 </Button>
               )}
 
@@ -553,6 +652,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                       </Link>
                     </DropdownMenuItem>
                   )}
+
+                  <DropdownMenuItem asChild className="rounded-xl text-xs">
+                    <Link to="/notification-preferences">
+                      <Bell className="mr-2 h-4 w-4" />
+                      Notifications
+                    </Link>
+                  </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
 

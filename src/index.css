@@ -4,11 +4,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* =========================================================
-   Mas Callnet HRMS Clean Premium Design System
-   Phase 1 Foundation
-   Safe global styling only - no business logic impact
-   ========================================================= */
+/*
+  Mas Callnet HRMS Final Safe UI Foundation
+  Corrected version:
+  - No broad .bg-card !important override
+  - No global forced white input override
+  - No fake component styling
+  - No red/coral theme override
+  - Keeps shadcn variables compatible
+*/
 
 @layer base {
   :root {
@@ -56,46 +60,6 @@
     --chart-3: 243 75% 59%;
     --chart-4: 38 92% 50%;
     --chart-5: 215 25% 45%;
-
-    --font-sans:
-      "Inter",
-      ui-sans-serif,
-      system-ui,
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      Roboto,
-      "Helvetica Neue",
-      Arial,
-      "Noto Sans",
-      sans-serif;
-
-    --font-serif:
-      ui-serif,
-      Georgia,
-      Cambria,
-      "Times New Roman",
-      Times,
-      serif;
-
-    --font-mono:
-      ui-monospace,
-      SFMono-Regular,
-      Menlo,
-      Monaco,
-      Consolas,
-      "Liberation Mono",
-      "Courier New",
-      monospace;
-
-    --shadow-2xs: 0 1px 2px rgba(15, 23, 42, 0.04);
-    --shadow-xs: 0 1px 3px rgba(15, 23, 42, 0.05);
-    --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
-    --shadow: 0 8px 24px rgba(15, 23, 42, 0.07);
-    --shadow-md: 0 12px 32px rgba(15, 23, 42, 0.08);
-    --shadow-lg: 0 18px 45px rgba(15, 23, 42, 0.1);
-    --shadow-xl: 0 28px 70px rgba(15, 23, 42, 0.13);
-    --shadow-2xl: 0 36px 90px rgba(15, 23, 42, 0.18);
   }
 
   .dark {
@@ -126,15 +90,6 @@
     --border: 217 33% 22%;
     --input: 217 33% 22%;
     --ring: 199 89% 48%;
-
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 199 89% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 33% 17%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 20%;
-    --sidebar-ring: 199 89% 48%;
   }
 
   * {
@@ -150,10 +105,17 @@
     @apply bg-background text-foreground;
     min-height: 100vh;
     background:
-      radial-gradient(circle at top left, rgba(14, 165, 233, 0.09), transparent 34%),
-      radial-gradient(circle at top right, rgba(79, 70, 229, 0.06), transparent 30%),
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.08), transparent 34%),
+      radial-gradient(circle at top right, rgba(79, 70, 229, 0.05), transparent 30%),
       linear-gradient(135deg, #f8fafc 0%, #f3f6fb 42%, #eef3f9 100%);
-    font-family: var(--font-sans);
+    font-family:
+      "Inter",
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
     color: #0f172a;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
@@ -179,7 +141,8 @@
 }
 
 /* =========================================================
-   Global UI polish
+   Reusable HRMS helper classes
+   Use these in pages/components when needed.
    ========================================================= */
 
 @layer components {
@@ -222,46 +185,31 @@
     font-weight: 700;
     line-height: 1;
   }
+
+  .mcn-soft-panel {
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    background: #f8fafc;
+  }
+
+  .mcn-premium-panel {
+    border: 1px solid #dbe3ef;
+    border-radius: 1.25rem;
+    background:
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.08), transparent 30%),
+      #ffffff;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  }
 }
 
 /* =========================================================
-   Shadcn/base component visual refinement
+   Safe global visual polish
+   These rules are intentionally light.
+   No broad !important overrides.
    ========================================================= */
 
-.bg-card {
-  background: #ffffff !important;
-}
-
-.text-muted-foreground {
-  color: #64748b !important;
-}
-
-.rounded-lg.border.bg-card,
-.rounded-xl.border.bg-card,
-.rounded-2xl.border.bg-card,
-.bg-card,
-[data-radix-popper-content-wrapper] > * {
-  border-color: #dbe3ef !important;
-}
-
-.shadow-sm {
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04) !important;
-}
-
-.shadow-md {
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.07) !important;
-}
-
-.shadow-lg,
-.shadow-xl,
-.shadow-2xl {
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.1) !important;
-}
-
-/* Buttons */
 button,
-[role="button"],
-a[class*="button"] {
+[role="button"] {
   transition:
     transform 160ms ease,
     box-shadow 160ms ease,
@@ -275,123 +223,39 @@ button:hover,
   transform: translateY(-0.5px);
 }
 
-/* Inputs */
 input,
 textarea,
-select,
-[role="combobox"] {
-  border-radius: 0.85rem !important;
-  border-color: #dbe3ef !important;
-  background: #ffffff !important;
-  font-size: 0.85rem !important;
+select {
+  font-size: 0.85rem;
 }
 
-input:focus,
-textarea:focus,
-select:focus,
-[role="combobox"]:focus {
-  border-color: rgba(14, 165, 233, 0.65) !important;
-  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.12) !important;
-  outline: none !important;
-}
-
-/* Labels and form text */
 label {
-  font-size: 0.78rem !important;
-  font-weight: 600 !important;
-  color: #334155 !important;
-}
-
-/* Tabs */
-[role="tablist"] {
-  border-radius: 1rem !important;
-  background: #f1f5f9 !important;
-  border: 1px solid #e2e8f0 !important;
-  padding: 0.25rem !important;
-}
-
-[role="tab"] {
-  border-radius: 0.8rem !important;
-  font-size: 0.78rem !important;
-  font-weight: 650 !important;
-}
-
-[role="tab"][data-state="active"] {
-  background: #ffffff !important;
-  color: #0f172a !important;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06) !important;
-}
-
-/* Dropdowns, dialogs, popovers */
-[role="dialog"],
-[role="menu"],
-[data-radix-popper-content-wrapper] > * {
-  border-radius: 1rem !important;
-  border-color: #dbe3ef !important;
-  background: #ffffff !important;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.16) !important;
-}
-
-/* Badges */
-.inline-flex.items-center.rounded-full,
-[class*="Badge"] {
-  border-radius: 999px !important;
-  font-size: 0.72rem !important;
-  font-weight: 700 !important;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #334155;
 }
 
 /* =========================================================
    Tables
+   Keep table styling safe.
+   Do not force spacing globally.
    ========================================================= */
 
 table {
   width: 100%;
   font-size: 0.8125rem;
-  border-collapse: separate !important;
-  border-spacing: 0 0.45rem !important;
-}
-
-thead tr {
-  background: transparent !important;
 }
 
 thead th {
-  border-bottom: none !important;
-  color: #64748b !important;
-  font-size: 0.7rem !important;
-  font-weight: 800 !important;
-  letter-spacing: 0.08em;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-tbody tr {
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.035);
-  transition:
-    transform 140ms ease,
-    box-shadow 140ms ease,
-    background-color 140ms ease;
-}
-
-tbody tr:hover {
-  background: #ffffff;
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.07);
-  transform: translateY(-1px);
-}
-
 tbody td {
-  border-bottom: none !important;
   color: #475569;
-}
-
-tbody td:first-child {
-  border-bottom-left-radius: 0.9rem;
-  border-top-left-radius: 0.9rem;
-}
-
-tbody td:last-child {
-  border-bottom-right-radius: 0.9rem;
-  border-top-right-radius: 0.9rem;
 }
 
 /* =========================================================
@@ -434,7 +298,7 @@ tbody td:last-child {
 }
 
 /* =========================================================
-   Mobile polish
+   Mobile
    ========================================================= */
 
 @media (max-width: 768px) {
@@ -444,15 +308,6 @@ tbody td:last-child {
 
   body {
     background: #f3f6fb;
-  }
-
-  table {
-    border-spacing: 0 0.35rem !important;
-  }
-
-  tbody td:first-child,
-  tbody td:last-child {
-    border-radius: 0;
   }
 }
 
