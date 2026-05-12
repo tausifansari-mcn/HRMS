@@ -1,6 +1,21 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { z } from "zod";
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Loader2,
+  LockKeyhole,
+  Mail,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
+
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,21 +27,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import {
-  ArrowRight,
-  Eye,
-  EyeOff,
-  Loader2,
-  LockKeyhole,
-  Mail,
-  ShieldCheck,
-  UserRound,
-} from "lucide-react";
-import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
 
-const companyLogo = "/company-logo.png?v=999";
+const companyLogo = "/mcn-logo.png?v=999";
 
 const loginSchema = z.object({
   email: z.string().trim().email("Please enter a valid email address"),
@@ -51,7 +53,6 @@ const signupSchema = z
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [logoError, setLogoError] = useState(false);
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -111,7 +112,9 @@ const Auth = () => {
     }
 
     setIsLoading(true);
+
     const { error } = await signIn(loginEmail, loginPassword);
+
     setIsLoading(false);
 
     if (error) {
@@ -154,6 +157,7 @@ const Auth = () => {
         title: "Reset Link Sent",
         description: "Please check your email for the password reset link.",
       });
+
       setShowForgotPassword(false);
     }
   };
@@ -206,10 +210,12 @@ const Auth = () => {
 
           if (!isAllowed) {
             setIsLoading(false);
+
             showAlert(
               "Registration Restricted",
               "Only approved company email domains are allowed. Please contact your administrator."
             );
+
             return;
           }
         }
@@ -248,21 +254,13 @@ const Auth = () => {
         <div className="relative w-full max-w-md">
           <Card className="overflow-hidden rounded-[2rem] border border-white bg-white/95 shadow-2xl shadow-slate-200/80 backdrop-blur">
             <CardHeader className="space-y-5 px-7 pb-4 pt-8 text-center">
-              {/* Polished company logo plate */}
-              <div className="mx-auto w-full max-w-[315px] rounded-[26px] border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-200/80">
-                <div className="flex h-[108px] items-center justify-center rounded-[22px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 px-5 py-4 shadow-xl">
-                  {logoError ? (
-                    <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-950 text-2xl font-bold tracking-wide text-white">
-                      MCN
-                    </div>
-                  ) : (
-                    <img
-                      src={companyLogo}
-                      alt="Mas Callnet Logo"
-                      className="block h-20 w-full max-w-[255px] object-contain drop-shadow-md"
-                      onError={() => setLogoError(true)}
-                    />
-                  )}
+              <div className="mx-auto w-full max-w-[315px] rounded-2xl border border-white/10 bg-white/[0.04] p-3 shadow-xl shadow-slate-950/10">
+                <div className="flex h-[82px] items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 px-4 py-3 shadow-lg">
+                  <img
+                    src={companyLogo}
+                    alt="Mas Callnet Logo"
+                    className="block h-16 w-full max-w-[215px] object-contain drop-shadow-md"
+                  />
                 </div>
               </div>
 
@@ -270,6 +268,7 @@ const Auth = () => {
                 <CardTitle className="text-2xl font-semibold tracking-tight text-slate-950">
                   Welcome Back
                 </CardTitle>
+
                 <CardDescription className="mt-2 text-sm text-slate-500">
                   Sign in to continue to your HRMS portal
                 </CardDescription>
@@ -419,6 +418,7 @@ const Auth = () => {
                           <p className="text-sm font-semibold text-slate-950">
                             Reset Password
                           </p>
+
                           <p className="mt-1 text-xs text-slate-500">
                             Enter your registered email address.
                           </p>
