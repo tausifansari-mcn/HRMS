@@ -29,6 +29,7 @@ import ReviewsManagement from "./pages/ReviewsManagement";
 
 import Attendance from "./pages/Attendance";
 import AttendanceRegularization from "./pages/AttendanceRegularization";
+import BulkUploadHub from "./pages/BulkUploadHub";
 import Departments from "./pages/Departments";
 import CompanyCalendar from "./pages/CompanyCalendar";
 import NotificationPreferences from "./pages/NotificationPreferences";
@@ -185,6 +186,15 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AttendanceRegularization />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/bulk-upload"
+              element={
+                <ProtectedRoute>
+                  <BulkUploadHub />
                 </ProtectedRoute>
               }
             />

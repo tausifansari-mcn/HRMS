@@ -161,6 +161,13 @@ const navGroups: NavGroup[] = [
         description: "Performance reviews",
       },
       {
+        label: "Bulk Upload Hub",
+        href: "/bulk-upload",
+        icon: <Package className="h-4 w-4" />,
+        adminOnly: true,
+        description: "Bulk upload templates and staging",
+      },
+      {
         label: "Assets",
         href: "/assets",
         icon: <Package className="h-4 w-4" />,
