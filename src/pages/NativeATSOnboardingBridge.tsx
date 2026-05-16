@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -12,8 +12,24 @@ type Row = {
   email: string;
   branch_name: string;
   role_applied: string;
+  recruiter_name?: string;
   status: string;
   created_at: string;
+  latest_decision?: string;
+  latest_stage?: string;
+  latest_process?: string;
+  offer_doj?: string;
+  offer_salary?: string;
+  employee_id?: string;
+  employee_code?: string;
+};
+
+const badgeTone = (value: string) => {
+  const v = (value || "").toLowerCase();
+  if (v.includes("selected")) return "bg-emerald-50 text-emerald-700 border-emerald-200";
+  if (v.includes("reject") || v.includes("no show")) return "bg-rose-50 text-rose-700 border-rose-200";
+  if (v.includes("hold") || v.includes("pending")) return "bg-amber-50 text-amber-700 border-amber-200";
+  return "bg-slate-100 text-slate-700 border-slate-200";
 };
 
 export default function NativeATSOnboardingBridge() {
@@ -21,18 +37,60 @@ export default function NativeATSOnboardingBridge() {
   const [loading, setLoading] = useState(false);
   const [converting, setConverting] = useState("");
   const [message, setMessage] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
 
   const load = async () => {
     setLoading(true);
     setMessage("");
     try {
-      const { data, error } = await db
+      const { data: candidates, error } = await db
         .from("ats_candidate")
-        .select("id,candidate_code,full_name,mobile,email,branch_name,role_applied,status,created_at")
+        .select("id,candidate_code,full_name,mobile,email,branch_name,role_applied,recruiter_name,status,created_at")
         .order("created_at", { ascending: false })
-        .limit(300);
+        .limit(500);
       if (error) throw error;
-      setRows(data || []);
+
+      const ids = (candidates || []).map((r: Row) => r.id).filter(Boolean);
+      const codes = (candidates || []).map((r: Row) => r.candidate_code).filter(Boolean);
+
+      const [{ data: submissions }, { data: lifecycles }] = await Promise.all([
+        codes.length
+          ? db
+              .from("ats_recruiter_submission")
+              .select("candidate_code,final_decision,walkin_end_stage,interviewed_for_process,offer_salary,offer_doj,submitted_at")
+              .in("candidate_code", codes)
+          : Promise.resolve({ data: [] }),
+        ids.length
+          ? db.from("ats_candidate_lifecycle").select("candidate_id,employee_id,metadata,lifecycle_stage").in("candidate_id", ids)
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      const latestByCode = new Map<string, any>();
+      (submissions || []).forEach((s: any) => {
+        const old = latestByCode.get(s.candidate_code || "");
+        if (!old || new Date(s.submitted_at || 0).getTime() > new Date(old.submitted_at || 0).getTime()) latestByCode.set(s.candidate_code || "", s);
+      });
+
+      const lifecycleById = new Map<string, any>();
+      (lifecycles || []).forEach((l: any) => lifecycleById.set(l.candidate_id || "", l));
+
+      setRows(
+        (candidates || []).map((r: Row) => {
+          const latest = latestByCode.get(r.candidate_code || "") || {};
+          const lifecycle = lifecycleById.get(r.id) || {};
+          return {
+            ...r,
+            latest_decision: latest.final_decision || r.status || "Waiting",
+            latest_stage: latest.walkin_end_stage || "Arrival",
+            latest_process: latest.interviewed_for_process || "-",
+            offer_salary: latest.offer_salary || "",
+            offer_doj: latest.offer_doj || "",
+            employee_id: lifecycle.employee_id || "",
+            employee_code: lifecycle.metadata?.employee_code || "",
+          };
+        })
+      );
     } catch (err: any) {
       setMessage(err.message || "Unable to load candidates");
     } finally {
@@ -63,6 +121,19 @@ export default function NativeATSOnboardingBridge() {
     void load();
   }, []);
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((r) => {
+      const decision = r.latest_decision || r.status || "Waiting";
+      const text = [r.candidate_code, r.full_name, r.mobile, r.email, r.branch_name, r.role_applied, r.recruiter_name, decision].join(" ").toLowerCase();
+      return (!q || text.includes(q)) && (statusFilter === "All" || decision === statusFilter);
+    });
+  }, [rows, search, statusFilter]);
+
+  const statusOptions = useMemo(() => ["All", ...Array.from(new Set(rows.map((r) => r.latest_decision || r.status || "Waiting")))], [rows]);
+  const selectedCount = rows.filter((r) => r.latest_decision === "Selected").length;
+  const convertedCount = rows.filter((r) => !!r.employee_id).length;
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -70,63 +141,55 @@ export default function NativeATSOnboardingBridge() {
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-600">Native ATS</p>
             <h1 className="mt-2 text-3xl font-black text-slate-950">ATS Candidate Journey + HRMS Onboarding Bridge</h1>
-            <p className="mt-2 text-slate-600">Convert selected ATS candidates into HRMS onboarding employee records. Candidate journey remains linked through lifecycle logs.</p>
+            <p className="mt-2 text-slate-600">Convert selected ATS candidates into HRMS onboarding employees. Decision comes from latest recruiter submission.</p>
           </div>
           <button onClick={load} className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white">Refresh</button>
         </div>
 
         {message && <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-800">{message}</div>}
 
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-3xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Total Candidates</p><p className="mt-2 text-3xl font-black">{rows.length}</p></div>
+          <div className="rounded-3xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Selected</p><p className="mt-2 text-3xl font-black text-emerald-700">{selectedCount}</p></div>
+          <div className="rounded-3xl border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Onboarding Created</p><p className="mt-2 text-3xl font-black text-violet-700">{convertedCount}</p></div>
+        </div>
+
+        <div className="rounded-3xl border bg-white p-4 shadow-sm">
+          <div className="grid gap-3 md:grid-cols-[1fr_240px]">
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search candidate, mobile, recruiter, branch..." className="rounded-2xl border bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400" />
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-2xl border bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-400">
+              {statusOptions.map((s) => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+
         <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
           <div className="border-b p-5">
             <h2 className="font-bold text-slate-950">Candidates</h2>
-            <p className="text-sm text-slate-500">Only candidates with recruiter decision Selected can be moved to onboarding. Other candidates remain tracked here.</p>
+            <p className="text-sm text-slate-500">Selected candidates become HRMS onboarding employees from here.</p>
           </div>
 
-          {loading ? (
-            <div className="p-8 text-center text-slate-500">Loading...</div>
-          ) : (
+          {loading ? <div className="p-8 text-center text-slate-500">Loading...</div> : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[960px] text-sm">
+              <table className="w-full min-w-[1120px] text-sm">
                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th className="p-4">Candidate</th>
-                    <th className="p-4">Contact</th>
-                    <th className="p-4">Branch / Role</th>
-                    <th className="p-4">Current Status</th>
-                    <th className="p-4">Action</th>
-                  </tr>
+                  <tr><th className="p-4">Candidate</th><th className="p-4">Contact</th><th className="p-4">Branch / Role</th><th className="p-4">Recruiter</th><th className="p-4">Decision / Stage</th><th className="p-4">Offer</th><th className="p-4">Lifecycle</th><th className="p-4">Action</th></tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => {
-                    const canConvert = r.status === "Selected" || r.status === "Selected - Pending Onboarding";
-                    const converted = r.status === "Selected - Onboarding";
+                  {filtered.map((r) => {
+                    const decision = r.latest_decision || r.status || "Waiting";
+                    const converted = !!r.employee_id || r.status === "Selected - Onboarding";
+                    const canConvert = decision === "Selected" && !converted;
                     return (
                       <tr key={r.id} className="border-t">
-                        <td className="p-4">
-                          <div className="font-bold text-slate-900">{r.full_name || "-"}</div>
-                          <div className="text-xs text-slate-500">{r.candidate_code || "-"}</div>
-                        </td>
-                        <td className="p-4 text-slate-600">
-                          <div>{r.mobile || "-"}</div>
-                          <div className="text-xs">{r.email || "-"}</div>
-                        </td>
-                        <td className="p-4 text-slate-600">
-                          <div>{r.branch_name || "-"}</div>
-                          <div className="text-xs">{r.role_applied || "-"}</div>
-                        </td>
-                        <td className="p-4">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{r.status || "Waiting"}</span>
-                        </td>
-                        <td className="p-4">
-                          <button
-                            disabled={!canConvert || converted || converting === r.id}
-                            onClick={() => convert(r.id)}
-                            className="rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white disabled:bg-slate-300"
-                          >
-                            {converting === r.id ? "Converting..." : converted ? "Onboarding Created" : "Move to HRMS Onboarding"}
-                          </button>
-                        </td>
+                        <td className="p-4"><div className="font-bold text-slate-900">{r.full_name || "-"}</div><div className="text-xs text-slate-500">{r.candidate_code || "-"}</div></td>
+                        <td className="p-4 text-slate-600"><div>{r.mobile || "-"}</div><div className="text-xs">{r.email || "-"}</div></td>
+                        <td className="p-4 text-slate-600"><div>{r.branch_name || "-"}</div><div className="text-xs">{r.role_applied || "-"}</div></td>
+                        <td className="p-4 text-slate-600">{r.recruiter_name || "-"}</td>
+                        <td className="p-4"><span className={`rounded-full border px-3 py-1 text-xs font-bold ${badgeTone(decision)}`}>{decision}</span><div className="mt-2 text-xs text-slate-500">{r.latest_stage} • {r.latest_process}</div></td>
+                        <td className="p-4 text-slate-600"><div>{r.offer_salary || "-"}</div><div className="text-xs">DOJ: {r.offer_doj || "-"}</div></td>
+                        <td className="p-4">{converted ? <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">HRMS Onboarding {r.employee_code || ""}</span> : <span className="rounded-full border bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">Candidate Journey</span>}</td>
+                        <td className="p-4"><button disabled={!canConvert || converting === r.id} onClick={() => convert(r.id)} className="rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white disabled:bg-slate-300">{converting === r.id ? "Converting..." : converted ? "Created" : "Move to HRMS"}</button></td>
                       </tr>
                     );
                   })}
