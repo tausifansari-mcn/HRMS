@@ -220,8 +220,8 @@ VALUES
   'Employee Master Upload',
   'employees',
   'Bulk create employee master records. Department and Manager are matched from existing HRMS masters. User login invite can be handled separately after import.',
-  ARRAY['EmployeeCode','FirstName','LastName','Email','Designation','HireDate'],
-  ARRAY['Phone','Department','ManagerCode','ManagerEmail','DateOfBirth','Gender','Address','City','Country','EmploymentType','Status','WorkingHoursStart','WorkingHoursEnd','WorkingDays'],
+  to_jsonb(ARRAY['EmployeeCode','FirstName','LastName','Email','Designation','HireDate']::text[]),
+  to_jsonb(ARRAY['Phone','Department','ManagerCode','ManagerEmail','DateOfBirth','Gender','Address','City','Country','EmploymentType','Status','WorkingHoursStart','WorkingHoursEnd','WorkingDays']::text[]),
   '{"EmployeeCode":"MCN001","FirstName":"Amit","LastName":"Kumar","Email":"amit.kumar@example.com","Designation":"Executive","HireDate":"2026-05-16","Phone":"9876543210","Department":"Operations","ManagerCode":"MCN010","EmploymentType":"full-time","Status":"active","WorkingHoursStart":"09:00","WorkingHoursEnd":"18:00","WorkingDays":"1,2,3,4,5"}'::jsonb,
   '{"email":"must be unique","employee_code":"must be unique","date_format":"YYYY-MM-DD","status_values":["active","inactive","onboarding","offboarded"]}'::jsonb,
   true
@@ -231,8 +231,8 @@ VALUES
   'Department Master Upload',
   'departments',
   'Template prepared for future department bulk import. Current frontend stages and tracks this upload type; employee import is production-enabled first.',
-  ARRAY['DepartmentName'],
-  ARRAY['Description','ManagerCode'],
+  to_jsonb(ARRAY['DepartmentName']::text[]),
+  to_jsonb(ARRAY['Description','ManagerCode']::text[]),
   '{"DepartmentName":"Operations","Description":"Operations department","ManagerCode":"MCN010"}'::jsonb,
   '{}'::jsonb,
   true
@@ -242,8 +242,8 @@ VALUES
   'Asset Master Upload',
   'assets',
   'Template prepared for future asset bulk import. Current frontend stages and tracks this upload type; employee import is production-enabled first.',
-  ARRAY['AssetCode','Name','Category'],
-  ARRAY['SerialNumber','Vendor','PurchaseDate','PurchaseCost','WarrantyEndDate','Status','Notes'],
+  to_jsonb(ARRAY['AssetCode','Name','Category']::text[]),
+  to_jsonb(ARRAY['SerialNumber','Vendor','PurchaseDate','PurchaseCost','WarrantyEndDate','Status','Notes']::text[]),
   '{"AssetCode":"LAP001","Name":"Dell Laptop","Category":"Laptop","SerialNumber":"ABC123","Status":"available"}'::jsonb,
   '{}'::jsonb,
   true
