@@ -1,5 +1,5 @@
-import NativeATSOnboardingBridge from "./NativeATSOnboardingBridge";
+import NativeATSDashboardV2 from "./NativeATSDashboardV2";
 
 export default function NativeATSDashboard() {
-  return <NativeATSOnboardingBridge />;
+  return <NativeATSDashboardV2 />;
 }
