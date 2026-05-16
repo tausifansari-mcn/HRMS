@@ -1,5 +1,7 @@
-import NativeATSDashboardV2 from "./NativeATSDashboardV2";
+import NativeATSDashboardReplica from "./NativeATSDashboardReplica";
 
-export default function NativeATSDashboard() {
-  return <NativeATSDashboardV2 />;
-}
+const NativeATSDashboard = () => {
+  return <NativeATSDashboardReplica />;
+};
+
+export default NativeATSDashboard;
