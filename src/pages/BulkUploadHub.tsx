@@ -286,12 +286,12 @@ function getFallbackSampleValue(
     lastname: "Kumar",
     email: "amit.test001@example.com",
     designation: "Executive",
-    hiredate: "2026-05-16",
+    hiredate: "16-05-2026",
     phone: "9876543210",
     department: "Operations",
     managercode: "",
     manageremail: "",
-    dateofbirth: "1995-01-01",
+    dateofbirth: "01-01-1995",
     gender: "Male",
     address: "Demo Address",
     city: "Delhi",
@@ -307,7 +307,7 @@ function getFallbackSampleValue(
     return employeeSamples[normalizedHeader];
   }
 
-  if (normalizedHeader.includes("date")) return "2026-05-16";
+  if (normalizedHeader.includes("date")) return "16-05-2026";
   if (normalizedHeader.includes("email")) return "sample@example.com";
   if (normalizedHeader.includes("phone") || normalizedHeader.includes("mobile")) return "9876543210";
   if (normalizedHeader.includes("status")) return "active";
@@ -375,7 +375,7 @@ function buildTemplateGuide(template: UploadTemplate) {
     "Important rules:",
     "1. Do not rename headers.",
     "2. Do not delete optional columns. Keep blank commas if you do not have a value.",
-    "3. Date fields must use YYYY-MM-DD format, for example 2026-05-16.",
+    "3. Date fields must use DD-MM-YYYY format, for example 16-05-2026.",
     "4. Time fields must use HH:mm format, for example 09:00.",
     "5. Values containing commas must stay inside double quotes, for example \"1,2,3,4,5\".",
     "6. For manager fields, keep ManagerCode and ManagerEmail blank unless the manager already exists in HRMS.",
@@ -586,8 +586,8 @@ export default function BulkUploadHub() {
 
       ["HireDate", "DateOfBirth", "AttendanceDate", "RosterDate", "EffectiveDate", "PayrollMonth"].forEach((column) => {
         const value = String(row[column] || "").trim();
-        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-          errors.push(`${column} must be YYYY-MM-DD`);
+        if (value && !/^\d{2}-\d{2}-\d{4}$/.test(value)) {
+          errors.push(`${column} must be DD-MM-YYYY`);
         }
       });
 
@@ -919,7 +919,7 @@ export default function BulkUploadHub() {
                     <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
                       <p className="font-semibold">Safe upload rule</p>
                       <p className="mt-1">
-                        Always use the downloaded CSV. Do not delete optional columns; keep them blank if not needed. Date format must be YYYY-MM-DD and comma values like WorkingDays must stay inside quotes.
+                        Always use the downloaded CSV. Do not delete optional columns; keep them blank if not needed. Date format must be DD-MM-YYYY and comma values like WorkingDays must stay inside quotes.
                       </p>
                     </div>
                   </div>
