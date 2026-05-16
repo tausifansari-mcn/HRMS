@@ -59,6 +59,17 @@ type CsvRow = Record<string, string>;
 const db = supabase as any;
 const BULK_UPLOAD_BUCKET = "hrms-bulk-uploads";
 
+const IMPORT_RPC_BY_TYPE: Record<string, string> = {
+  EMPLOYEE_MASTER: "import_upload_batch",
+  PROCESS_MASTER: "import_process_upload_batch",
+  DEPARTMENT_MASTER: "import_department_upload_batch",
+  ASSET_MASTER: "import_asset_upload_batch",
+};
+
+function getImportRpc(uploadTypeCode: string) {
+  return IMPORT_RPC_BY_TYPE[String(uploadTypeCode || "").toUpperCase()] || "";
+}
+
 const statusClass: Record<string, string> = {
   uploaded: "bg-slate-100 text-slate-700 border-slate-200",
   validating: "bg-sky-50 text-sky-700 border-sky-200",
@@ -462,6 +473,7 @@ export default function BulkUploadHub() {
   const [csvHealth, setCsvHealth] = useState<CsvHealth | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [activeImportBatchId, setActiveImportBatchId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -796,49 +808,58 @@ export default function BulkUploadHub() {
   async function importBatchToTarget(batch: UploadBatch) {
     setMessage(null);
     setErrorMessage(null);
+
+    const rpcName = getImportRpc(batch.upload_type_code);
+    if (!rpcName) {
+      const msg = `Import mapping for ${batch.upload_type_code} is not enabled yet.`;
+      setErrorMessage(msg);
+      window.alert(msg);
+      return;
+    }
+
+    if (Number(batch.valid_rows || 0) <= Number(batch.imported_rows || 0)) {
+      const msg = "There are no pending valid rows to import for this batch.";
+      setErrorMessage(msg);
+      window.alert(msg);
+      return;
+    }
+
     setIsProcessing(true);
+    setActiveImportBatchId(batch.id);
+    setMessage(`Import started for ${batch.upload_batch_no}. Please wait...`);
 
     try {
-      const supportedImportTypes = ["EMPLOYEE_MASTER", "PROCESS_MASTER", "DEPARTMENT_MASTER", "ASSET_MASTER"];
-      if (!supportedImportTypes.includes(batch.upload_type_code)) {
-        throw new Error(
-          `Import mapping for ${batch.upload_type_code} is not enabled yet. This upload can be staged and validated, but Employee Master, Process Master, Department Master, and Asset Master imports are production-enabled now.`
-        );
-      }
-
-      const rpcName = batch.upload_type_code === "PROCESS_MASTER"
-        ? "import_process_upload_batch"
-        : batch.upload_type_code === "DEPARTMENT_MASTER"
-          ? "import_department_upload_batch"
-          : batch.upload_type_code === "ASSET_MASTER"
-            ? "import_asset_upload_batch"
-            : "import_upload_batch";
-
       const { data, error } = await db.rpc(rpcName, {
         p_batch_id: batch.id,
       });
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        throw new Error(error.message || "Import RPC failed.");
+      }
 
       const result = data || {};
       if (result.ok === false) {
         throw new Error(result.message || "Import action failed.");
       }
 
-      setMessage(
-        `Import completed. Imported ${result.importedRows || 0} row(s). ${
-          result.errorRows ? `${result.errorRows} row(s) failed and are visible in View Rows.` : ""
-        }`
-      );
+      const importedRows = Number(result.importedRows || result.imported_rows || 0);
+      const errorRows = Number(result.errorRows || result.error_rows || 0);
+      const successMsg = `Import completed for ${batch.upload_batch_no}. Imported ${importedRows} row(s).${
+        errorRows ? ` ${errorRows} row(s) failed and are visible in View Rows.` : ""
+      }`;
+
+      setMessage(successMsg);
+      window.alert(successMsg);
 
       await loadData();
       await loadBatchRows(batch);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Import action failed."
-      );
+      const msg = error instanceof Error ? error.message : "Import action failed.";
+      setErrorMessage(msg);
+      window.alert(`Import failed: ${msg}`);
     } finally {
       setIsProcessing(false);
+      setActiveImportBatchId(null);
     }
   }
 
@@ -857,7 +878,7 @@ export default function BulkUploadHub() {
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
                   Manage upload templates, upload CSV/Excel files, stage rows,
-                  validate required columns, and import validated Employee Master, Process Master, and Department Master rows directly into HRMS.
+                  validate required columns, and import validated Employee Master, Process Master, Department Master, and Asset Master rows directly into HRMS.
                 </p>
               </div>
 
@@ -1194,10 +1215,10 @@ export default function BulkUploadHub() {
                               {batch.valid_rows > batch.imported_rows && (
                                 <button
                                   onClick={() => importBatchToTarget(batch)}
-                                  disabled={isProcessing}
-                                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                                  disabled={isProcessing || activeImportBatchId === batch.id}
+                                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                  Import to HRMS
+                                  {activeImportBatchId === batch.id ? "Importing..." : "Import to HRMS"}
                                 </button>
                               )}
                             </div>
