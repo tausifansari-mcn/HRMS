@@ -177,6 +177,223 @@ function formatDateTime(value?: string | null) {
   }).format(new Date(value));
 }
 
+
+type CsvParseResult = {
+  headers: string[];
+  rows: CsvRow[];
+  rowWidthWarnings: string[];
+};
+
+type CsvHealth = {
+  headers: string[];
+  expectedHeaders: string[];
+  missingHeaders: string[];
+  unknownHeaders: string[];
+  wrongOrder: boolean;
+  rowCount: number;
+  rowWidthWarnings: string[];
+};
+
+function getTemplateHeaders(template: UploadTemplate) {
+  const seen = new Set<string>();
+  const headers: string[] = [];
+
+  [...(template.required_columns || []), ...(template.optional_columns || [])]
+    .map((column) => String(column || "").trim())
+    .filter(Boolean)
+    .forEach((column) => {
+      if (!seen.has(column)) {
+        seen.add(column);
+        headers.push(column);
+      }
+    });
+
+  return headers;
+}
+
+function parseCsvDetailed(text: string): CsvParseResult {
+  const lines = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter((line) => line.trim().length > 0);
+
+  if (lines.length < 1) return { headers: [], rows: [], rowWidthWarnings: [] };
+
+  const headers = splitCsvLine(lines[0]).map(normalizeHeader);
+  const rowWidthWarnings: string[] = [];
+
+  const rows = lines.slice(1).map((line, index) => {
+    const values = splitCsvLine(line);
+    const row: CsvRow = {};
+
+    if (values.length !== headers.length) {
+      rowWidthWarnings.push(
+        `Row ${index + 1}: expected ${headers.length} column(s), found ${values.length}. Keep blank commas for optional columns and wrap comma values in quotes.`
+      );
+    }
+
+    headers.forEach((header, headerIndex) => {
+      row[header] = values[headerIndex]?.trim() || "";
+    });
+
+    return row;
+  });
+
+  return { headers, rows, rowWidthWarnings };
+}
+
+function buildCsvHealth(
+  template: UploadTemplate,
+  parsed: CsvParseResult
+): CsvHealth {
+  const expectedHeaders = getTemplateHeaders(template);
+  const uploadedHeaderSet = new Set(parsed.headers);
+  const expectedHeaderSet = new Set(expectedHeaders);
+
+  const missingHeaders = expectedHeaders.filter(
+    (header) => !uploadedHeaderSet.has(header)
+  );
+  const unknownHeaders = parsed.headers.filter(
+    (header) => header && !expectedHeaderSet.has(header)
+  );
+  const wrongOrder =
+    expectedHeaders.length === parsed.headers.length &&
+    expectedHeaders.some((header, index) => header !== parsed.headers[index]);
+
+  return {
+    headers: parsed.headers,
+    expectedHeaders,
+    missingHeaders,
+    unknownHeaders,
+    wrongOrder,
+    rowCount: parsed.rows.length,
+    rowWidthWarnings: parsed.rowWidthWarnings,
+  };
+}
+
+function getFallbackSampleValue(
+  uploadTypeCode: string,
+  header: string,
+  required: boolean
+) {
+  const normalizedUploadType = uploadTypeCode.toUpperCase();
+  const normalizedHeader = header.toLowerCase();
+
+  const employeeSamples: Record<string, string> = {
+    employeecode: "TEST001",
+    firstname: "Amit",
+    lastname: "Kumar",
+    email: "amit.test001@example.com",
+    designation: "Executive",
+    hiredate: "2026-05-16",
+    phone: "9876543210",
+    department: "Operations",
+    managercode: "",
+    manageremail: "",
+    dateofbirth: "1995-01-01",
+    gender: "Male",
+    address: "Demo Address",
+    city: "Delhi",
+    country: "India",
+    employmenttype: "full-time",
+    status: "active",
+    workinghoursstart: "09:00",
+    workinghoursend: "18:00",
+    workingdays: "1,2,3,4,5",
+  };
+
+  if (normalizedUploadType === "EMPLOYEE_MASTER" && normalizedHeader in employeeSamples) {
+    return employeeSamples[normalizedHeader];
+  }
+
+  if (normalizedHeader.includes("date")) return "2026-05-16";
+  if (normalizedHeader.includes("email")) return "sample@example.com";
+  if (normalizedHeader.includes("phone") || normalizedHeader.includes("mobile")) return "9876543210";
+  if (normalizedHeader.includes("status")) return "active";
+  if (normalizedHeader.includes("name")) return "Sample Name";
+  if (normalizedHeader.includes("code")) return "SAMPLE001";
+  if (normalizedHeader.includes("time") || normalizedHeader.includes("start")) return "09:00";
+  if (normalizedHeader.includes("end")) return "18:00";
+  if (normalizedHeader.includes("days")) return "1,2,3,4,5";
+  if (normalizedHeader.includes("amount") || normalizedHeader.includes("salary")) return "10000";
+  if (normalizedHeader.includes("count") || normalizedHeader.includes("qty")) return "1";
+
+  return required ? "Sample" : "";
+}
+
+function buildTemplateRow(template: UploadTemplate, includeSampleValues: boolean) {
+  const sample = template.sample_row || {};
+  const required = new Set(template.required_columns || []);
+  const isEmployeeMaster = String(template.upload_type_code || "").toUpperCase() === "EMPLOYEE_MASTER";
+
+  return getTemplateHeaders(template).map((header) => {
+    if (!includeSampleValues) return "";
+
+    // Employee Master must always use frontend-safe sample values first.
+    // This prevents database sample values like ManagerCode = MCN010 from causing
+    // "ManagerCode not found" errors when the sample is uploaded directly.
+    if (isEmployeeMaster) {
+      return getFallbackSampleValue(
+        template.upload_type_code,
+        header,
+        required.has(header)
+      );
+    }
+
+    const dbSampleValue = sample[header];
+    const dbSampleText = String(dbSampleValue ?? "").trim();
+    if (dbSampleText) return dbSampleText;
+
+    return getFallbackSampleValue(
+      template.upload_type_code,
+      header,
+      required.has(header)
+    );
+  });
+}
+
+function buildTemplateCsv(template: UploadTemplate, includeSampleValues: boolean) {
+  const headers = getTemplateHeaders(template);
+  const row = buildTemplateRow(template, includeSampleValues);
+
+  return [
+    headers.map(toCsvValue).join(","),
+    row.map(toCsvValue).join(","),
+  ].join("\n");
+}
+
+function buildTemplateGuide(template: UploadTemplate) {
+  const headers = getTemplateHeaders(template);
+  const required = new Set(template.required_columns || []);
+
+  return [
+    `Bulk Upload Template Guide - ${template.upload_type_name}`,
+    `Upload Type Code: ${template.upload_type_code}`,
+    `Target Table: ${template.target_table || "-"}`,
+    "",
+    "Important rules:",
+    "1. Do not rename headers.",
+    "2. Do not delete optional columns. Keep blank commas if you do not have a value.",
+    "3. Date fields must use YYYY-MM-DD format, for example 2026-05-16.",
+    "4. Time fields must use HH:mm format, for example 09:00.",
+    "5. Values containing commas must stay inside double quotes, for example \"1,2,3,4,5\".",
+    "6. For manager fields, keep ManagerCode and ManagerEmail blank unless the manager already exists in HRMS.",
+    "",
+    "Column order:",
+    ...headers.map((header, index) => `${index + 1}. ${header}${required.has(header) ? "  [Required]" : "  [Optional]"}`),
+  ].join("\n");
+}
+
+function csvHealthHasBlockingError(health: CsvHealth | null) {
+  if (!health) return false;
+  return (
+    health.missingHeaders.length > 0 ||
+    health.unknownHeaders.length > 0 ||
+    health.rowWidthWarnings.length > 0
+  );
+}
+
 export default function BulkUploadHub() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -190,6 +407,7 @@ export default function BulkUploadHub() {
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewRows, setPreviewRows] = useState<CsvRow[]>([]);
+  const [csvHealth, setCsvHealth] = useState<CsvHealth | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -281,6 +499,7 @@ export default function BulkUploadHub() {
   async function handleFileChange(file: File | null) {
     setSelectedFile(file);
     setPreviewRows([]);
+    setCsvHealth(null);
     setMessage(null);
     setErrorMessage(null);
 
@@ -288,31 +507,56 @@ export default function BulkUploadHub() {
 
     if (file.name.toLowerCase().endsWith(".csv")) {
       const text = await file.text();
-      const rows = parseCsv(text);
-      setPreviewRows(rows.slice(0, 10));
+      const parsed = parseCsvDetailed(text);
+      setPreviewRows(parsed.rows.slice(0, 10));
+
+      if (selectedTemplate) {
+        const health = buildCsvHealth(selectedTemplate, parsed);
+        setCsvHealth(health);
+
+        if (csvHealthHasBlockingError(health)) {
+          setErrorMessage(
+            "CSV structure issue found. Download the safe template for this upload type and keep every column in the same order."
+          );
+        } else if (health.wrongOrder) {
+          setMessage(
+            "CSV headers are valid, but column order is different from the recommended template. Import can continue, but using the downloaded template is safer."
+          );
+        }
+      }
       return;
     }
 
     setMessage(
-      "Excel file selected. File can be uploaded and tracked. Row preview is available for CSV files only in this handover build."
+      "Excel file selected. File can be uploaded and tracked. Row preview is available for CSV files only in this handover build. For safest import, download and use the CSV template."
     );
   }
 
   function downloadTemplate(template: UploadTemplate) {
-    const requiredColumns = template.required_columns || [];
-    const optionalColumns = template.optional_columns || [];
-    const headers = [...requiredColumns, ...optionalColumns];
-    const sample = template.sample_row || {};
-
-    const csv = [
-      headers.join(","),
-      headers.map((header) => toCsvValue(sample[header] || "")).join(","),
-    ].join("\n");
+    const csv = buildTemplateCsv(template, true);
 
     downloadTextFile(
-      `${template.upload_type_code.toLowerCase()}_template.csv`,
+      `${template.upload_type_code.toLowerCase()}_sample_template.csv`,
       csv,
       "text/csv;charset=utf-8"
+    );
+  }
+
+  function downloadBlankTemplate(template: UploadTemplate) {
+    const csv = buildTemplateCsv(template, false);
+
+    downloadTextFile(
+      `${template.upload_type_code.toLowerCase()}_blank_template.csv`,
+      csv,
+      "text/csv;charset=utf-8"
+    );
+  }
+
+  function downloadTemplateGuide(template: UploadTemplate) {
+    downloadTextFile(
+      `${template.upload_type_code.toLowerCase()}_upload_guide.txt`,
+      buildTemplateGuide(template),
+      "text/plain;charset=utf-8"
     );
   }
 
@@ -337,6 +581,20 @@ export default function BulkUploadHub() {
       Object.keys(row).forEach((column) => {
         if (column && !allowedColumns.has(column)) {
           errors.push(`Unknown column: ${column}`);
+        }
+      });
+
+      ["HireDate", "DateOfBirth", "AttendanceDate", "RosterDate", "EffectiveDate", "PayrollMonth"].forEach((column) => {
+        const value = String(row[column] || "").trim();
+        if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          errors.push(`${column} must be YYYY-MM-DD`);
+        }
+      });
+
+      ["WorkingHoursStart", "WorkingHoursEnd", "ShiftStart", "ShiftEnd"].forEach((column) => {
+        const value = String(row[column] || "").trim();
+        if (value && !/^\d{2}:\d{2}$/.test(value)) {
+          errors.push(`${column} must be HH:mm`);
         }
       });
 
@@ -397,7 +655,17 @@ export default function BulkUploadHub() {
 
       if (selectedFile.name.toLowerCase().endsWith(".csv")) {
         const text = await selectedFile.text();
-        parsedRows = parseCsv(text);
+        const parsed = parseCsvDetailed(text);
+        const health = buildCsvHealth(selectedTemplate, parsed);
+        setCsvHealth(health);
+
+        if (csvHealthHasBlockingError(health)) {
+          throw new Error(
+            "CSV structure issue found. Please download the safe template for this upload type and keep every column/blank comma position intact."
+          );
+        }
+
+        parsedRows = parsed.rows;
         stagedRows = validateRows(selectedTemplate, parsedRows);
       }
 
@@ -575,9 +843,15 @@ export default function BulkUploadHub() {
                 <Field label="Upload Type">
                   <select
                     value={selectedTemplateCode}
-                    onChange={(event) =>
-                      setSelectedTemplateCode(event.target.value)
-                    }
+                    onChange={(event) => {
+                      setSelectedTemplateCode(event.target.value);
+                      setSelectedFile(null);
+                      setPreviewRows([]);
+                      setCsvHealth(null);
+                      setMessage(null);
+                      setErrorMessage(null);
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
                     className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-slate-400"
                   >
                     {templates.map((template) => (
@@ -609,12 +883,26 @@ export default function BulkUploadHub() {
                         </p>
                       </div>
 
-                      <button
-                        onClick={() => downloadTemplate(selectedTemplate)}
-                        className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-                      >
-                        Download Template
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => downloadTemplate(selectedTemplate)}
+                          className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                        >
+                          Download Sample CSV
+                        </button>
+                        <button
+                          onClick={() => downloadBlankTemplate(selectedTemplate)}
+                          className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                        >
+                          Download Blank CSV
+                        </button>
+                        <button
+                          onClick={() => downloadTemplateGuide(selectedTemplate)}
+                          className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                        >
+                          Download Guide
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -626,6 +914,13 @@ export default function BulkUploadHub() {
                         title="Optional Columns"
                         columns={selectedTemplate.optional_columns || []}
                       />
+                    </div>
+
+                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+                      <p className="font-semibold">Safe upload rule</p>
+                      <p className="mt-1">
+                        Always use the downloaded CSV. Do not delete optional columns; keep them blank if not needed. Date format must be YYYY-MM-DD and comma values like WorkingDays must stay inside quotes.
+                      </p>
                     </div>
                   </div>
                 )}
@@ -653,6 +948,10 @@ export default function BulkUploadHub() {
                       <span>Type: {selectedFile.type || "Unknown"}</span>
                     </div>
                   </div>
+                )}
+
+                {csvHealth && (
+                  <CsvHealthCard health={csvHealth} />
                 )}
 
                 {previewRows.length > 0 && (
@@ -701,7 +1000,7 @@ export default function BulkUploadHub() {
                 <div className="flex justify-end">
                   <button
                     onClick={createUploadBatch}
-                    disabled={isProcessing}
+                    disabled={isProcessing || csvHealthHasBlockingError(csvHealth)}
                     className="h-10 rounded-xl bg-slate-950 px-5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isProcessing ? "Processing..." : "Create Upload Batch"}
@@ -864,6 +1163,80 @@ export default function BulkUploadHub() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+function CsvHealthCard({ health }: { health: CsvHealth }) {
+  const hasBlockingError = csvHealthHasBlockingError(health);
+
+  return (
+    <div
+      className={`rounded-2xl border p-4 text-sm ${
+        hasBlockingError
+          ? "border-rose-200 bg-rose-50 text-rose-800"
+          : health.wrongOrder
+            ? "border-amber-200 bg-amber-50 text-amber-800"
+            : "border-emerald-200 bg-emerald-50 text-emerald-800"
+      }`}
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="font-semibold">
+            {hasBlockingError
+              ? "CSV structure needs correction"
+              : health.wrongOrder
+                ? "CSV headers are valid, but order is different"
+                : "CSV structure looks correct"}
+          </p>
+          <p className="mt-1 text-xs leading-5 opacity-90">
+            Uploaded rows: {health.rowCount}. Expected columns: {health.expectedHeaders.length}. Uploaded columns: {health.headers.length}.
+          </p>
+        </div>
+      </div>
+
+      {(health.missingHeaders.length > 0 || health.unknownHeaders.length > 0) && (
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {health.missingHeaders.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em]">Missing headers</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {health.missingHeaders.map((header) => (
+                  <span key={header} className="rounded-full border border-rose-200 bg-white px-2.5 py-1 text-xs font-medium text-rose-700">
+                    {header}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {health.unknownHeaders.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em]">Unknown headers</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {health.unknownHeaders.map((header) => (
+                  <span key={header} className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-700">
+                    {header}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {health.rowWidthWarnings.length > 0 && (
+        <div className="mt-3 rounded-xl border border-rose-200 bg-white p-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-rose-700">Row column mismatch</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-rose-700">
+            {health.rowWidthWarnings.slice(0, 5).map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+          {health.rowWidthWarnings.length > 5 && (
+            <p className="mt-2 text-xs text-rose-700">+{health.rowWidthWarnings.length - 5} more row(s).</p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
