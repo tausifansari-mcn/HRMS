@@ -71,6 +71,11 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
+            {/* Public ATS walk-in registration pages for non-employees */}
+            <Route path="/interview-registration" element={<NativeATSCandidateRegistration />} />
+            <Route path="/candidate-registration" element={<Navigate to="/interview-registration" replace />} />
+            <Route path="/walkin-registration" element={<Navigate to="/interview-registration" replace />} />
+
             {/* Protected app pages */}
             <Route
               path="/dashboard"
@@ -236,7 +241,6 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-
 
             {/* Native Workforce OS pages */}
             <Route
