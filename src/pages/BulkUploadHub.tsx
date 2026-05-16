@@ -323,6 +323,19 @@ function getFallbackSampleValue(
     manageremail: "",
   };
 
+  const assetSamples: Record<string, string> = {
+    assetcode: "AST001",
+    assetname: "Dell Laptop",
+    category: "Laptop",
+    status: "available",
+    serialnumber: "SN-DEMO-001",
+    purchasedate: "16-05-2026",
+    purchasecost: "45000",
+    vendor: "Demo Vendor",
+    warrantyenddate: "16-05-2027",
+    notes: "Imported from Bulk Upload Hub",
+  };
+
   if (normalizedUploadType === "EMPLOYEE_MASTER" && normalizedHeader in employeeSamples) {
     return employeeSamples[normalizedHeader];
   }
@@ -333,6 +346,10 @@ function getFallbackSampleValue(
 
   if (normalizedUploadType === "DEPARTMENT_MASTER" && normalizedHeader in departmentSamples) {
     return departmentSamples[normalizedHeader];
+  }
+
+  if (normalizedUploadType === "ASSET_MASTER" && normalizedHeader in assetSamples) {
+    return assetSamples[normalizedHeader];
   }
 
   if (normalizedHeader.includes("date")) return "16-05-2026";
@@ -357,14 +374,14 @@ function buildTemplateRow(template: UploadTemplate, includeSampleValues: boolean
   const isEmployeeMaster = uploadTypeCode === "EMPLOYEE_MASTER";
   const isProcessMaster = uploadTypeCode === "PROCESS_MASTER";
   const isDepartmentMaster = uploadTypeCode === "DEPARTMENT_MASTER";
+  const isAssetMaster = uploadTypeCode === "ASSET_MASTER";
 
   return getTemplateHeaders(template).map((header) => {
     if (!includeSampleValues) return "";
 
-    // Employee Master, Process Master, and Department Master must always use frontend-safe sample values first.
-    // This prevents unsafe database sample values like missing ManagerCode/Department from causing
-    // avoidable upload errors when the sample is uploaded directly.
-    if (isEmployeeMaster || isProcessMaster || isDepartmentMaster) {
+    // Employee Master, Process Master, Department Master, and Asset Master must always use frontend-safe sample values first.
+    // This prevents unsafe database sample values from causing avoidable upload errors when the sample is uploaded directly.
+    if (isEmployeeMaster || isProcessMaster || isDepartmentMaster || isAssetMaster) {
       return getFallbackSampleValue(
         template.upload_type_code,
         header,
@@ -412,6 +429,8 @@ function buildTemplateGuide(template: UploadTemplate) {
     "6. For manager fields, keep ManagerCode and ManagerEmail blank unless the manager already exists in HRMS.",
     "7. For Process Master, Department Name must exactly match an existing HRMS department, for example Operations.",
     "8. For Department Master, keep ManagerCode and ManagerEmail blank unless that manager already exists in Employee Master.",
+    "9. For Asset Master, Status should be a valid HRMS asset status such as available, assigned, maintenance, retired, or lost.",
+    "10. For Asset Master, PurchaseDate and WarrantyEndDate must use DD-MM-YYYY format.",
     "",
     "Column order:",
     ...headers.map((header, index) => `${index + 1}. ${header}${required.has(header) ? "  [Required]" : "  [Optional]"}`),
@@ -780,10 +799,10 @@ export default function BulkUploadHub() {
     setIsProcessing(true);
 
     try {
-      const supportedImportTypes = ["EMPLOYEE_MASTER", "PROCESS_MASTER", "DEPARTMENT_MASTER"];
+      const supportedImportTypes = ["EMPLOYEE_MASTER", "PROCESS_MASTER", "DEPARTMENT_MASTER", "ASSET_MASTER"];
       if (!supportedImportTypes.includes(batch.upload_type_code)) {
         throw new Error(
-          `Import mapping for ${batch.upload_type_code} is not enabled yet. This upload can be staged and validated, but Employee Master, Process Master, and Department Master imports are production-enabled now.`
+          `Import mapping for ${batch.upload_type_code} is not enabled yet. This upload can be staged and validated, but Employee Master, Process Master, Department Master, and Asset Master imports are production-enabled now.`
         );
       }
 
@@ -791,7 +810,9 @@ export default function BulkUploadHub() {
         ? "import_process_upload_batch"
         : batch.upload_type_code === "DEPARTMENT_MASTER"
           ? "import_department_upload_batch"
-          : "import_upload_batch";
+          : batch.upload_type_code === "ASSET_MASTER"
+            ? "import_asset_upload_batch"
+            : "import_upload_batch";
 
       const { data, error } = await db.rpc(rpcName, {
         p_batch_id: batch.id,
