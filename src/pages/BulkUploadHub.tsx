@@ -314,12 +314,25 @@ function getFallbackSampleValue(
     description: "KYC backend process",
   };
 
+  const departmentSamples: Record<string, string> = {
+    departmentname: "Operations Support",
+    "department name": "Operations Support",
+    name: "Operations Support",
+    description: "Operations support department",
+    managercode: "",
+    manageremail: "",
+  };
+
   if (normalizedUploadType === "EMPLOYEE_MASTER" && normalizedHeader in employeeSamples) {
     return employeeSamples[normalizedHeader];
   }
 
   if (normalizedUploadType === "PROCESS_MASTER" && normalizedHeader in processSamples) {
     return processSamples[normalizedHeader];
+  }
+
+  if (normalizedUploadType === "DEPARTMENT_MASTER" && normalizedHeader in departmentSamples) {
+    return departmentSamples[normalizedHeader];
   }
 
   if (normalizedHeader.includes("date")) return "16-05-2026";
@@ -343,14 +356,15 @@ function buildTemplateRow(template: UploadTemplate, includeSampleValues: boolean
   const uploadTypeCode = String(template.upload_type_code || "").toUpperCase();
   const isEmployeeMaster = uploadTypeCode === "EMPLOYEE_MASTER";
   const isProcessMaster = uploadTypeCode === "PROCESS_MASTER";
+  const isDepartmentMaster = uploadTypeCode === "DEPARTMENT_MASTER";
 
   return getTemplateHeaders(template).map((header) => {
     if (!includeSampleValues) return "";
 
-    // Employee Master and Process Master must always use frontend-safe sample values first.
-    // This prevents database sample values like missing ManagerCode/Department from causing
+    // Employee Master, Process Master, and Department Master must always use frontend-safe sample values first.
+    // This prevents unsafe database sample values like missing ManagerCode/Department from causing
     // avoidable upload errors when the sample is uploaded directly.
-    if (isEmployeeMaster || isProcessMaster) {
+    if (isEmployeeMaster || isProcessMaster || isDepartmentMaster) {
       return getFallbackSampleValue(
         template.upload_type_code,
         header,
@@ -397,6 +411,7 @@ function buildTemplateGuide(template: UploadTemplate) {
     "5. Values containing commas must stay inside double quotes, for example \"1,2,3,4,5\".",
     "6. For manager fields, keep ManagerCode and ManagerEmail blank unless the manager already exists in HRMS.",
     "7. For Process Master, Department Name must exactly match an existing HRMS department, for example Operations.",
+    "8. For Department Master, keep ManagerCode and ManagerEmail blank unless that manager already exists in Employee Master.",
     "",
     "Column order:",
     ...headers.map((header, index) => `${index + 1}. ${header}${required.has(header) ? "  [Required]" : "  [Optional]"}`),
@@ -765,16 +780,18 @@ export default function BulkUploadHub() {
     setIsProcessing(true);
 
     try {
-      const supportedImportTypes = ["EMPLOYEE_MASTER", "PROCESS_MASTER"];
+      const supportedImportTypes = ["EMPLOYEE_MASTER", "PROCESS_MASTER", "DEPARTMENT_MASTER"];
       if (!supportedImportTypes.includes(batch.upload_type_code)) {
         throw new Error(
-          `Import mapping for ${batch.upload_type_code} is not enabled yet. This upload can be staged and validated, but Employee Master and Process Master imports are production-enabled now.`
+          `Import mapping for ${batch.upload_type_code} is not enabled yet. This upload can be staged and validated, but Employee Master, Process Master, and Department Master imports are production-enabled now.`
         );
       }
 
       const rpcName = batch.upload_type_code === "PROCESS_MASTER"
         ? "import_process_upload_batch"
-        : "import_upload_batch";
+        : batch.upload_type_code === "DEPARTMENT_MASTER"
+          ? "import_department_upload_batch"
+          : "import_upload_batch";
 
       const { data, error } = await db.rpc(rpcName, {
         p_batch_id: batch.id,
@@ -819,7 +836,7 @@ export default function BulkUploadHub() {
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
                   Manage upload templates, upload CSV/Excel files, stage rows,
-                  validate required columns, and import validated Employee Master / Process Master rows directly into HRMS.
+                  validate required columns, and import validated Employee Master, Process Master, and Department Master rows directly into HRMS.
                 </p>
               </div>
 
