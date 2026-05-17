@@ -40,7 +40,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsAdminOrHR } from "@/hooks/useUserRole";
+import { useIsAdminOrHR, useWorkforceAccess } from "@/hooks/useUserRole";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { cn } from "@/lib/utils";
 import { APP_VERSION, isAutoUpdatingEnvironment } from "@/lib/version";
@@ -52,6 +52,7 @@ interface NavItem {
   badge?: number;
   adminOnly?: boolean;
   employeeOnly?: boolean;
+  pageCode?: string;
   description?: string;
 }
 
@@ -70,209 +71,61 @@ const navGroups: NavGroup[] = [
   {
     title: "Overview",
     items: [
-      {
-        label: "Dashboard",
-        href: "/dashboard",
-        icon: <Home className="h-4 w-4" />,
-        description: "Workspace overview",
-      },
-      {
-        label: "My Modules",
-        href: "/modules",
-        icon: <Package className="h-4 w-4" />,
-        description: "Role-wise ATS, LMS, WFM and performance modules",
-      },
-      {
-        label: "Reports",
-        href: "/reports",
-        icon: <BarChart3 className="h-4 w-4" />,
-        adminOnly: true,
-        description: "Reports and insights",
-      },
+      { label: "Dashboard", href: "/dashboard", icon: <Home className="h-4 w-4" />, description: "Workspace overview" },
+      { label: "My Modules", href: "/modules", icon: <Package className="h-4 w-4" />, description: "Role-wise ATS, LMS, WFM and performance modules" },
+      { label: "Reports", href: "/reports", icon: <BarChart3 className="h-4 w-4" />, adminOnly: true, description: "Reports and insights" },
     ],
   },
   {
     title: "People",
     items: [
-      {
-        label: "Employees",
-        href: "/employees",
-        icon: <Users className="h-4 w-4" />,
-        adminOnly: true,
-        description: "Employee directory",
-      },
-      {
-        label: "Team Directory",
-        href: "/employees",
-        icon: <Users className="h-4 w-4" />,
-        employeeOnly: true,
-        description: "Team directory",
-      },
-      {
-        label: "Departments",
-        href: "/departments",
-        icon: <Building2 className="h-4 w-4" />,
-        adminOnly: true,
-        description: "Department structure",
-      },
-      {
-        label: "Onboarding",
-        href: "/onboarding",
-        icon: <UserPlus className="h-4 w-4" />,
-        adminOnly: true,
-        description: "New employee onboarding",
-      },
+      { label: "Employees", href: "/employees", icon: <Users className="h-4 w-4" />, adminOnly: true, description: "Employee directory" },
+      { label: "Team Directory", href: "/employees", icon: <Users className="h-4 w-4" />, employeeOnly: true, description: "Team directory" },
+      { label: "Departments", href: "/departments", icon: <Building2 className="h-4 w-4" />, adminOnly: true, description: "Department structure" },
+      { label: "Onboarding", href: "/onboarding", icon: <UserPlus className="h-4 w-4" />, adminOnly: true, description: "New employee onboarding" },
     ],
   },
   {
     title: "Time",
     items: [
-      {
-        label: "Attendance",
-        href: "/attendance",
-        icon: <Clock className="h-4 w-4" />,
-        description: "Attendance records",
-      },
-      {
-        label: "Attendance Regularization",
-        href: "/attendance-regularization",
-        icon: <ClipboardList className="h-4 w-4" />,
-        description: "Attendance correction workflow",
-      },
-      {
-        label: "Calendar",
-        href: "/calendar",
-        icon: <Calendar className="h-4 w-4" />,
-        description: "Company calendar",
-      },
-      {
-        label: "Leaves",
-        href: "/leaves",
-        icon: <CalendarDays className="h-4 w-4" />,
-        description: "Leave requests",
-      },
+      { label: "Attendance", href: "/attendance", icon: <Clock className="h-4 w-4" />, description: "Attendance records" },
+      { label: "Attendance Regularization", href: "/attendance-regularization", icon: <ClipboardList className="h-4 w-4" />, description: "Attendance correction workflow" },
+      { label: "Calendar", href: "/calendar", icon: <Calendar className="h-4 w-4" />, description: "Company calendar" },
+      { label: "Leaves", href: "/leaves", icon: <CalendarDays className="h-4 w-4" />, description: "Leave requests" },
     ],
   },
   {
     title: "Operations",
     items: [
-      {
-        label: "Performance",
-        href: "/performance",
-        icon: <Target className="h-4 w-4" />,
-        description: "Goals and performance",
-      },
-      {
-        label: "Reviews",
-        href: "/reviews-management",
-        icon: <ClipboardList className="h-4 w-4" />,
-        adminOnly: true,
-        description: "Performance reviews",
-      },
-      {
-        label: "Bulk Upload Hub",
-        href: "/bulk-upload",
-        icon: <Package className="h-4 w-4" />,
-        adminOnly: true,
-        description: "Bulk upload templates and staging",
-      },
-      {
-        label: "Assets",
-        href: "/assets",
-        icon: <Package className="h-4 w-4" />,
-        adminOnly: true,
-        description: "Asset management",
-      },
-      {
-        label: "Payroll",
-        href: "/payroll",
-        icon: <CreditCard className="h-4 w-4" />,
-        adminOnly: true,
-        description: "Payroll workspace",
-      },
+      { label: "Performance", href: "/performance", icon: <Target className="h-4 w-4" />, description: "Goals and performance" },
+      { label: "Reviews", href: "/reviews-management", icon: <ClipboardList className="h-4 w-4" />, adminOnly: true, description: "Performance reviews" },
+      { label: "Bulk Upload Hub", href: "/bulk-upload", icon: <Package className="h-4 w-4" />, adminOnly: true, description: "Bulk upload templates and staging" },
+      { label: "Assets", href: "/assets", icon: <Package className="h-4 w-4" />, adminOnly: true, description: "Asset management" },
+      { label: "Payroll", href: "/payroll", icon: <CreditCard className="h-4 w-4" />, adminOnly: true, description: "Payroll workspace" },
     ],
   },
   {
     title: "Workforce OS",
     items: [
-      {
-        label: "ATS Dashboard",
-        href: "/ats/dashboard",
-        icon: <UserPlus className="h-4 w-4" />,
-        adminOnly: true,
-        description: "Recruitment command center",
-      },
-      {
-        label: "My Candidate Queue",
-        href: "/ats/recruiter/my-candidates",
-        icon: <ClipboardList className="h-4 w-4" />,
-        description: "Assigned recruitment queue",
-      },
-      {
-        label: "My Learning",
-        href: "/lms/my-learning",
-        icon: <BookOpen className="h-4 w-4" />,
-        description: "Learning path and assigned modules",
-      },
-      {
-        label: "LMS Coordinator",
-        href: "/lms/coordinator",
-        icon: <Users className="h-4 w-4" />,
-        adminOnly: true,
-        description: "Training batch and trainee coordination",
-      },
-      {
-        label: "Roster Planning",
-        href: "/wfm/roster",
-        icon: <Clock className="h-4 w-4" />,
-        adminOnly: true,
-        description: "WFM roster and shift planning",
-      },
-      {
-        label: "Quality Dashboard",
-        href: "/quality/dashboard",
-        icon: <ShieldCheck className="h-4 w-4" />,
-        adminOnly: true,
-        description: "Quality, defects and coaching",
-      },
-      {
-        label: "Operations Dashboard",
-        href: "/operations/dashboard",
-        icon: <Activity className="h-4 w-4" />,
-        adminOnly: true,
-        description: "Process productivity and SLA",
-      },
-      {
-        label: "Performance Command Center",
-        href: "/performance/command-center",
-        icon: <BarChart3 className="h-4 w-4" />,
-        description: "Date/month filtered performance intelligence",
-      },
-      {
-        label: "Access Control",
-        href: "/settings/access-control",
-        icon: <Settings className="h-4 w-4" />,
-        adminOnly: true,
-        description: "Role and page access management",
-      },
+      { label: "ATS Dashboard", href: "/ats/dashboard", icon: <UserPlus className="h-4 w-4" />, pageCode: "ATS_DASHBOARD", description: "Recruitment command center" },
+      { label: "My Candidate Queue", href: "/ats/recruiter/my-candidates", icon: <ClipboardList className="h-4 w-4" />, pageCode: "ATS_RECRUITER_QUEUE", description: "Assigned recruitment queue" },
+      { label: "My Learning", href: "/lms/my-learning", icon: <BookOpen className="h-4 w-4" />, pageCode: "LMS_MY_LEARNING", description: "Learning path and assigned modules" },
+      { label: "LMS Coordinator", href: "/lms/coordinator", icon: <Users className="h-4 w-4" />, pageCode: "LMS_COORDINATOR", description: "Training batch and trainee coordination" },
+      { label: "LMS Admin", href: "/lms/admin", icon: <BookOpen className="h-4 w-4" />, pageCode: "LMS_ADMIN", description: "Curriculum, content and rules" },
+      { label: "LMS Management", href: "/lms/management-dashboard", icon: <BarChart3 className="h-4 w-4" />, pageCode: "LMS_MANAGEMENT_DASHBOARD", description: "Training management dashboard" },
+      { label: "Roster Planning", href: "/wfm/roster", icon: <Clock className="h-4 w-4" />, pageCode: "WFM_ROSTER", description: "WFM roster and shift planning" },
+      { label: "WFM Live Tracker", href: "/wfm/live-tracker", icon: <Clock className="h-4 w-4" />, pageCode: "WFM_LIVE_TRACKER", description: "Live shift and break tracker" },
+      { label: "Quality Dashboard", href: "/quality/dashboard", icon: <ShieldCheck className="h-4 w-4" />, pageCode: "QUALITY_DASHBOARD", description: "Quality, defects and coaching" },
+      { label: "Operations Dashboard", href: "/operations/dashboard", icon: <Activity className="h-4 w-4" />, pageCode: "OPERATIONS_DASHBOARD", description: "Process productivity and SLA" },
+      { label: "Performance Command Center", href: "/performance/command-center", icon: <BarChart3 className="h-4 w-4" />, pageCode: "WORKFORCE_COMMAND_CENTER", description: "Unified workforce intelligence" },
+      { label: "Access Control", href: "/settings/access-control", icon: <Settings className="h-4 w-4" />, pageCode: "ACCESS_CONTROL", adminOnly: true, description: "Role and page access management" },
     ],
   },
   {
     title: "System",
     items: [
-      {
-        label: "Settings",
-        href: "/settings",
-        icon: <Settings className="h-4 w-4" />,
-        adminOnly: true,
-        description: "System settings",
-      },
-      {
-        label: "Notifications",
-        href: "/notification-preferences",
-        icon: <Bell className="h-4 w-4" />,
-        description: "Notification preferences",
-      },
+      { label: "Settings", href: "/settings", icon: <Settings className="h-4 w-4" />, adminOnly: true, description: "System settings" },
+      { label: "Notifications", href: "/notification-preferences", icon: <Bell className="h-4 w-4" />, description: "Notification preferences" },
     ],
   },
 ];
@@ -287,6 +140,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const { user, signOut, isSigningOut } = useAuth();
   const { isAdminOrHR } = useIsAdminOrHR();
+  const { canViewPage, visiblePageCodes } = useWorkforceAccess();
   const { data: versionData } = useVersionCheck();
 
   const displayVersion = isAutoUpdatingEnvironment()
@@ -296,79 +150,46 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       : versionData?.currentVersion ?? APP_VERSION;
 
   const filteredNavGroups = useMemo(() => {
+    const visibleSet = new Set(visiblePageCodes);
     return navGroups
       .map((group) => ({
         ...group,
         items: group.items.filter((item) => {
+          if (item.pageCode) {
+            return visibleSet.has(item.pageCode) || canViewPage(item.pageCode);
+          }
           if (item.adminOnly && !isAdminOrHR) return false;
           if (item.employeeOnly && isAdminOrHR) return false;
           return true;
         }),
       }))
       .filter((group) => group.items.length > 0);
-  }, [isAdminOrHR]);
+  }, [isAdminOrHR, canViewPage, visiblePageCodes]);
 
   const searchableItems = useMemo(() => {
     return filteredNavGroups.flatMap((group) =>
-      group.items.map((item) => ({
-        ...item,
-        groupTitle: group.title,
-      }))
+      group.items.map((item) => ({ ...item, groupTitle: group.title }))
     );
   }, [filteredNavGroups]);
 
   const searchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-
     if (!query) return [];
 
-    return searchableItems
-      .filter((item) => {
-        const labelMatch = item.label.toLowerCase().includes(query);
-        const groupMatch = item.groupTitle.toLowerCase().includes(query);
-        const descriptionMatch = item.description?.toLowerCase().includes(query);
-
-        return labelMatch || groupMatch || descriptionMatch;
-      })
-      .slice(0, 6);
+    return searchableItems.filter((item) =>
+      item.label.toLowerCase().includes(query) ||
+      item.description?.toLowerCase().includes(query) ||
+      item.groupTitle.toLowerCase().includes(query)
+    );
   }, [searchQuery, searchableItems]);
 
-  const activeItem = useMemo(() => {
-    return filteredNavGroups
-      .flatMap((group) => group.items)
-      .find((item) => {
-        if (item.href === "/dashboard") {
-          return location.pathname === "/dashboard";
-        }
-
-        return (
-          location.pathname === item.href ||
-          location.pathname.startsWith(`${item.href}/`)
-        );
-      });
-  }, [filteredNavGroups, location.pathname]);
-
-  const getUserInitials = () => {
-    const name = user?.user_metadata?.full_name || user?.email || "User";
-
-    return name
-      .split(" ")
-      .map((n: string) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  const getUserName = () => {
-    return user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
-  };
-
-  const isActivePath = (href: string) => {
-    if (href === "/dashboard") {
-      return location.pathname === "/dashboard";
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (searchResults[0]) {
+      navigate(searchResults[0].href);
+      setSearchQuery("");
+      setSidebarOpen(false);
     }
-
-    return location.pathname === href || location.pathname.startsWith(`${href}/`);
   };
 
   const handleSignOut = async () => {
@@ -376,409 +197,104 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     navigate("/auth");
   };
 
-  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const userInitials = user?.email?.slice(0, 2).toUpperCase() || "MC";
 
-    if (searchResults.length > 0) {
-      navigate(searchResults[0].href);
-      setSearchQuery("");
-    }
-  };
-
-  const pageTitle = activeItem?.label || "Dashboard";
-  const pageDescription =
-    activeItem?.description || "Modern HRMS workspace for daily operations.";
-
-  const SidebarContent = () => {
-    return (
-      <div className="flex h-full flex-col bg-[#0f172a] text-slate-100">
-        {/* Brand / Logo */}
-        <div className="relative border-b border-white/10 px-4 py-4">
-          <div className="absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.26),transparent_48%)]" />
-
-          <div className="relative rounded-2xl border border-white/10 bg-white/[0.05] p-3 shadow-xl shadow-slate-950/20">
-            <div className="flex h-[82px] items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 px-4 py-3 shadow-lg">
-              {logoError ? (
-                <div className="flex h-full w-full items-center justify-center rounded-xl bg-slate-950 text-lg font-bold tracking-wide text-white">
-                  MCN
-                </div>
-              ) : (
-                <img
-                  src={companyLogo}
-                  alt="Mas Callnet Logo"
-                  className="block h-16 w-full max-w-[215px] object-contain drop-shadow-md"
-                  onError={() => setLogoError(true)}
-                />
-              )}
-            </div>
-
-            <div className="mt-3 min-w-0 text-center">
-              <p className="truncate text-[14px] font-semibold tracking-tight text-white">
-                Mas Callnet HRMS
-              </p>
-              <p className="truncate text-[12px] text-slate-400">
-                Employee Portal
-              </p>
-            </div>
+  const SidebarContent = () => (
+    <div className="flex h-full flex-col">
+      <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-4">
+        <Link to="/dashboard" className="flex items-center gap-3">
+          {logoError ? (
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-accent text-sm font-bold text-sidebar-accent-foreground">MCN</div>
+          ) : (
+            <img src={companyLogo} alt="MAS Callnet" className="h-9 w-9 rounded-xl object-contain" onError={() => setLogoError(true)} />
+          )}
+          <div>
+            <p className="text-sm font-bold leading-tight text-sidebar-foreground">MAS Callnet</p>
+            <p className="text-xs text-sidebar-foreground/60">HRMS</p>
           </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="mcn-sidebar-scroll flex-1 overflow-y-auto px-3 py-4">
-          <div className="space-y-5">
-            {filteredNavGroups.map((group) => (
-              <div key={group.title}>
-                <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  {group.title}
-                </p>
-
-                <div className="space-y-1">
-                  {group.items.map((item) => {
-                    const active = isActivePath(item.href);
-
-                    return (
-                      <Link
-                        key={`${group.title}-${item.label}`}
-                        to={item.href}
-                        onClick={() => setSidebarOpen(false)}
-                        className={cn(
-                          "group flex items-center justify-between rounded-xl px-3 py-2.5 text-[13.5px] font-semibold transition",
-                          active
-                            ? "bg-white text-slate-950 shadow-lg shadow-slate-950/20"
-                            : "text-slate-300 hover:bg-white/10 hover:text-white"
-                        )}
-                      >
-                        <span className="flex min-w-0 items-center gap-3">
-                          <span
-                            className={cn(
-                              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition",
-                              active
-                                ? "bg-slate-100 text-slate-950"
-                                : "bg-white/5 text-slate-400 group-hover:bg-white/10 group-hover:text-white"
-                            )}
-                          >
-                            {item.icon}
-                          </span>
-
-                          <span className="truncate">{item.label}</span>
-                        </span>
-
-                        {item.badge ? (
-                          <Badge className="ml-2 h-5 rounded-full bg-cyan-100 px-2 text-[10px] font-semibold text-cyan-700 hover:bg-cyan-100">
-                            {item.badge}
-                          </Badge>
-                        ) : active ? (
-                          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-                        ) : null}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </nav>
-
-        {/* User Footer */}
-        <div className="border-t border-white/10 p-3">
-          <Link
-            to="/profile"
-            onClick={() => setSidebarOpen(false)}
-            className="flex items-center gap-3 rounded-2xl bg-white/5 p-3 transition hover:bg-white/10"
-          >
-            <Avatar className="h-9 w-9 border border-white/10">
-              <AvatarImage alt={getUserName()} />
-              <AvatarFallback className="bg-white text-xs font-semibold text-slate-950">
-                {getUserInitials()}
-              </AvatarFallback>
-            </Avatar>
-
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-white">
-                {getUserName()}
-              </p>
-              <p className="truncate text-[11px] text-slate-400">{user?.email}</p>
-            </div>
-          </Link>
-
-          <Link
-            to="/changelog"
-            onClick={() => setSidebarOpen(false)}
-            className="mt-2 flex items-center justify-center rounded-xl px-3 py-2 text-[11px] text-slate-500 transition hover:bg-white/5 hover:text-slate-300"
-          >
-            v{displayVersion}
-          </Link>
-        </div>
+        </Link>
       </div>
-    );
-  };
+
+      <div className="flex-1 overflow-y-auto p-3">
+        {filteredNavGroups.map((group) => (
+          <div key={group.title} className="mb-5">
+            <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">{group.title}</p>
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + "/");
+                return (
+                  <Link
+                    key={item.href}
+                    to={item.href}
+                    onClick={() => setSidebarOpen(false)}
+                    className={cn(
+                      "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
+                      isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-soft"
+                        : "text-sidebar-foreground/75 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                    )}
+                  >
+                    <span className={cn("transition-transform group-hover:scale-110", isActive && "text-sidebar-accent-foreground")}>{item.icon}</span>
+                    <span className="flex-1 truncate">{item.label}</span>
+                    {item.badge && <Badge variant="secondary" className="h-5 min-w-5 rounded-full px-1.5 text-xs">{item.badge}</Badge>}
+                    {isActive && <ChevronRight className="h-4 w-4" />}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="border-t border-sidebar-border p-3">
+        <Badge variant="outline" className="mb-2 w-full justify-center border-sidebar-border text-sidebar-foreground/70">v{displayVersion}</Badge>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-[#f3f6fb] text-slate-900">
-      <PWAInstallBanner />
-
-      {sidebarOpen && (
-        <button
-          type="button"
-          aria-label="Close sidebar"
-          className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[260px] border-r border-slate-900 bg-[#0f172a] shadow-2xl lg:block">
+    <div className="min-h-screen bg-background">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-sidebar-border bg-sidebar lg:block"><SidebarContent /></aside>
+      {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+      <aside className={cn("fixed inset-y-0 left-0 z-50 w-72 border-r border-sidebar-border bg-sidebar transition-transform duration-300 lg:hidden", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
+        <div className="absolute right-3 top-3"><Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)}><X className="h-5 w-5" /></Button></div>
         <SidebarContent />
       </aside>
-
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 w-[280px] bg-[#0f172a] shadow-2xl transition-transform duration-300 lg:hidden",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        <div className="absolute right-3 top-3 z-10">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-lg text-slate-300 hover:bg-white/10 hover:text-white"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <SidebarContent />
-      </aside>
-
-      <div className="min-h-screen lg:pl-[260px]">
-        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/50 backdrop-blur">
-          <div className="flex min-h-[68px] items-center justify-between gap-4 px-4 sm:px-5 lg:px-6">
-            <div className="flex min-w-0 items-center gap-3">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-xl text-slate-600 hover:bg-slate-100 lg:hidden"
-                onClick={() => setSidebarOpen(true)}
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-
-              <div className="min-w-0">
-                <div className="mb-0.5 hidden items-center gap-1.5 text-[11px] font-medium text-slate-400 sm:flex">
-                  <span>HRMS</span>
-                  <ChevronRight className="h-3 w-3" />
-                  <span className="truncate">{pageTitle}</span>
-                </div>
-
-                <h1 className="truncate text-[17px] font-semibold tracking-tight text-slate-950">
-                  {pageTitle}
-                </h1>
-
-                <p className="hidden truncate text-[12px] text-slate-500 md:block">
-                  {pageDescription}
-                </p>
-              </div>
-            </div>
-
-            {/* Working Search */}
-            <form
-              onSubmit={handleSearchSubmit}
-              className="relative hidden w-full max-w-xs xl:block"
-            >
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-              <Input
-                type="search"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search HRMS..."
-                autoComplete="off"
-                className="h-10 rounded-2xl border-slate-200 bg-slate-50 pl-10 pr-10 text-xs text-slate-700 shadow-none placeholder:text-slate-400 focus-visible:border-sky-300 focus-visible:bg-white focus-visible:ring-sky-100"
-              />
-
-              {searchQuery && (
-                <button
-                  type="button"
-                  aria-label="Clear search"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-
-              {searchQuery.trim() && (
-                <div className="absolute left-0 right-0 top-12 z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                  {searchResults.length > 0 ? (
-                    <div className="max-h-80 overflow-y-auto p-2">
-                      {searchResults.map((item) => (
-                        <Link
-                          key={`${item.groupTitle}-${item.href}-${item.label}`}
-                          to={item.href}
-                          onClick={() => setSearchQuery("")}
-                          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-slate-50"
-                        >
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-                            {item.icon}
-                          </span>
-
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-xs font-semibold text-slate-950">
-                              {item.label}
-                            </span>
-                            <span className="mt-0.5 block truncate text-[11px] text-slate-500">
-                              {item.groupTitle}
-                              {item.description ? ` • ${item.description}` : ""}
-                            </span>
-                          </span>
-
-                          <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
-                        </Link>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center text-xs text-slate-500">
-                      No matching page found.
-                    </div>
-                  )}
+      <div className="lg:pl-72">
+        <header className="sticky top-0 z-20 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75">
+          <div className="flex h-16 items-center gap-4 px-4 sm:px-6">
+            <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}><Menu className="h-5 w-5" /></Button>
+            <form onSubmit={handleSearchSubmit} className="relative max-w-md flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search modules, people, reports..." className="pl-10" />
+              {searchQuery.trim() && searchResults.length > 0 && (
+                <div className="absolute left-0 right-0 top-12 z-50 rounded-2xl border bg-popover p-2 shadow-lg">
+                  {searchResults.slice(0, 6).map((item) => (
+                    <button key={item.href} type="button" onClick={() => { navigate(item.href); setSearchQuery(""); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-accent">
+                      {item.icon}
+                      <div><p className="font-medium">{item.label}</p><p className="text-xs text-muted-foreground">{item.description}</p></div>
+                    </button>
+                  ))}
                 </div>
               )}
             </form>
-
-            <div className="flex shrink-0 items-center gap-2">
-              {isAdminOrHR ? (
-                <Button
-                  asChild
-                  size="sm"
-                  className="hidden h-9 rounded-xl bg-slate-950 px-3 text-xs font-medium text-white shadow-sm hover:bg-slate-800 sm:inline-flex"
-                >
-                  <Link to="/onboarding">
-                    <UserPlus className="mr-2 h-3.5 w-3.5" />
-                    Add Employee
-                  </Link>
-                </Button>
-              ) : (
-                <Button
-                  asChild
-                  size="sm"
-                  className="hidden h-9 rounded-xl bg-slate-950 px-3 text-xs font-medium text-white shadow-sm hover:bg-slate-800 sm:inline-flex"
-                >
-                  <Link to="/leaves">
-                    <CalendarDays className="mr-2 h-3.5 w-3.5" />
-                    Apply Leave
-                  </Link>
-                </Button>
-              )}
-
-              {isAdminOrHR ? (
-                <NotificationBell />
-              ) : (
-                <Button
-                  asChild
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 rounded-xl border-slate-200 bg-white text-slate-500 shadow-sm"
-                >
-                  <Link to="/notification-preferences" aria-label="Notification preferences">
-                    <Bell className="h-4 w-4" />
-                  </Link>
-                </Button>
-              )}
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="h-10 gap-2 rounded-xl px-2 hover:bg-slate-100"
-                  >
-                    <Avatar className="h-8 w-8 border border-slate-200">
-                      <AvatarImage alt={getUserName()} />
-                      <AvatarFallback className="bg-slate-950 text-[11px] font-semibold text-white">
-                        {getUserInitials()}
-                      </AvatarFallback>
-                    </Avatar>
-
-                    <div className="hidden min-w-0 text-left lg:block">
-                      <p className="max-w-[120px] truncate text-xs font-semibold text-slate-950">
-                        {getUserName()}
-                      </p>
-                      <p className="text-[11px] text-slate-500">
-                        {isAdminOrHR ? "Admin / HR" : "Employee"}
-                      </p>
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-
-                <DropdownMenuContent
-                  align="end"
-                  className="z-50 w-64 rounded-2xl border-slate-200 bg-white p-2 shadow-xl"
-                >
-                  <DropdownMenuLabel className="p-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 border border-slate-200">
-                        <AvatarImage alt={getUserName()} />
-                        <AvatarFallback className="bg-slate-950 text-xs font-semibold text-white">
-                          {getUserInitials()}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-950">
-                          {getUserName()}
-                        </p>
-                        <p className="truncate text-xs font-normal text-slate-500">
-                          {user?.email}
-                        </p>
-                      </div>
-                    </div>
-                  </DropdownMenuLabel>
-
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem asChild className="rounded-xl text-xs">
-                    <Link to="/profile">
-                      <User className="mr-2 h-4 w-4" />
-                      Profile
-                    </Link>
-                  </DropdownMenuItem>
-
-                  {isAdminOrHR && (
-                    <DropdownMenuItem asChild className="rounded-xl text-xs">
-                      <Link to="/settings">
-                        <Settings className="mr-2 h-4 w-4" />
-                        Settings
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
-
-                  <DropdownMenuItem asChild className="rounded-xl text-xs">
-                    <Link to="/notification-preferences">
-                      <Bell className="mr-2 h-4 w-4" />
-                      Notifications
-                    </Link>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem
-                    className="rounded-xl text-xs text-slate-700"
-                    onClick={handleSignOut}
-                    disabled={isSigningOut}
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    {isSigningOut ? "Signing out..." : "Sign out"}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            <NotificationBell />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full"><Avatar className="h-10 w-10"><AvatarImage src="" /><AvatarFallback className="bg-primary text-primary-foreground">{userInitials}</AvatarFallback></Avatar></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel><div className="flex flex-col space-y-1"><p className="text-sm font-medium">My Account</p><p className="text-xs text-muted-foreground">{user?.email}</p></div></DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild><Link to="/profile"><User className="mr-2 h-4 w-4" />Profile</Link></DropdownMenuItem>
+                <DropdownMenuItem asChild><Link to="/settings"><Settings className="mr-2 h-4 w-4" />Settings</Link></DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} disabled={isSigningOut}><LogOut className="mr-2 h-4 w-4" />{isSigningOut ? "Signing out..." : "Sign out"}</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
-
-        <main className="px-4 py-5 sm:px-5 lg:px-6">
-          <div className="mx-auto max-w-[1480px]">{children}</div>
-        </main>
+        <main className="p-4 sm:p-6 lg:p-8"><PWAInstallBanner />{children}</main>
       </div>
     </div>
   );
