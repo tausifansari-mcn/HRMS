@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import WorkforcePageGate from "@/components/security/WorkforcePageGate";
 import ScrollToTop from "@/components/layout/ScrollToTop";
 import Landing from "./pages/Landing";
 import Features from "./pages/Features";
@@ -51,6 +52,10 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+const Gate = ({ pageCode, children }: { pageCode: string; children: React.ReactNode }) => (
+  <WorkforcePageGate pageCode={pageCode}>{children}</WorkforcePageGate>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -60,7 +65,6 @@ const App = () => (
         <AuthProvider>
           <ScrollToTop />
           <Routes>
-            {/* Public marketing pages */}
             <Route path="/" element={<Navigate to="/auth" replace />} />
             <Route path="/features" element={<Features />} />
             <Route path="/how-it-works" element={<HowItWorks />} />
@@ -71,322 +75,47 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
-            {/* Public ATS walk-in registration pages for non-employees */}
             <Route path="/interview-registration" element={<NativeATSCandidateRegistration />} />
             <Route path="/candidate-registration" element={<Navigate to="/interview-registration" replace />} />
             <Route path="/walkin-registration" element={<Navigate to="/interview-registration" replace />} />
 
-            {/* Protected app pages */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
+            <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+            <Route path="/onboarding-requests" element={<Navigate to="/onboarding?tab=requests" replace />} />
+            <Route path="/leaves" element={<ProtectedRoute><Leaves /></ProtectedRoute>} />
+            <Route path="/leave-approvals" element={<Navigate to="/leaves" replace />} />
+            <Route path="/assets" element={<ProtectedRoute><Assets /></ProtectedRoute>} />
+            <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/performance" element={<ProtectedRoute><Performance /></ProtectedRoute>} />
+            <Route path="/reviews-management" element={<ProtectedRoute><ReviewsManagement /></ProtectedRoute>} />
+            <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
+            <Route path="/attendance-regularization" element={<ProtectedRoute><AttendanceRegularization /></ProtectedRoute>} />
+            <Route path="/bulk-upload" element={<ProtectedRoute><BulkUploadHub /></ProtectedRoute>} />
+            <Route path="/departments" element={<ProtectedRoute><Departments /></ProtectedRoute>} />
+            <Route path="/calendar" element={<ProtectedRoute><CompanyCalendar /></ProtectedRoute>} />
+            <Route path="/notification-preferences" element={<ProtectedRoute><NotificationPreferences /></ProtectedRoute>} />
 
-            <Route
-              path="/employees"
-              element={
-                <ProtectedRoute>
-                  <Employees />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/modules" element={<ProtectedRoute><ModuleLauncher /></ProtectedRoute>} />
+            <Route path="/ats/dashboard" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativeATSDashboard /></Gate></ProtectedRoute>} />
+            <Route path="/ats/candidate-registration" element={<ProtectedRoute><NativeATSCandidateRegistration /></ProtectedRoute>} />
+            <Route path="/ats/recruiter/my-candidates" element={<ProtectedRoute><Gate pageCode="ATS_RECRUITER_QUEUE"><NativeATSRecruiterDashboard /></Gate></ProtectedRoute>} />
+            <Route path="/ats/sourcing-analysis" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativePlaceholderPage title="ATS Sourcing Analysis" module="ATS" /></Gate></ProtectedRoute>} />
+            <Route path="/lms/my-learning" element={<ProtectedRoute><Gate pageCode="LMS_MY_LEARNING"><NativeLMSMyLearning /></Gate></ProtectedRoute>} />
+            <Route path="/lms/coordinator" element={<ProtectedRoute><Gate pageCode="LMS_COORDINATOR"><NativeLMSCoordinator /></Gate></ProtectedRoute>} />
+            <Route path="/lms/admin" element={<ProtectedRoute><Gate pageCode="LMS_ADMIN"><NativePlaceholderPage title="LMS Admin" module="LMS" /></Gate></ProtectedRoute>} />
+            <Route path="/lms/management-dashboard" element={<ProtectedRoute><Gate pageCode="LMS_MANAGEMENT_DASHBOARD"><NativePlaceholderPage title="LMS Management Dashboard" module="LMS" /></Gate></ProtectedRoute>} />
+            <Route path="/wfm/roster" element={<ProtectedRoute><Gate pageCode="WFM_ROSTER"><NativeWFMRoster /></Gate></ProtectedRoute>} />
+            <Route path="/wfm/live-tracker" element={<ProtectedRoute><Gate pageCode="WFM_LIVE_TRACKER"><NativePlaceholderPage title="WFM Live Tracker" module="WFM" /></Gate></ProtectedRoute>} />
+            <Route path="/quality/dashboard" element={<ProtectedRoute><Gate pageCode="QUALITY_DASHBOARD"><NativePlaceholderPage title="Quality Dashboard" module="Quality" /></Gate></ProtectedRoute>} />
+            <Route path="/operations/dashboard" element={<ProtectedRoute><Gate pageCode="OPERATIONS_DASHBOARD"><NativePlaceholderPage title="Operations Dashboard" module="Operations" /></Gate></ProtectedRoute>} />
+            <Route path="/performance/command-center" element={<ProtectedRoute><Gate pageCode="WORKFORCE_COMMAND_CENTER"><UnifiedPerformanceCommandCenter /></Gate></ProtectedRoute>} />
+            <Route path="/settings/access-control" element={<ProtectedRoute><Gate pageCode="ACCESS_CONTROL"><UnifiedAccessControl /></Gate></ProtectedRoute>} />
 
-            <Route
-              path="/onboarding"
-              element={
-                <ProtectedRoute>
-                  <Onboarding />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Redirect old onboarding-requests route to onboarding with requests tab */}
-            <Route
-              path="/onboarding-requests"
-              element={<Navigate to="/onboarding?tab=requests" replace />}
-            />
-
-            <Route
-              path="/leaves"
-              element={
-                <ProtectedRoute>
-                  <Leaves />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Redirect old leave-approvals route to leaves */}
-            <Route
-              path="/leave-approvals"
-              element={<Navigate to="/leaves" replace />}
-            />
-
-            <Route
-              path="/assets"
-              element={
-                <ProtectedRoute>
-                  <Assets />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/payroll"
-              element={
-                <ProtectedRoute>
-                  <Payroll />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/reports"
-              element={
-                <ProtectedRoute>
-                  <Reports />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/performance"
-              element={
-                <ProtectedRoute>
-                  <Performance />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/reviews-management"
-              element={
-                <ProtectedRoute>
-                  <ReviewsManagement />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/attendance"
-              element={
-                <ProtectedRoute>
-                  <Attendance />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/attendance-regularization"
-              element={
-                <ProtectedRoute>
-                  <AttendanceRegularization />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/bulk-upload"
-              element={
-                <ProtectedRoute>
-                  <BulkUploadHub />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/departments"
-              element={
-                <ProtectedRoute>
-                  <Departments />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/calendar"
-              element={
-                <ProtectedRoute>
-                  <CompanyCalendar />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/notification-preferences"
-              element={
-                <ProtectedRoute>
-                  <NotificationPreferences />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Native Workforce OS pages */}
-            <Route
-              path="/modules"
-              element={
-                <ProtectedRoute>
-                  <ModuleLauncher />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/ats/dashboard"
-              element={
-                <ProtectedRoute>
-                  <NativeATSDashboard />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/ats/candidate-registration"
-              element={
-                <ProtectedRoute>
-                  <NativeATSCandidateRegistration />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/ats/recruiter/my-candidates"
-              element={
-                <ProtectedRoute>
-                  <NativeATSRecruiterDashboard />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/ats/sourcing-analysis"
-              element={
-                <ProtectedRoute>
-                  <NativePlaceholderPage title="ATS Sourcing Analysis" module="ATS" />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/lms/my-learning"
-              element={
-                <ProtectedRoute>
-                  <NativeLMSMyLearning />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/lms/coordinator"
-              element={
-                <ProtectedRoute>
-                  <NativeLMSCoordinator />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/lms/admin"
-              element={
-                <ProtectedRoute>
-                  <NativePlaceholderPage title="LMS Admin" module="LMS" />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/lms/management-dashboard"
-              element={
-                <ProtectedRoute>
-                  <NativePlaceholderPage title="LMS Management Dashboard" module="LMS" />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/wfm/roster"
-              element={
-                <ProtectedRoute>
-                  <NativeWFMRoster />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/wfm/live-tracker"
-              element={
-                <ProtectedRoute>
-                  <NativePlaceholderPage title="WFM Live Tracker" module="WFM" />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/quality/dashboard"
-              element={
-                <ProtectedRoute>
-                  <NativePlaceholderPage title="Quality Dashboard" module="Quality" />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/operations/dashboard"
-              element={
-                <ProtectedRoute>
-                  <NativePlaceholderPage title="Operations Dashboard" module="Operations" />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/performance/command-center"
-              element={
-                <ProtectedRoute>
-                  <UnifiedPerformanceCommandCenter />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/settings/access-control"
-              element={
-                <ProtectedRoute>
-                  <UnifiedAccessControl />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/changelog"
-              element={
-                <ProtectedRoute>
-                  <Changelog />
-                </ProtectedRoute>
-              }
-            />
-
+            <Route path="/changelog" element={<ProtectedRoute><Changelog /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <CookieConsent />
