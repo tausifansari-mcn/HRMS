@@ -1,6 +1,7 @@
 -- =============================================================
 -- Phase 8E: Unified Workforce Performance Command Center
 -- Safe additive SQL for unified role-wise cockpit.
+-- Defensive version: repairs existing partial LMS/WFM/ATS tables before views.
 -- =============================================================
 
 BEGIN;
@@ -37,6 +38,41 @@ CREATE TABLE IF NOT EXISTS public.command_center_alert_log (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Repair existing partial tables used by command center.
+ALTER TABLE public.command_center_saved_filter ADD COLUMN IF NOT EXISTS user_id uuid;
+ALTER TABLE public.command_center_saved_filter ADD COLUMN IF NOT EXISTS filter_name text;
+ALTER TABLE public.command_center_saved_filter ADD COLUMN IF NOT EXISTS filter_payload jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.command_center_saved_filter ADD COLUMN IF NOT EXISTS is_default boolean NOT NULL DEFAULT false;
+ALTER TABLE public.command_center_saved_filter ADD COLUMN IF NOT EXISTS active_status boolean NOT NULL DEFAULT true;
+ALTER TABLE public.command_center_saved_filter ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.command_center_saved_filter ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS alert_domain text;
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS alert_level text NOT NULL DEFAULT 'Info';
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS alert_title text;
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS alert_message text;
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS branch_name text;
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS process_name text;
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS team_name text;
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS employee_id uuid;
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS employee_code text;
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS alert_date date NOT NULL DEFAULT current_date;
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS action_status text NOT NULL DEFAULT 'Open';
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS owner_user_id uuid;
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.command_center_alert_log ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+-- LMS content progress existed in older builds with completed_at but without completed/progress_percent.
+ALTER TABLE public.lms_content_progress ADD COLUMN IF NOT EXISTS completed boolean NOT NULL DEFAULT false;
+ALTER TABLE public.lms_content_progress ADD COLUMN IF NOT EXISTS progress_percent numeric NOT NULL DEFAULT 0;
+ALTER TABLE public.lms_content_progress ADD COLUMN IF NOT EXISTS completed_at timestamptz;
+
+UPDATE public.lms_content_progress
+SET completed = true
+WHERE completed_at IS NOT NULL
+   OR COALESCE(progress_percent, 0) >= 100;
+
 CREATE INDEX IF NOT EXISTS idx_command_center_alert_log_scope
 ON public.command_center_alert_log(alert_date, alert_domain, branch_name, process_name, team_name, action_status);
 
@@ -60,6 +96,8 @@ UNION ALL
 SELECT 'LMS', 'Completed Learning Rows', COUNT(*)::numeric
 FROM public.lms_content_progress
 WHERE completed = true
+   OR completed_at IS NOT NULL
+   OR COALESCE(progress_percent, 0) >= 100
 UNION ALL
 SELECT 'WFM', 'Rostered Today', COUNT(*)::numeric
 FROM public.wfm_roster_assignment
