@@ -1,6 +1,11 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import NativeLMSAdmin from "./NativeLMSAdmin";
 
 export default function NativePlaceholderPage({ title, module }: { title: string; module: string }) {
+  if (title === "LMS Admin") {
+    return <NativeLMSAdmin />;
+  }
+
   return (
     <DashboardLayout>
       <div className="rounded-3xl border bg-white p-8 shadow-sm">
