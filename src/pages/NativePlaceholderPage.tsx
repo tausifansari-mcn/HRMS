@@ -1,9 +1,14 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import NativeLMSAdmin from "./NativeLMSAdmin";
+import NativeLMSManagementDashboard from "./NativeLMSManagementDashboard";
 
 export default function NativePlaceholderPage({ title, module }: { title: string; module: string }) {
   if (title === "LMS Admin") {
     return <NativeLMSAdmin />;
+  }
+
+  if (title === "LMS Management Dashboard") {
+    return <NativeLMSManagementDashboard />;
   }
 
   return (
