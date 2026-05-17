@@ -1,7 +1,7 @@
 -- =============================================================
 -- Phase 8D: Quality + Operations Performance Foundation
 -- Safe additive SQL for quality dashboard, operations dashboard and trend analytics.
--- Corrected: PostgreSQL does not allow COALESCE() expressions inside a table-level UNIQUE constraint.
+-- Defensive version: repairs existing partial tables with ADD COLUMN IF NOT EXISTS.
 -- =============================================================
 
 BEGIN;
@@ -67,16 +67,86 @@ CREATE TABLE IF NOT EXISTS public.performance_target_master (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   metric_code text NOT NULL,
   metric_name text NOT NULL,
-  domain text NOT NULL CHECK (domain IN ('QUALITY','OPERATIONS','TRAINING','ATS','WFM','HRMS')),
+  domain text NOT NULL,
   branch_name text,
   process_name text,
-  target_value numeric NOT NULL,
+  target_value numeric NOT NULL DEFAULT 0,
   target_operator text NOT NULL DEFAULT '>=',
   active_status boolean NOT NULL DEFAULT true,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Repair existing/partial tables from earlier phases.
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS employee_id uuid REFERENCES public.employees(id) ON DELETE SET NULL;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS employee_code text;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS employee_name text;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS audit_date date NOT NULL DEFAULT current_date;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS branch_name text;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS process_name text;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS team_name text;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS manager_name text;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS auditor_name text;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS client_name text;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS call_id text;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS transaction_id text;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS quality_score numeric NOT NULL DEFAULT 0;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS fatal_count integer NOT NULL DEFAULT 0;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS error_count integer NOT NULL DEFAULT 0;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS defect_category text;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS defect_sub_category text;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS coaching_required boolean NOT NULL DEFAULT false;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS coaching_status text NOT NULL DEFAULT 'Pending';
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS remarks text;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.quality_score_log ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS employee_id uuid REFERENCES public.employees(id) ON DELETE SET NULL;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS employee_code text;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS employee_name text;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS performance_date date NOT NULL DEFAULT current_date;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS branch_name text;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS process_name text;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS team_name text;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS manager_name text;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS client_name text;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS login_minutes integer NOT NULL DEFAULT 0;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS productive_minutes integer NOT NULL DEFAULT 0;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS handled_volume integer NOT NULL DEFAULT 0;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS target_volume integer NOT NULL DEFAULT 0;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS aht_seconds numeric NOT NULL DEFAULT 0;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS accuracy_percent numeric NOT NULL DEFAULT 0;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS efficiency_percent numeric NOT NULL DEFAULT 0;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS sla_met_count integer NOT NULL DEFAULT 0;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS sla_total_count integer NOT NULL DEFAULT 0;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS shrinkage_minutes integer NOT NULL DEFAULT 0;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'Active';
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS remarks text;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.operations_productivity_log ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE public.performance_target_master ADD COLUMN IF NOT EXISTS metric_code text;
+ALTER TABLE public.performance_target_master ADD COLUMN IF NOT EXISTS metric_name text;
+ALTER TABLE public.performance_target_master ADD COLUMN IF NOT EXISTS domain text;
+ALTER TABLE public.performance_target_master ADD COLUMN IF NOT EXISTS branch_name text;
+ALTER TABLE public.performance_target_master ADD COLUMN IF NOT EXISTS process_name text;
+ALTER TABLE public.performance_target_master ADD COLUMN IF NOT EXISTS target_value numeric NOT NULL DEFAULT 0;
+ALTER TABLE public.performance_target_master ADD COLUMN IF NOT EXISTS target_operator text NOT NULL DEFAULT '>=';
+ALTER TABLE public.performance_target_master ADD COLUMN IF NOT EXISTS active_status boolean NOT NULL DEFAULT true;
+ALTER TABLE public.performance_target_master ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.performance_target_master ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.performance_target_master ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+-- If an old table has nulls in newly required target fields, normalize before indexes/seed.
+UPDATE public.performance_target_master SET metric_code = COALESCE(metric_code, 'UNKNOWN_' || id::text) WHERE metric_code IS NULL;
+UPDATE public.performance_target_master SET metric_name = COALESCE(metric_name, metric_code) WHERE metric_name IS NULL;
+UPDATE public.performance_target_master SET domain = COALESCE(domain, 'QUALITY') WHERE domain IS NULL;
+UPDATE public.performance_target_master SET target_value = COALESCE(target_value, 0) WHERE target_value IS NULL;
+UPDATE public.performance_target_master SET target_operator = COALESCE(target_operator, '>=') WHERE target_operator IS NULL;
+UPDATE public.performance_target_master SET active_status = COALESCE(active_status, true) WHERE active_status IS NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS ux_performance_target_master_scope
 ON public.performance_target_master (
