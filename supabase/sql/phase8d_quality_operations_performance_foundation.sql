@@ -1,6 +1,7 @@
 -- =============================================================
 -- Phase 8D: Quality + Operations Performance Foundation
 -- Safe additive SQL for quality dashboard, operations dashboard and trend analytics.
+-- Corrected: PostgreSQL does not allow COALESCE() expressions inside a table-level UNIQUE constraint.
 -- =============================================================
 
 BEGIN;
@@ -74,14 +75,28 @@ CREATE TABLE IF NOT EXISTS public.performance_target_master (
   active_status boolean NOT NULL DEFAULT true,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(metric_code, domain, COALESCE(branch_name,''), COALESCE(process_name,''))
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_quality_score_log_date_scope ON public.quality_score_log(audit_date, branch_name, process_name, team_name);
-CREATE INDEX IF NOT EXISTS idx_quality_score_log_employee ON public.quality_score_log(employee_code, audit_date);
-CREATE INDEX IF NOT EXISTS idx_operations_productivity_log_date_scope ON public.operations_productivity_log(performance_date, branch_name, process_name, team_name);
-CREATE INDEX IF NOT EXISTS idx_operations_productivity_log_employee ON public.operations_productivity_log(employee_code, performance_date);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_performance_target_master_scope
+ON public.performance_target_master (
+  metric_code,
+  domain,
+  (COALESCE(branch_name, '')),
+  (COALESCE(process_name, ''))
+);
+
+CREATE INDEX IF NOT EXISTS idx_quality_score_log_date_scope
+ON public.quality_score_log(audit_date, branch_name, process_name, team_name);
+
+CREATE INDEX IF NOT EXISTS idx_quality_score_log_employee
+ON public.quality_score_log(employee_code, audit_date);
+
+CREATE INDEX IF NOT EXISTS idx_operations_productivity_log_date_scope
+ON public.operations_productivity_log(performance_date, branch_name, process_name, team_name);
+
+CREATE INDEX IF NOT EXISTS idx_operations_productivity_log_employee
+ON public.operations_productivity_log(employee_code, performance_date);
 
 CREATE OR REPLACE VIEW public.quality_dashboard_daily_summary AS
 SELECT
@@ -119,6 +134,15 @@ SELECT
 FROM public.operations_productivity_log
 GROUP BY performance_date, COALESCE(branch_name,'Unmapped'), COALESCE(process_name,'Unmapped'), COALESCE(team_name,'Unmapped');
 
+DELETE FROM public.performance_target_master
+WHERE branch_name IS NULL
+  AND process_name IS NULL
+  AND (
+    (domain = 'QUALITY' AND metric_code IN ('QUALITY_SCORE','FATAL_COUNT','COACHING_PENDING'))
+    OR
+    (domain = 'OPERATIONS' AND metric_code IN ('PRODUCTIVITY_ACHIEVEMENT','ACCURACY_PERCENT','EFFICIENCY_PERCENT','SLA_PERCENT','SHRINKAGE_PERCENT'))
+  );
+
 INSERT INTO public.performance_target_master (metric_code, metric_name, domain, target_value, target_operator)
 VALUES
 ('QUALITY_SCORE','Quality Score','QUALITY',95,'>='),
@@ -128,13 +152,7 @@ VALUES
 ('ACCURACY_PERCENT','Accuracy %','OPERATIONS',95,'>='),
 ('EFFICIENCY_PERCENT','Efficiency %','OPERATIONS',90,'>='),
 ('SLA_PERCENT','SLA %','OPERATIONS',95,'>='),
-('SHRINKAGE_PERCENT','Shrinkage %','OPERATIONS',10,'<=')
-ON CONFLICT (metric_code, domain, COALESCE(branch_name,''), COALESCE(process_name,'')) DO UPDATE SET
-  metric_name = EXCLUDED.metric_name,
-  target_value = EXCLUDED.target_value,
-  target_operator = EXCLUDED.target_operator,
-  active_status = true,
-  updated_at = now();
+('SHRINKAGE_PERCENT','Shrinkage %','OPERATIONS',10,'<=');
 
 ALTER TABLE public.quality_score_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.operations_productivity_log ENABLE ROW LEVEL SECURITY;
