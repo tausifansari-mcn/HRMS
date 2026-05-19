@@ -225,7 +225,6 @@ DECLARE
   v_date_of_birth DATE;
   v_imported      INTEGER := 0;
   v_error_rows    INTEGER := 0;
-  v_total_valid   INTEGER := 0;
   v_part          TEXT;
   v_text          TEXT;
 BEGIN
@@ -246,6 +245,10 @@ BEGIN
     );
   END IF;
 
+  IF v_batch.batch_status IN ('imported', 'imported_with_errors') THEN
+    RETURN jsonb_build_object('ok', false, 'message', 'Batch has already been imported. Create a new upload batch to re-import.', 'importedRows', 0, 'errorRows', 0);
+  END IF;
+
   UPDATE public.upload_batch
   SET batch_status = 'importing', imported_by = auth.uid(), updated_at = now()
   WHERE id = p_batch_id;
@@ -255,7 +258,6 @@ BEGIN
     WHERE upload_batch_id = p_batch_id AND row_status IN ('valid', 'pending')
     ORDER BY row_no
   LOOP
-    v_total_valid   := v_total_valid + 1;
     v_data          := COALESCE(v_row.normalized_data, v_row.raw_data, '{}'::jsonb);
     v_errors        := ARRAY[]::TEXT[];
     v_department_id := NULL;
@@ -431,17 +433,17 @@ BEGIN
 
   UPDATE public.upload_batch SET
     imported_rows = v_imported,
-    error_rows    = (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error'),
+    error_rows    = v_error_rows,
     batch_status  = CASE
-      WHEN v_imported > 0 AND (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error') > 0 THEN 'imported_with_errors'
+      WHEN v_imported > 0 AND v_error_rows > 0 THEN 'imported_with_errors'
       WHEN v_imported > 0 THEN 'imported'
       ELSE 'failed'
     END,
     imported_by  = auth.uid(),
     imported_at  = now(),
     error_summary = CASE
-      WHEN (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error') > 0
-        THEN (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error')::TEXT || ' row(s) failed during import'
+      WHEN v_error_rows > 0
+        THEN v_error_rows::TEXT || ' row(s) failed during import'
       ELSE NULL
     END,
     updated_at = now()
@@ -492,6 +494,10 @@ BEGIN
 
   IF v_batch.upload_type_code <> 'PROCESS_MASTER' THEN
     RETURN jsonb_build_object('ok', false, 'message', 'Batch is not PROCESS_MASTER type', 'importedRows', 0, 'errorRows', 0);
+  END IF;
+
+  IF v_batch.batch_status IN ('imported', 'imported_with_errors') THEN
+    RETURN jsonb_build_object('ok', false, 'message', 'Batch has already been imported. Create a new upload batch to re-import.', 'importedRows', 0, 'errorRows', 0);
   END IF;
 
   UPDATE public.upload_batch
@@ -563,15 +569,15 @@ BEGIN
 
   UPDATE public.upload_batch SET
     imported_rows = v_imported,
-    error_rows    = (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error'),
+    error_rows    = v_error_rows,
     batch_status  = CASE
-      WHEN v_imported > 0 AND (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error') > 0 THEN 'imported_with_errors'
+      WHEN v_imported > 0 AND v_error_rows > 0 THEN 'imported_with_errors'
       WHEN v_imported > 0 THEN 'imported'
       ELSE 'failed'
     END,
     imported_by = auth.uid(), imported_at = now(),
-    error_summary = CASE WHEN (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error') > 0
-      THEN (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error')::TEXT || ' row(s) failed'
+    error_summary = CASE WHEN v_error_rows > 0
+      THEN v_error_rows::TEXT || ' row(s) failed'
       ELSE NULL END,
     updated_at = now()
   WHERE id = p_batch_id;
@@ -583,7 +589,7 @@ $$;
 -- ============================================================
 -- import_department_upload_batch  (DEPARTMENT_MASTER)
 -- Target table: public.departments
--- CSV: departmentname, description, managercode, manageremail
+-- CSV: departmentname, description
 -- Note: departments.name is the unique column (TEXT)
 -- ============================================================
 
@@ -612,6 +618,10 @@ BEGIN
 
   IF v_batch.upload_type_code <> 'DEPARTMENT_MASTER' THEN
     RETURN jsonb_build_object('ok', false, 'message', 'Batch is not DEPARTMENT_MASTER type', 'importedRows', 0, 'errorRows', 0);
+  END IF;
+
+  IF v_batch.batch_status IN ('imported', 'imported_with_errors') THEN
+    RETURN jsonb_build_object('ok', false, 'message', 'Batch has already been imported. Create a new upload batch to re-import.', 'importedRows', 0, 'errorRows', 0);
   END IF;
 
   UPDATE public.upload_batch
@@ -662,15 +672,15 @@ BEGIN
 
   UPDATE public.upload_batch SET
     imported_rows = v_imported,
-    error_rows    = (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error'),
+    error_rows    = v_error_rows,
     batch_status  = CASE
-      WHEN v_imported > 0 AND (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error') > 0 THEN 'imported_with_errors'
+      WHEN v_imported > 0 AND v_error_rows > 0 THEN 'imported_with_errors'
       WHEN v_imported > 0 THEN 'imported'
       ELSE 'failed'
     END,
     imported_by = auth.uid(), imported_at = now(),
-    error_summary = CASE WHEN (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error') > 0
-      THEN (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error')::TEXT || ' row(s) failed'
+    error_summary = CASE WHEN v_error_rows > 0
+      THEN v_error_rows::TEXT || ' row(s) failed'
       ELSE NULL END,
     updated_at = now()
   WHERE id = p_batch_id;
@@ -717,6 +727,10 @@ BEGIN
 
   IF v_batch.upload_type_code <> 'ASSET_MASTER' THEN
     RETURN jsonb_build_object('ok', false, 'message', 'Batch is not ASSET_MASTER type', 'importedRows', 0, 'errorRows', 0);
+  END IF;
+
+  IF v_batch.batch_status IN ('imported', 'imported_with_errors') THEN
+    RETURN jsonb_build_object('ok', false, 'message', 'Batch has already been imported. Create a new upload batch to re-import.', 'importedRows', 0, 'errorRows', 0);
   END IF;
 
   UPDATE public.upload_batch
@@ -816,15 +830,15 @@ BEGIN
 
   UPDATE public.upload_batch SET
     imported_rows = v_imported,
-    error_rows    = (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error'),
+    error_rows    = v_error_rows,
     batch_status  = CASE
-      WHEN v_imported > 0 AND (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error') > 0 THEN 'imported_with_errors'
+      WHEN v_imported > 0 AND v_error_rows > 0 THEN 'imported_with_errors'
       WHEN v_imported > 0 THEN 'imported'
       ELSE 'failed'
     END,
     imported_by = auth.uid(), imported_at = now(),
-    error_summary = CASE WHEN (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error') > 0
-      THEN (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error')::TEXT || ' row(s) failed'
+    error_summary = CASE WHEN v_error_rows > 0
+      THEN v_error_rows::TEXT || ' row(s) failed'
       ELSE NULL END,
     updated_at = now()
   WHERE id = p_batch_id;
@@ -867,6 +881,10 @@ BEGIN
 
   IF v_batch.upload_type_code <> 'BRANCH_MASTER' THEN
     RETURN jsonb_build_object('ok', false, 'message', 'Batch is not BRANCH_MASTER type', 'importedRows', 0, 'errorRows', 0);
+  END IF;
+
+  IF v_batch.batch_status IN ('imported', 'imported_with_errors') THEN
+    RETURN jsonb_build_object('ok', false, 'message', 'Batch has already been imported. Create a new upload batch to re-import.', 'importedRows', 0, 'errorRows', 0);
   END IF;
 
   UPDATE public.upload_batch
@@ -928,15 +946,15 @@ BEGIN
 
   UPDATE public.upload_batch SET
     imported_rows = v_imported,
-    error_rows    = (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error'),
+    error_rows    = v_error_rows,
     batch_status  = CASE
-      WHEN v_imported > 0 AND (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error') > 0 THEN 'imported_with_errors'
+      WHEN v_imported > 0 AND v_error_rows > 0 THEN 'imported_with_errors'
       WHEN v_imported > 0 THEN 'imported'
       ELSE 'failed'
     END,
     imported_by = auth.uid(), imported_at = now(),
-    error_summary = CASE WHEN (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error') > 0
-      THEN (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error')::TEXT || ' row(s) failed'
+    error_summary = CASE WHEN v_error_rows > 0
+      THEN v_error_rows::TEXT || ' row(s) failed'
       ELSE NULL END,
     updated_at = now()
   WHERE id = p_batch_id;
@@ -979,6 +997,10 @@ BEGIN
 
   IF v_batch.upload_type_code <> 'LOB_MASTER' THEN
     RETURN jsonb_build_object('ok', false, 'message', 'Batch is not LOB_MASTER type', 'importedRows', 0, 'errorRows', 0);
+  END IF;
+
+  IF v_batch.batch_status IN ('imported', 'imported_with_errors') THEN
+    RETURN jsonb_build_object('ok', false, 'message', 'Batch has already been imported. Create a new upload batch to re-import.', 'importedRows', 0, 'errorRows', 0);
   END IF;
 
   UPDATE public.upload_batch
@@ -1040,15 +1062,15 @@ BEGIN
 
   UPDATE public.upload_batch SET
     imported_rows = v_imported,
-    error_rows    = (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error'),
+    error_rows    = v_error_rows,
     batch_status  = CASE
-      WHEN v_imported > 0 AND (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error') > 0 THEN 'imported_with_errors'
+      WHEN v_imported > 0 AND v_error_rows > 0 THEN 'imported_with_errors'
       WHEN v_imported > 0 THEN 'imported'
       ELSE 'failed'
     END,
     imported_by = auth.uid(), imported_at = now(),
-    error_summary = CASE WHEN (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error') > 0
-      THEN (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error')::TEXT || ' row(s) failed'
+    error_summary = CASE WHEN v_error_rows > 0
+      THEN v_error_rows::TEXT || ' row(s) failed'
       ELSE NULL END,
     updated_at = now()
   WHERE id = p_batch_id;
@@ -1091,6 +1113,10 @@ BEGIN
 
   IF v_batch.upload_type_code <> 'DESIGNATION_MASTER' THEN
     RETURN jsonb_build_object('ok', false, 'message', 'Batch is not DESIGNATION_MASTER type', 'importedRows', 0, 'errorRows', 0);
+  END IF;
+
+  IF v_batch.batch_status IN ('imported', 'imported_with_errors') THEN
+    RETURN jsonb_build_object('ok', false, 'message', 'Batch has already been imported. Create a new upload batch to re-import.', 'importedRows', 0, 'errorRows', 0);
   END IF;
 
   UPDATE public.upload_batch
@@ -1152,15 +1178,15 @@ BEGIN
 
   UPDATE public.upload_batch SET
     imported_rows = v_imported,
-    error_rows    = (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error'),
+    error_rows    = v_error_rows,
     batch_status  = CASE
-      WHEN v_imported > 0 AND (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error') > 0 THEN 'imported_with_errors'
+      WHEN v_imported > 0 AND v_error_rows > 0 THEN 'imported_with_errors'
       WHEN v_imported > 0 THEN 'imported'
       ELSE 'failed'
     END,
     imported_by = auth.uid(), imported_at = now(),
-    error_summary = CASE WHEN (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error') > 0
-      THEN (SELECT COUNT(*) FROM public.upload_batch_row WHERE upload_batch_id = p_batch_id AND row_status = 'error')::TEXT || ' row(s) failed'
+    error_summary = CASE WHEN v_error_rows > 0
+      THEN v_error_rows::TEXT || ' row(s) failed'
       ELSE NULL END,
     updated_at = now()
   WHERE id = p_batch_id;
