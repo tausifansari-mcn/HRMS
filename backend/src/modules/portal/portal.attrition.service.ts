@@ -1,0 +1,54 @@
+import type { RowDataPacket } from "mysql2";
+import { db } from "../../db/mysql.js";
+import type { AttritionData } from "./portal.types.js";
+
+export const portalAttritionService = {
+  async getAttrition(processId: string, period: string): Promise<AttritionData> {
+    if (!/^\d{4}-\d{2}$/.test(period)) throw new Error(`Invalid period format: ${period}`);
+
+    const [hcRows] = await db.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) AS headcount,
+              AVG(TIMESTAMPDIFF(MONTH, date_of_joining, CURDATE())) AS avg_tenure
+       FROM employees WHERE process_id = ? AND employment_status = 'Active'`,
+      [processId]
+    );
+    const hc = (hcRows as RowDataPacket[])[0];
+
+    const [exitRows] = await db.execute<RowDataPacket[]>(
+      `SELECT
+         COUNT(*) AS total_exits,
+         SUM(CASE WHEN exit_type = 'voluntary'   THEN 1 ELSE 0 END) AS voluntary_count,
+         SUM(CASE WHEN exit_type = 'involuntary' THEN 1 ELSE 0 END) AS involuntary_count
+       FROM exit_records
+       WHERE process_id = ? AND DATE_FORMAT(exit_date, '%Y-%m') = ?`,
+      [processId, period]
+    ).catch((): [RowDataPacket[], unknown] => [[{ total_exits: 0, voluntary_count: 0, involuntary_count: 0 } as RowDataPacket], null]);
+    const exits = (exitRows as RowDataPacket[])[0];
+
+    const [reasonRows] = await db.execute<RowDataPacket[]>(
+      `SELECT exit_reason AS reason, COUNT(*) AS cnt
+       FROM exit_records
+       WHERE process_id = ? AND DATE_FORMAT(exit_date, '%Y-%m') = ?
+       GROUP BY exit_reason ORDER BY cnt DESC LIMIT 3`,
+      [processId, period]
+    ).catch((): [RowDataPacket[], unknown] => [[], null]);
+
+    const headcount = Number(hc.headcount) || 0;
+    const totalExits = Number(exits.total_exits) || 0;
+    const attrition_pct = headcount > 0
+      ? Math.round((totalExits / headcount) * 100 * 100) / 100
+      : 0;
+
+    return {
+      period,
+      attrition_pct,
+      voluntary_count: Number(exits.voluntary_count) || 0,
+      involuntary_count: Number(exits.involuntary_count) || 0,
+      headcount,
+      sanctioned_strength: headcount,
+      open_positions: 0,
+      avg_tenure_months: Math.round(Number(hc.avg_tenure) || 0),
+      top_exit_reasons: (reasonRows as RowDataPacket[]).map(r => ({ reason: r.reason, count: Number(r.cnt) })),
+    };
+  },
+};
