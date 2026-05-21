@@ -16,19 +16,28 @@ export const portalKpiService = {
   },
 
   async getScorecards(processId: string, period: string): Promise<KpiScorecard[]> {
+    if (!/^\d{4}-\d{2}$/.test(period)) throw new Error(`Invalid period format: ${period}`);
+
+    // Fetch process name first to build a safe parameterized LIKE
+    const [procRows] = await db.execute<RowDataPacket[]>(
+      "SELECT process_name FROM process_master WHERE id = ? LIMIT 1",
+      [processId]
+    );
+    const procName = (procRows as RowDataPacket[])[0]?.process_name as string | undefined;
+    if (!procName) return [];
+
     const [metricRows] = await db.execute<RowDataPacket[]>(
       `SELECT
          m.id AS metric_id, m.metric_code, m.metric_name, m.unit, m.direction,
          tm.target_value,
          ks.actual_value
-       FROM process_master p
-       JOIN kpi_template kt ON kt.template_name LIKE CONCAT('%', p.process_name, '%')
+       FROM kpi_template kt
        JOIN kpi_template_metric tm ON tm.template_id = kt.id
        JOIN kpi_metric_master m ON m.id = tm.metric_id
        LEFT JOIN kpi_score ks ON ks.metric_id = m.id AND ks.period = ?
-       WHERE p.id = ?
+       WHERE kt.template_name LIKE ?
        ORDER BY m.category, m.metric_name`,
-      [period, processId]
+      [period, `%${procName.replace(/[%_\\]/g, "\\$&")}%`]
     );
 
     const metricIds = (metricRows as RowDataPacket[]).map(r => r.metric_id);
@@ -72,6 +81,8 @@ export const portalKpiService = {
 
 function getSixMonthsAgo(period: string): string {
   const [y, m] = period.split("-").map(Number);
-  const d = new Date(y, m - 7, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  let year = y;
+  let month = m - 6;
+  while (month <= 0) { month += 12; year -= 1; }
+  return `${year}-${String(month).padStart(2, "0")}`;
 }
