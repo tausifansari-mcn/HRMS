@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 
-const HRMS_API_URL = import.meta.env.VITE_HRMS_API_URL ?? 'http://localhost:5055';
+// Empty string = use Vercel proxy (same origin, /api/* rewritten to Railway)
+// Local dev = http://localhost:5055
+const HRMS_API_URL = import.meta.env.VITE_HRMS_API_URL || 'http://localhost:5055';
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
