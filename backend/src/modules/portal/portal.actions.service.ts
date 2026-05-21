@@ -62,7 +62,11 @@ export const portalActionsService = {
     };
     const entries = Object.entries(input).filter(([, v]) => v !== undefined);
     if (entries.length === 0) return;
-    const setClauses = entries.map(([k]) => `${FIELD_MAP[k] ?? k} = ?`).join(", ");
+    const setClauses = entries.map(([k]) => {
+      const col = FIELD_MAP[k];
+      if (!col) throw new Error(`Unknown field: ${k}`);
+      return `${col} = ?`;
+    }).join(", ");
     const values = entries.map(([, v]) => v);
     await db.execute(`UPDATE action_plan SET ${setClauses} WHERE id = ?`, [...values, id]);
   },
