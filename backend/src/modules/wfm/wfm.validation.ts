@@ -1,0 +1,96 @@
+import { z } from "zod";
+
+const TIME_REGEX = /^\d{2}:\d{2}$/;
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+export const createShiftSchema = z.object({
+  shiftCode: z.string().trim().min(2).max(50),
+  shiftName: z.string().trim().min(2).max(255),
+  startTime: z.string().regex(TIME_REGEX, "Time must be HH:MM"),
+  endTime: z.string().regex(TIME_REGEX, "Time must be HH:MM"),
+  requiredMinutes: z.coerce.number().int().min(1).max(1440).default(540),
+  branchName: z.string().trim().max(255).nullable().optional(),
+  processName: z.string().trim().max(255).nullable().optional(),
+});
+
+export const updateShiftSchema = z.object({
+  shiftName: z.string().trim().min(2).max(255).optional(),
+  startTime: z.string().regex(TIME_REGEX, "Time must be HH:MM").optional(),
+  endTime: z.string().regex(TIME_REGEX, "Time must be HH:MM").optional(),
+  requiredMinutes: z.coerce.number().int().min(1).max(1440).optional(),
+  branchName: z.string().trim().max(255).nullable().optional(),
+  processName: z.string().trim().max(255).nullable().optional(),
+  activeStatus: z.boolean().optional(),
+});
+
+export const rosterPlanSchema = z
+  .object({
+    planName: z.string().trim().min(1).max(255),
+    processId: z.string().uuid().nullable().optional(),
+    branchId: z.string().uuid().nullable().optional(),
+    shiftId: z.string().uuid().nullable().optional(),
+    fromDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
+    toDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
+    requiredHeadcount: z.coerce.number().int().min(0).default(0),
+  })
+  .refine((d) => d.toDate >= d.fromDate, { message: "toDate must be >= fromDate" });
+
+export const rosterAssignSchema = z.object({
+  employeeId: z.string().uuid(),
+  shiftId: z.string().uuid().nullable().optional(),
+  planId: z.string().uuid().nullable().optional(),
+  rosterDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
+  rosterStatus: z.string().max(50).default("Rostered"),
+  branchName: z.string().trim().max(255).nullable().optional(),
+  processName: z.string().trim().max(255).nullable().optional(),
+});
+
+export const attendanceSessionFiltersSchema = z.object({
+  employeeId: z.string().uuid().optional(),
+  fromDate: z.string().regex(DATE_REGEX).optional(),
+  toDate: z.string().regex(DATE_REGEX).optional(),
+  status: z.string().optional(),
+  processName: z.string().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export const clockInSchema = z.object({
+  employeeId: z.string().uuid(),
+  sessionDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
+  punchSource: z.enum(["MANUAL", "BIOMETRIC", "DIALER"]).default("MANUAL"),
+  branchName: z.string().trim().max(255).nullable().optional(),
+  processName: z.string().trim().max(255).nullable().optional(),
+});
+
+export const clockOutSchema = z.object({
+  sessionId: z.string().uuid(),
+});
+
+export const breakSchema = z.object({
+  sessionId: z.string().uuid(),
+  breakType: z.enum(["Break", "Lunch", "Bio", "Training"]),
+});
+
+export const regularizationSchema = z.object({
+  employeeId: z.string().uuid(),
+  sessionDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
+  reason: z.string().trim().min(1).max(500),
+  supportingNote: z.string().trim().nullable().optional(),
+});
+
+export const reviewRegularizationSchema = z.object({
+  status: z.enum(["approved", "rejected"]),
+  reviewerNote: z.string().trim().nullable().optional(),
+});
+
+export type CreateShiftInput = z.infer<typeof createShiftSchema>;
+export type UpdateShiftInput = z.infer<typeof updateShiftSchema>;
+export type RosterPlanInput = z.infer<typeof rosterPlanSchema>;
+export type RosterAssignInput = z.infer<typeof rosterAssignSchema>;
+export type AttendanceSessionFilters = z.infer<typeof attendanceSessionFiltersSchema>;
+export type ClockInInput = z.infer<typeof clockInSchema>;
+export type ClockOutInput = z.infer<typeof clockOutSchema>;
+export type BreakInput = z.infer<typeof breakSchema>;
+export type RegularizationInput = z.infer<typeof regularizationSchema>;
+export type ReviewRegularizationInput = z.infer<typeof reviewRegularizationSchema>;

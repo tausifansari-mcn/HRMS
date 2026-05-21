@@ -11,10 +11,9 @@ export function requireRole(...allowedRoles: string[]) {
       }
 
       const [rows] = await db.execute<RowDataPacket[]>(
-        `SELECT r.role_key
-           FROM user_roles ur
-           JOIN roles r ON r.id = ur.role_id
-          WHERE ur.user_id = ? AND ur.is_active = 1`,
+        `SELECT role_key
+           FROM user_roles
+          WHERE user_id = ? AND active_status = 1`,
         [req.authUser.id]
       );
 

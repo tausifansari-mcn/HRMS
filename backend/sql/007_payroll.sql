@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS salary_structure_master (
   structure_code VARCHAR(50)  NOT NULL UNIQUE,
   structure_name VARCHAR(255) NOT NULL,
   description    TEXT,
+  basic_pct      DECIMAL(5,2) NOT NULL DEFAULT 40.00,
+  hra_pct        DECIMAL(5,2) NOT NULL DEFAULT 20.00,
   active_status  TINYINT(1)   NOT NULL DEFAULT 1,
   created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

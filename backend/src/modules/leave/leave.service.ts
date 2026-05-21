@@ -1,0 +1,130 @@
+import { randomUUID } from "crypto";
+import type { RowDataPacket } from "mysql2";
+import { db } from "../../db/mysql.js";
+import type {
+  LeaveBalanceLedger,
+  LeaveHoliday,
+  LeaveRequest,
+  LeaveType,
+  PaginatedResult,
+} from "./leave.types.js";
+import type {
+  CreateHolidayInput,
+  CreateLeaveTypeInput,
+  LeaveRequestFilters,
+  LeaveRequestInput,
+  ReviewLeaveInput,
+} from "./leave.validation.js";
+
+export const leaveService = {
+  async listLeaveTypes(): Promise<LeaveType[]> {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      "SELECT * FROM leave_type_master WHERE active_status = 1 ORDER BY leave_name ASC"
+    );
+    return rows as LeaveType[];
+  },
+
+  async createLeaveType(input: CreateLeaveTypeInput): Promise<LeaveType> {
+    const [dup] = await db.execute<RowDataPacket[]>(
+      "SELECT id FROM leave_type_master WHERE leave_code = ? LIMIT 1", [input.leaveCode]
+    );
+    if ((dup as RowDataPacket[]).length > 0) throw new Error("Leave code already exists");
+
+    const id = randomUUID();
+    await db.execute(
+      `INSERT INTO leave_type_master (id, leave_code, leave_name, max_days_per_year, carry_forward, requires_approval, paid_leave)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, input.leaveCode, input.leaveName, input.maxDaysPerYear,
+       input.carryForward ? 1 : 0, input.requiresApproval ? 1 : 0, input.paidLeave ? 1 : 0]
+    );
+    const [rows] = await db.execute<RowDataPacket[]>(
+      "SELECT * FROM leave_type_master WHERE id = ? LIMIT 1", [id]
+    );
+    return (rows as LeaveType[])[0];
+  },
+
+  async submitRequest(input: LeaveRequestInput): Promise<LeaveRequest> {
+    const id = randomUUID();
+    await db.execute(
+      `INSERT INTO leave_request (id, employee_id, leave_type_id, from_date, to_date, total_days, reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, input.employeeId, input.leaveTypeId, input.fromDate, input.toDate,
+       input.totalDays, input.reason ?? null]
+    );
+    return this.getRequest(id);
+  },
+
+  async getRequest(id: string): Promise<LeaveRequest> {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      "SELECT * FROM leave_request WHERE id = ? LIMIT 1", [id]
+    );
+    const rec = (rows as LeaveRequest[])[0];
+    if (!rec) throw new Error("Leave request not found");
+    return rec;
+  },
+
+  async reviewRequest(id: string, input: ReviewLeaveInput, reviewerId: string): Promise<LeaveRequest> {
+    await this.getRequest(id);
+    await db.execute(
+      "UPDATE leave_request SET status = ? WHERE id = ?",
+      [input.status, id]
+    );
+    await db.execute(
+      `INSERT INTO leave_approval_log (id, leave_request_id, action, action_by, remarks)
+       VALUES (UUID(), ?, ?, ?, ?)`,
+      [id, input.status, reviewerId, input.remarks ?? null]
+    );
+    return this.getRequest(id);
+  },
+
+  async listRequests(filters: LeaveRequestFilters): Promise<PaginatedResult<LeaveRequest>> {
+    const { page, limit, employeeId, leaveTypeId, status, fromDate, toDate } = filters;
+    const offset = (page - 1) * limit;
+    const conds: string[] = [];
+    const params: unknown[] = [];
+    if (employeeId)  { conds.push("employee_id = ?");    params.push(employeeId); }
+    if (leaveTypeId) { conds.push("leave_type_id = ?");  params.push(leaveTypeId); }
+    if (status)      { conds.push("status = ?");         params.push(status); }
+    if (fromDate)    { conds.push("from_date >= ?");     params.push(fromDate); }
+    if (toDate)      { conds.push("to_date <= ?");       params.push(toDate); }
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT * FROM leave_request ${where} ORDER BY applied_at DESC LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+    const [countRows] = await db.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) AS total FROM leave_request ${where}`, params
+    );
+    return { data: rows as LeaveRequest[], total: (countRows as any)[0]?.total ?? 0, page, limit };
+  },
+
+  async getBalance(employeeId: string, year: number): Promise<LeaveBalanceLedger[]> {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      "SELECT * FROM leave_balance_ledger WHERE employee_id = ? AND balance_year = ?",
+      [employeeId, year]
+    );
+    return rows as LeaveBalanceLedger[];
+  },
+
+  async listHolidays(year?: number): Promise<LeaveHoliday[]> {
+    let sql = "SELECT * FROM leave_holiday_master WHERE active_status = 1";
+    const params: unknown[] = [];
+    if (year) { sql += " AND YEAR(holiday_date) = ?"; params.push(year); }
+    sql += " ORDER BY holiday_date ASC";
+    const [rows] = await db.execute<RowDataPacket[]>(sql, params);
+    return rows as LeaveHoliday[];
+  },
+
+  async createHoliday(input: CreateHolidayInput): Promise<LeaveHoliday> {
+    const id = randomUUID();
+    await db.execute(
+      `INSERT INTO leave_holiday_master (id, holiday_name, holiday_date, holiday_type, branch_id)
+       VALUES (?, ?, ?, ?, ?)`,
+      [id, input.holidayName, input.holidayDate, input.holidayType, input.branchId ?? null]
+    );
+    const [rows] = await db.execute<RowDataPacket[]>(
+      "SELECT * FROM leave_holiday_master WHERE id = ? LIMIT 1", [id]
+    );
+    return (rows as LeaveHoliday[])[0];
+  },
+};
