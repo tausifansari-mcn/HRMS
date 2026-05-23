@@ -50,6 +50,11 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
+import PortalLogin from "./pages/portal/PortalLogin";
+import PortalOverview from "./pages/portal/PortalOverview";
+import PortalProcessDashboard from "./pages/portal/PortalProcessDashboard";
+import { PortalRoute } from "./components/portal/PortalRoute";
+
 const queryClient = new QueryClient();
 
 const Gate = ({ pageCode, children }: { pageCode: string; children: React.ReactNode }) => (
@@ -114,6 +119,11 @@ const App = () => (
             <Route path="/operations/dashboard" element={<ProtectedRoute><Gate pageCode="OPERATIONS_DASHBOARD"><NativePlaceholderPage title="Operations Dashboard" module="Operations" /></Gate></ProtectedRoute>} />
             <Route path="/performance/command-center" element={<ProtectedRoute><Gate pageCode="WORKFORCE_COMMAND_CENTER"><UnifiedPerformanceCommandCenter /></Gate></ProtectedRoute>} />
             <Route path="/settings/access-control" element={<ProtectedRoute><Gate pageCode="ACCESS_CONTROL"><UnifiedAccessControl /></Gate></ProtectedRoute>} />
+
+            {/* Client Portal Routes */}
+            <Route path="/portal/login" element={<PortalLogin />} />
+            <Route path="/portal" element={<PortalRoute><PortalOverview /></PortalRoute>} />
+            <Route path="/portal/processes/:id" element={<PortalRoute><PortalProcessDashboard /></PortalRoute>} />
 
             <Route path="/changelog" element={<ProtectedRoute><Changelog /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
