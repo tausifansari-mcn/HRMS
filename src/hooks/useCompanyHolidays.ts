@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
+import { USE_HRMS_BACKEND } from "@/lib/dataSource";
 
 export interface CompanyHoliday {
   id: string;
@@ -13,6 +15,15 @@ export function useCompanyHolidays() {
   return useQuery({
     queryKey: ["company-holidays", currentYear],
     queryFn: async () => {
+      if (USE_HRMS_BACKEND.leave) {
+        const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/leave/holidays");
+        return (res.data || []).map((h: any): CompanyHoliday => ({
+          id: h.id,
+          title: h.holiday_name ?? h.title,
+          event_date: h.holiday_date ?? h.event_date,
+        }));
+      }
+
       const { data, error } = await supabase
         .from("company_events")
         .select("id, title, event_date")

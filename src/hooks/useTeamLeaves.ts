@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
+import { USE_HRMS_BACKEND } from "@/lib/dataSource";
 import { useAuth } from "@/contexts/AuthContext";
 
 export interface TeamLeave {
@@ -20,6 +22,22 @@ export function useTeamLeaves(month: Date) {
     queryKey: ["team-leaves", user?.id, month.getMonth(), month.getFullYear()],
     queryFn: async () => {
       if (!user?.id) return [];
+
+      if (USE_HRMS_BACKEND.leave) {
+        const start = new Date(month.getFullYear(), month.getMonth(), 1).toISOString().slice(0, 10);
+        const end   = new Date(month.getFullYear(), month.getMonth() + 1, 0).toISOString().slice(0, 10);
+        const res = await hrmsApi.get<{ success: boolean; data: any[] }>(`/api/leave/requests?fromDate=${start}&toDate=${end}&status=approved`);
+        return (res.data || []).map((r: any): TeamLeave => ({
+          id: r.id,
+          employee_id: r.employee_id,
+          employee_name: r.employee_name ?? "",
+          employee_avatar: null,
+          leave_type: r.leave_type_name ?? "Leave",
+          start_date: r.from_date,
+          end_date: r.to_date,
+          days_count: r.total_days ?? 0,
+        }));
+      }
 
       // Get current user's employee record
       const { data: myEmployee } = await supabase

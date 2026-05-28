@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
+import { USE_HRMS_BACKEND } from "@/lib/dataSource";
 import { format } from "date-fns";
 
 export interface PayrollRecord {
@@ -31,6 +33,27 @@ export function usePayrollRecords(month?: number, year?: number) {
   return useQuery({
     queryKey: ["payroll-records", month, year],
     queryFn: async () => {
+      if (USE_HRMS_BACKEND.payroll) {
+        const params = new URLSearchParams();
+        if (month !== undefined) params.set("month", String(month));
+        if (year  !== undefined) params.set("year",  String(year));
+        const res = await hrmsApi.get<{ success: boolean; data: any[] }>(`/api/payroll/runs?${params}`);
+        return (res.data || []).map((run: any): PayrollRecord => ({
+          id: run.id,
+          employeeId: "",
+          employeeCode: "",
+          employee: { name: "", email: "" },
+          month: run.run_month ?? "",
+          monthNum: Number((run.run_month ?? "0-0").split("-")[1]),
+          year:     Number((run.run_month ?? "0-0").split("-")[0]),
+          basic: 0,
+          allowances: 0,
+          deductions: Number(run.total_deductions ?? 0),
+          netSalary:  Number(run.total_net ?? 0),
+          status: run.status === "disbursed" ? "paid" : run.status === "processing" || run.status === "locked" ? "processing" : "pending",
+        }));
+      }
+
       let query = supabase
         .from("payroll_records")
         .select(`
@@ -281,6 +304,27 @@ export function useSalaryStructures() {
   return useQuery({
     queryKey: ["salary-structures"],
     queryFn: async () => {
+      if (USE_HRMS_BACKEND.payroll) {
+        const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/payroll/structures");
+        return (res.data || []).map((s: any): SalaryStructure => ({
+          id: s.id,
+          employeeId: "",
+          employeeName: s.structure_name,
+          employeeEmail: "",
+          basicSalary: 0,
+          hra: 0,
+          transportAllowance: 0,
+          medicalAllowance: 0,
+          otherAllowances: 0,
+          taxDeduction: 0,
+          otherDeductions: 0,
+          effectiveFrom: s.created_at,
+          totalAllowances: 0,
+          totalDeductions: 0,
+          netSalary: 0,
+        }));
+      }
+
       const { data, error } = await supabase
         .from("salary_structures")
         .select(`

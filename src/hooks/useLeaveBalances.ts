@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
+import { USE_HRMS_BACKEND } from "@/lib/dataSource";
 
 export interface LeaveBalance {
   id: string;
@@ -16,6 +18,18 @@ export function useLeaveBalances(employeeId: string | undefined) {
     queryKey: ["leave-balances", employeeId, currentYear],
     queryFn: async () => {
       if (!employeeId) return [];
+
+      if (USE_HRMS_BACKEND.leave) {
+        const res = await hrmsApi.get<{ success: boolean; data: any }>(`/api/leave/balance/${employeeId}`);
+        const bal = res.data ?? {};
+        return Object.entries(bal).map(([name, days]: [string, any]): LeaveBalance => ({
+          id: name,
+          leave_type: { name, is_paid: null },
+          total_days: Number(days?.allocated ?? 0),
+          used_days:  Number(days?.used ?? 0),
+          year: currentYear,
+        }));
+      }
 
       const { data: eligibility, error: eligibilityError } = await supabase
         .from("employee_leave_eligibility")

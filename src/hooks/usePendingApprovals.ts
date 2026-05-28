@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
+import { USE_HRMS_BACKEND } from "@/lib/dataSource";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function usePendingApprovals() {
@@ -9,6 +11,12 @@ export function usePendingApprovals() {
     queryKey: ["pending-approvals", user?.id],
     queryFn: async () => {
       if (!user?.id) return { count: 0, requests: [] };
+
+      if (USE_HRMS_BACKEND.leave) {
+        const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/leave/requests?status=pending&limit=5");
+        const requests = res.data ?? [];
+        return { count: requests.length, requests };
+      }
 
       // Get current user's employee record
       const { data: myEmployee } = await supabase

@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
+import { USE_HRMS_BACKEND } from "@/lib/dataSource";
 import { eachDayOfInterval, isWeekend, parseISO, isSameDay } from "date-fns";
 import { toast } from "sonner";
 
@@ -15,6 +17,17 @@ export function useLeaveTypes() {
   return useQuery({
     queryKey: ["leave-types"],
     queryFn: async () => {
+      if (USE_HRMS_BACKEND.leave) {
+        const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/leave/types");
+        return (res.data || []).map((t: any): LeaveType => ({
+          id: t.id,
+          name: t.type_name ?? t.name,
+          description: t.description ?? null,
+          days_per_year: t.max_days_per_year ?? t.days_per_year ?? 0,
+          is_paid: t.is_paid ?? null,
+        }));
+      }
+
       const { data, error } = await supabase
         .from("leave_types")
         .select("*")

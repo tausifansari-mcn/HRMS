@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
+import { USE_HRMS_BACKEND } from "@/lib/dataSource";
 import { format, startOfMonth, endOfMonth, parseISO, differenceInMinutes } from "date-fns";
 import { getExpectedHours } from "@/lib/shiftUtils";
 
@@ -35,6 +37,40 @@ export function useAttendanceReportData(month: number, year: number) {
   return useQuery({
     queryKey: ["attendance-report-data", month, year],
     queryFn: async (): Promise<AttendanceReportSummary> => {
+      if (USE_HRMS_BACKEND.attendance) {
+        const res = await hrmsApi.get<{ success: boolean; data: any[] }>(
+          `/api/wfm/sessions?fromDate=${start}&toDate=${end}&limit=500`
+        );
+        const sessions = res.data ?? [];
+        const empMap = new Map<string, AttendanceReportRecord>();
+        for (const s of sessions) {
+          if (!empMap.has(s.employee_id)) {
+            empMap.set(s.employee_id, {
+              employeeId: s.employee_id,
+              employeeName: s.employee_name ?? s.employee_id,
+              employeeCode: s.employee_code ?? "",
+              department: s.process_name ?? "-",
+              totalDays: 0, totalHours: 0, lateArrivals: 0,
+              totalLateMinutes: 0, totalOvertimeHours: 0,
+              workingHoursStart: s.shift_start_time ?? null,
+              workingHoursEnd: s.shift_end_time ?? null,
+            });
+          }
+          const r = empMap.get(s.employee_id)!;
+          r.totalDays++;
+          r.totalHours += (s.total_login_minutes ?? 0) / 60;
+        }
+        const records = Array.from(empMap.values());
+        return {
+          monthName: format(startDate, "MMMM yyyy"),
+          records,
+          totalEmployees: records.length,
+          totalLateArrivals: 0,
+          totalOvertimeHours: 0,
+          avgLateMinutes: 0,
+        };
+      }
+
       // Fetch attendance records with employee data
       const { data: records, error } = await supabase
         .from("attendance_records")
