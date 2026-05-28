@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
+import { USE_HRMS_BACKEND } from "@/lib/dataSource";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
 export interface AttendanceRecord {
@@ -43,6 +45,13 @@ export function useAttendance(month?: Date, employeeId?: string) {
   return useQuery({
     queryKey: ["attendance", start, end, employeeId ?? "all"],
     queryFn: async () => {
+      if (USE_HRMS_BACKEND.attendance) {
+        const params = new URLSearchParams({ fromDate: start, toDate: end, limit: "200" });
+        if (employeeId) params.set("employeeId", employeeId);
+        const res = await hrmsApi.get<{ success: boolean; data: any[] }>(`/api/wfm/sessions?${params}`);
+        return (res.data || []) as unknown as AttendanceRecord[];
+      }
+
       let query = supabase
         .from("attendance_records")
         .select(`

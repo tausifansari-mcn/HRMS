@@ -41,3 +41,11 @@ integrationRouter.get("/:key/field-maps", (req, res, next) => {
 integrationRouter.get("/:key/suggestions", (req, res, next) => {
   integrationController.listSuggestions(req as any, res).catch(next);
 });
+
+integrationRouter.get("/:key/schedule", (req, res, next) => {
+  integrationController.getSchedule(req as any, res).catch(next);
+});
+
+integrationRouter.put("/:key/schedule", (req, res, next) => {
+  integrationController.upsertSchedule(req as any, res).catch(next);
+});

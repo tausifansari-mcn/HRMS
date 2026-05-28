@@ -6,6 +6,7 @@ import {
   createIntegrationSchema,
   runFiltersSchema,
   updateIntegrationSchema,
+  upsertScheduleSchema,
 } from "./integration.validation.js";
 
 export const integrationController = {
@@ -65,5 +66,16 @@ export const integrationController = {
   async listSuggestions(req: AuthenticatedRequest, res: Response) {
     const data = await integrationService.listSuggestions(req.params.key);
     return res.json({ success: true, data });
+  },
+
+  async getSchedule(req: AuthenticatedRequest, res: Response) {
+    const data = await integrationService.getSchedule(req.params.key);
+    return res.json({ success: true, data });
+  },
+
+  async upsertSchedule(req: AuthenticatedRequest, res: Response) {
+    const input = upsertScheduleSchema.parse(req.body);
+    const data = await integrationService.upsertSchedule(req.params.key, input);
+    return res.json({ success: true, data, message: "Schedule updated" });
   },
 };

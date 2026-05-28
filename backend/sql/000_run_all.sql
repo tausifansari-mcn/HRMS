@@ -13,6 +13,7 @@ SOURCE sql/008_integration_hub.sql;
 SOURCE sql/009_dialer_ispark.sql;
 SOURCE sql/010_kpi_migration.sql;
 SOURCE sql/011_exit_management.sql;
+SOURCE sql/012_roster_shift_times.sql;
 
 SELECT 'mas_hrms schema complete' AS status;
 SHOW TABLES;

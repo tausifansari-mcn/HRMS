@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
+import { USE_HRMS_BACKEND } from "@/lib/dataSource";
 import { format } from "date-fns";
 
 export interface LeaveRequest {
@@ -28,6 +30,50 @@ export function useLeaveRequests() {
   return useQuery({
     queryKey: ["leave-requests"],
     queryFn: async () => {
+      // Local demo mode bypass
+      if (localStorage.getItem("hrms_demo_session")) {
+        return [
+          {
+            id: "leave-1",
+            employeeId: "emp-2",
+            employee: {
+              name: "Ananya Sharma",
+              department: "Operations",
+            },
+            type: "Sick Leave",
+            startDate: "May 24, 2026",
+            endDate: "May 26, 2026",
+            days: 3,
+            reason: "Doctor advised rest due to fever",
+            status: "pending",
+            submittedAt: "May 23, 2026 at 10:15 AM",
+          },
+          {
+            id: "leave-2",
+            employeeId: "emp-3",
+            employee: {
+              name: "Rajesh Kumar",
+              department: "Technical Support",
+            },
+            type: "Casual Leave",
+            startDate: "May 20, 2026",
+            endDate: "May 21, 2026",
+            days: 2,
+            reason: "Family function out of town",
+            status: "approved",
+            submittedAt: "May 18, 2026 at 4:30 PM",
+            reviewedBy: { name: "Demo Admin" },
+            reviewedAt: "May 19, 2026 at 11:00 AM",
+            reviewNotes: "Approved, backup resource arranged.",
+          }
+        ];
+      }
+
+      if (USE_HRMS_BACKEND.leave) {
+        const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/leave/requests");
+        return (res.data || []) as unknown as LeaveRequest[];
+      }
+
       const { data, error } = await supabase
         .from("leave_requests")
         .select(`
@@ -99,6 +145,11 @@ export function useLeaveStats() {
   return useQuery({
     queryKey: ["leave-stats"],
     queryFn: async () => {
+      // Local demo mode bypass
+      if (localStorage.getItem("hrms_demo_session")) {
+        return { pending: 1, approved: 1, rejected: 0 };
+      }
+
       const { data, error } = await supabase
         .from("leave_requests")
         .select("id, status");
@@ -118,6 +169,15 @@ export function useLeaveTypes() {
   return useQuery({
     queryKey: ["leave-types"],
     queryFn: async () => {
+      // Local demo mode bypass
+      if (localStorage.getItem("hrms_demo_session")) {
+        return [
+          { id: "type-1", name: "Sick Leave", days_per_year: 10, is_paid: true },
+          { id: "type-2", name: "Casual Leave", days_per_year: 12, is_paid: true },
+          { id: "type-3", name: "Maternity Leave", days_per_year: 90, is_paid: true }
+        ];
+      }
+
       const { data, error } = await supabase
         .from("leave_types")
         .select("id, name, days_per_year, is_paid")

@@ -41,7 +41,22 @@ export const runFiltersSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+// Basic cron: 5 or 6 space-separated tokens — enough to reject obviously wrong input
+const CRON_RE = /^(\S+\s+){4}\S+(\s+\S+)?$/;
+
+export const upsertScheduleSchema = z.object({
+  cronExpression: z
+    .string()
+    .trim()
+    .min(9)
+    .regex(CRON_RE, "Invalid cron expression"),
+  enabled: z.boolean().optional(),
+}).refine((d) => d.cronExpression !== undefined || d.enabled !== undefined, {
+  message: "Provide at least cronExpression or enabled",
+});
+
 export type CreateIntegrationInput = z.infer<typeof createIntegrationSchema>;
 export type UpdateIntegrationInput = z.infer<typeof updateIntegrationSchema>;
 export type ConfirmFieldMapInput = z.infer<typeof confirmFieldMapSchema>;
 export type RunFilters = z.infer<typeof runFiltersSchema>;
+export type UpsertScheduleInput = z.infer<typeof upsertScheduleSchema>;

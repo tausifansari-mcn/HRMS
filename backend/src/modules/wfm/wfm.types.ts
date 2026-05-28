@@ -35,6 +35,8 @@ export interface WfmRosterAssignment {
   plan_id: string | null;
   roster_date: string;
   roster_status: string;
+  shift_start_time: string | null;
+  shift_end_time: string | null;
   branch_name: string | null;
   process_name: string | null;
   publish_status: string;

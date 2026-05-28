@@ -14,7 +14,9 @@ import type {
   CreateIntegrationInput,
   RunFilters,
   UpdateIntegrationInput,
+  UpsertScheduleInput,
 } from "./integration.validation.js";
+import type { IntegrationSchedule } from "./integration.types.js";
 
 export const integrationService = {
   async list(filters?: IntegrationListFilters): Promise<IntegrationConfig[]> {
@@ -202,5 +204,27 @@ export const integrationService = {
       [integrationKey]
     );
     return rows as IntegrationFieldMapSuggestion[];
+  },
+
+  async getSchedule(integrationKey: string): Promise<IntegrationSchedule> {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      "SELECT * FROM integration_schedule WHERE integration_key = ? LIMIT 1",
+      [integrationKey]
+    );
+    const record = (rows as IntegrationSchedule[])[0];
+    if (!record) throw new Error("Schedule not found");
+    return record;
+  },
+
+  async upsertSchedule(integrationKey: string, input: UpsertScheduleInput): Promise<IntegrationSchedule> {
+    await db.execute(
+      `INSERT INTO integration_schedule (id, integration_key, cron_expression, enabled)
+         VALUES (UUID(), ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         cron_expression = COALESCE(VALUES(cron_expression), cron_expression),
+         enabled = COALESCE(VALUES(enabled), enabled)`,
+      [integrationKey, input.cronExpression, input.enabled !== undefined ? (input.enabled ? 1 : 0) : 0]
+    );
+    return this.getSchedule(integrationKey);
   },
 };

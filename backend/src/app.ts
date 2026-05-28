@@ -9,6 +9,7 @@ import { healthRouter } from "./routes/health.routes.js";
 import { processRouter } from "./modules/process/process.routes.js";
 import { integrationRouter } from "./modules/integration-hub/integration.routes.js";
 import { wfmRouter } from "./modules/wfm/wfm.routes.js";
+import { rosterRouter } from "./modules/wfm/roster.routes.js";
 import { leaveRouter } from "./modules/leave/leave.routes.js";
 import { payrollRouter } from "./modules/payroll/payroll.routes.js";
 import { employeeRouter } from "./modules/employees/employee.routes.js";
@@ -25,7 +26,13 @@ app.use(
 
 app.use(
   cors({
-    origin: env.FRONTEND_URL,
+    origin: (origin, callback) => {
+      if (!origin || origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:") || origin === env.FRONTEND_URL) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true
   })
 );
@@ -46,6 +53,7 @@ app.use("/api/health", healthRouter);
 app.use("/api/processes", processRouter);
 app.use("/api/integration-hub", integrationRouter);
 app.use("/api/wfm", wfmRouter);
+app.use("/api/wfm/roster", rosterRouter);
 app.use("/api/leave", leaveRouter);
 app.use("/api/payroll", payrollRouter);
 app.use("/api/employees", employeeRouter);

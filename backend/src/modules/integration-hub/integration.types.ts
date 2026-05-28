@@ -64,3 +64,12 @@ export interface PaginatedResult<T> {
 export interface IntegrationListFilters {
   activeStatus?: "active" | "inactive" | "all";
 }
+
+export interface IntegrationSchedule {
+  id: string;
+  integration_key: string;
+  cron_expression: string;
+  enabled: number;
+  last_run_at: string | null;
+  next_run_at: string | null;
+}
