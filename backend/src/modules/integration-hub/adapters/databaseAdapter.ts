@@ -78,14 +78,17 @@ export function buildDialerAggregateQuery(
 
   return `
     SELECT
-      ${agentCodeCol}          AS employee_code,
-      DATE(${dateCol})         AS session_date,
-      ${campaignCol}           AS process_name,
-      ROUND(SUM(${talkCol}) / 60) AS login_minutes
+      ${agentCodeCol}              AS employee_code,
+      DATE(${dateCol})             AS session_date,
+      ${campaignCol}               AS process_name,
+      ROUND(SUM(${talkCol}) / 60)  AS login_minutes,
+      ROUND(SUM(pause_sec) / 60)   AS break_minutes,
+      COUNT(*)                     AS event_count
     FROM ${tableName}
     ${where}
+      AND ${agentCodeCol} REGEXP '^[A-Z]{2,4}[0-9]{4,6}$'
     GROUP BY ${agentCodeCol}, DATE(${dateCol}), ${campaignCol}
-    ORDER BY session_date DESC, employee_code
+    ORDER BY DATE(${dateCol}) DESC, login_minutes DESC
     LIMIT 10000
   `.trim();
 }
