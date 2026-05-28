@@ -205,11 +205,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.26),transparent_48%)]" />
         <div className="relative rounded-2xl border border-white/10 bg-white/[0.05] p-3 shadow-xl shadow-slate-950/20">
           <Link to="/dashboard">
-            <div className="flex h-[82px] items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 px-4 py-3 shadow-lg">
+            <div className="flex h-[104px] items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 px-4 py-3 shadow-lg">
               {logoError ? (
-                <div className="flex h-full w-full items-center justify-center rounded-xl bg-slate-950 text-lg font-bold tracking-wide text-white">MCN</div>
+                <div className="flex h-full w-full items-center justify-center rounded-xl bg-slate-950 text-xl font-bold tracking-wide text-white">MCN</div>
               ) : (
-                <img src={companyLogo} alt="MAS Callnet" className="block h-16 w-full max-w-[215px] object-contain drop-shadow-md" onError={() => setLogoError(true)} />
+                <img src={companyLogo} alt="MAS Callnet" className="block h-20 w-full max-w-[220px] object-contain drop-shadow-md" onError={() => setLogoError(true)} />
               )}
             </div>
             <div className="mt-3 min-w-0 text-center">
