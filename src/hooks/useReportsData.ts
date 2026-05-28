@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 
 const CHART_COLORS = [
@@ -15,32 +15,19 @@ export function useEmployeeGrowthData(year: number) {
   return useQuery({
     queryKey: ["employee-growth", year],
     queryFn: async () => {
-      // Get all employees with their hire dates
-      const { data: employees, error } = await supabase
-        .from("employees")
-        .select("id, hire_date, status")
-        .order("hire_date", { ascending: true });
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/employees?limit=500");
+      const employees = res.data ?? [];
 
-      if (error) throw error;
-
-      // Calculate cumulative employee count for each month
       const months = [];
       for (let month = 0; month < 12; month++) {
         const monthDate = new Date(year, month, 1);
         const monthEnd = endOfMonth(monthDate);
-        
-        // Count employees hired on or before this month end
-        const count = employees?.filter((emp) => {
-          const hireDate = new Date(emp.hire_date);
-          return hireDate <= monthEnd && emp.status !== "offboarded";
-        }).length || 0;
-
-        months.push({
-          month: format(monthDate, "MMM"),
-          employees: count,
-        });
+        const count = employees.filter((emp) => {
+          const hireDate = new Date(emp.date_of_joining ?? emp.hire_date ?? "2000-01-01");
+          return hireDate <= monthEnd && emp.employment_status !== "offboarded";
+        }).length;
+        months.push({ month: format(monthDate, "MMM"), employees: count });
       }
-
       return months;
     },
   });
@@ -50,27 +37,18 @@ export function useDepartmentDistribution() {
   return useQuery({
     queryKey: ["department-distribution"],
     queryFn: async () => {
-      const { data: departments, error: deptError } = await supabase
-        .from("departments")
-        .select("id, name");
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/employees?limit=500");
+      const employees = res.data ?? [];
 
-      if (deptError) throw deptError;
+      const deptMap = new Map<string, number>();
+      for (const emp of employees) {
+        const dept = emp.department_name ?? emp.department_id ?? "Unassigned";
+        deptMap.set(dept, (deptMap.get(dept) ?? 0) + 1);
+      }
 
-      const { data: employees, error: empError } = await supabase
-        .from("employees")
-        .select("department_id, status")
-        .eq("status", "active");
-
-      if (empError) throw empError;
-
-      // Count employees per department
-      const distribution = departments?.map((dept, index) => ({
-        name: dept.name,
-        value: employees?.filter((emp) => emp.department_id === dept.id).length || 0,
-        color: CHART_COLORS[index % CHART_COLORS.length],
-      })).filter((dept) => dept.value > 0) || [];
-
-      return distribution;
+      return Array.from(deptMap.entries())
+        .map(([name, value], i) => ({ name, value, color: CHART_COLORS[i % CHART_COLORS.length] }))
+        .filter((d) => d.value > 0);
     },
   });
 }
@@ -79,56 +57,35 @@ export function useLeaveStatistics(year: number) {
   return useQuery({
     queryKey: ["leave-statistics", year],
     queryFn: async () => {
-      // Get leave types
-      const { data: leaveTypes, error: ltError } = await supabase
-        .from("leave_types")
-        .select("id, name");
+      const [typesRes, reqRes] = await Promise.all([
+        hrmsApi.get<{ success: boolean; data: any[] }>("/api/leave/types"),
+        hrmsApi.get<{ success: boolean; data: any[] }>(
+          `/api/leave/requests?fromDate=${year}-01-01&toDate=${year}-12-31&limit=500`
+        ),
+      ]);
+      const leaveTypes = typesRes.data ?? [];
+      const leaveRequests = reqRes.data ?? [];
 
-      if (ltError) throw ltError;
-
-      // Get approved leave requests for the year
-      const startDate = `${year}-01-01`;
-      const endDate = `${year}-12-31`;
-
-      const { data: leaveRequests, error: lrError } = await supabase
-        .from("leave_requests")
-        .select("start_date, days_count, leave_type_id")
-        .eq("status", "approved")
-        .gte("start_date", startDate)
-        .lte("start_date", endDate);
-
-      if (lrError) throw lrError;
-
-      // Aggregate by month and leave type
       const monthlyData = [];
       for (let month = 0; month < 12; month++) {
         const monthStart = new Date(year, month, 1);
         const monthEnd = endOfMonth(monthStart);
-        
-        const monthData: Record<string, number | string> = {
-          month: format(monthStart, "MMM"),
-        };
-
-        leaveTypes?.forEach((lt) => {
-          const key = lt.name.toLowerCase().split(" ")[0]; // e.g., "Annual" -> "annual"
-          const daysCount = leaveRequests?.filter((lr) => {
-            const reqDate = new Date(lr.start_date);
-            return lr.leave_type_id === lt.id && 
-                   reqDate >= monthStart && 
-                   reqDate <= monthEnd;
-          }).reduce((sum, lr) => sum + lr.days_count, 0) || 0;
-
-          monthData[key] = daysCount;
-        });
-
+        const monthData: Record<string, number | string> = { month: format(monthStart, "MMM") };
+        for (const lt of leaveTypes) {
+          const key = (lt.type_name ?? lt.name ?? "leave").toLowerCase().split(" ")[0];
+          const days = leaveRequests.filter((lr) => {
+            const d = new Date(lr.from_date ?? lr.start_date ?? "");
+            return (lr.leave_type_id === lt.id || lr.leave_type_name === lt.type_name) &&
+              d >= monthStart && d <= monthEnd && lr.status === "approved";
+          }).reduce((s: number, lr: any) => s + (lr.total_days ?? lr.days_count ?? 0), 0);
+          monthData[key] = days;
+        }
         monthlyData.push(monthData);
       }
 
-      // Get unique leave type keys for the chart
-      const leaveTypeKeys = leaveTypes?.map((lt) => 
-        lt.name.toLowerCase().split(" ")[0]
-      ) || [];
-
+      const leaveTypeKeys = leaveTypes.map((lt: any) =>
+        (lt.type_name ?? lt.name ?? "leave").toLowerCase().split(" ")[0]
+      );
       return { monthlyData, leaveTypeKeys };
     },
   });
@@ -138,29 +95,16 @@ export function usePayrollTrend(year: number) {
   return useQuery({
     queryKey: ["payroll-trend", year],
     queryFn: async () => {
-      const { data: payrollRecords, error } = await supabase
-        .from("payroll_records")
-        .select("month, year, net_salary")
-        .eq("year", year)
-        .order("month", { ascending: true });
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/payroll/runs");
+      const runs = (res.data ?? []).filter((r: any) => {
+        const [y] = (r.run_month ?? "").split("-");
+        return Number(y) === year;
+      });
 
-      if (error) throw error;
-
-      // Aggregate by month
-      const monthlyData = [];
-      for (let month = 1; month <= 12; month++) {
-        const monthRecords = payrollRecords?.filter((r) => r.month === month) || [];
-        const totalAmount = monthRecords.reduce((sum, r) => sum + Number(r.net_salary), 0);
-
-        if (totalAmount > 0) {
-          monthlyData.push({
-            month: format(new Date(year, month - 1, 1), "MMM"),
-            amount: totalAmount,
-          });
-        }
-      }
-
-      return monthlyData;
+      return runs.map((r: any) => ({
+        month: format(new Date(`${r.run_month}-01`), "MMM"),
+        amount: r.total_net ?? 0,
+      })).filter((r: any) => r.amount > 0);
     },
   });
 }
@@ -169,83 +113,53 @@ export function useHeadcountSummary(year: number) {
   return useQuery({
     queryKey: ["headcount-summary", year],
     queryFn: async () => {
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/employees?limit=500");
+      const employees = res.data ?? [];
       const yearStart = startOfYear(new Date(year, 0, 1));
       const yearEnd = endOfYear(new Date(year, 0, 1));
-      const yearStartStr = format(yearStart, "yyyy-MM-dd");
-      const yearEndStr = format(yearEnd, "yyyy-MM-dd");
 
-      // Get all employees
-      const { data: employees, error } = await supabase
-        .from("employees")
-        .select("id, hire_date, status, updated_at");
+      const newHires = employees.filter((e) => {
+        const d = new Date(e.date_of_joining ?? e.hire_date ?? "2000-01-01");
+        return d >= yearStart && d <= yearEnd;
+      }).length;
 
-      if (error) throw error;
+      const terminations = employees.filter((e) => {
+        if (e.employment_status !== "offboarded") return false;
+        const d = new Date(e.updated_at ?? e.date_of_joining ?? "2000-01-01");
+        return d >= yearStart && d <= yearEnd;
+      }).length;
 
-      // New hires in the selected year
-      const newHires = employees?.filter((emp) => {
-        const hireDate = new Date(emp.hire_date);
-        return hireDate >= yearStart && hireDate <= yearEnd;
-      }).length || 0;
+      const currentHeadcount = employees.filter(
+        (e) => e.employment_status === "active" || e.employment_status === "onboarding"
+      ).length;
 
-      // Terminations (offboarded employees) - we check status and if updated in this year
-      const terminations = employees?.filter((emp) => {
-        if (emp.status !== "offboarded") return false;
-        const updatedAt = new Date(emp.updated_at);
-        return updatedAt >= yearStart && updatedAt <= yearEnd;
-      }).length || 0;
-
-      // Net change
-      const netChange = newHires - terminations;
-
-      // Current headcount (active + onboarding)
-      const currentHeadcount = employees?.filter(
-        (emp) => emp.status === "active" || emp.status === "onboarding"
-      ).length || 0;
-
-      // Headcount at start of year (employees hired before year start and not offboarded before year start)
-      const startOfYearHeadcount = employees?.filter((emp) => {
-        const hireDate = new Date(emp.hire_date);
+      const startOfYearHeadcount = employees.filter((e) => {
+        const hireDate = new Date(e.date_of_joining ?? e.hire_date ?? "2000-01-01");
         if (hireDate >= yearStart) return false;
-        if (emp.status === "offboarded") {
-          const updatedAt = new Date(emp.updated_at);
-          return updatedAt >= yearStart;
+        if (e.employment_status === "offboarded") {
+          const upd = new Date(e.updated_at ?? "2000-01-01");
+          return upd >= yearStart;
         }
         return true;
-      }).length || 0;
+      }).length;
 
-      // Monthly breakdown for the year
       const monthlyBreakdown = [];
       for (let month = 0; month < 12; month++) {
         const monthStart = startOfMonth(new Date(year, month, 1));
         const monthEnd = endOfMonth(new Date(year, month, 1));
-
-        const monthlyHires = employees?.filter((emp) => {
-          const hireDate = new Date(emp.hire_date);
-          return hireDate >= monthStart && hireDate <= monthEnd;
-        }).length || 0;
-
-        const monthlyTerminations = employees?.filter((emp) => {
-          if (emp.status !== "offboarded") return false;
-          const updatedAt = new Date(emp.updated_at);
-          return updatedAt >= monthStart && updatedAt <= monthEnd;
-        }).length || 0;
-
-        monthlyBreakdown.push({
-          month: format(monthStart, "MMM"),
-          hires: monthlyHires,
-          terminations: monthlyTerminations,
-          net: monthlyHires - monthlyTerminations,
-        });
+        const hires = employees.filter((e) => {
+          const d = new Date(e.date_of_joining ?? e.hire_date ?? "2000-01-01");
+          return d >= monthStart && d <= monthEnd;
+        }).length;
+        const terms = employees.filter((e) => {
+          if (e.employment_status !== "offboarded") return false;
+          const d = new Date(e.updated_at ?? "2000-01-01");
+          return d >= monthStart && d <= monthEnd;
+        }).length;
+        monthlyBreakdown.push({ month: format(monthStart, "MMM"), hires, terminations: terms, net: hires - terms });
       }
 
-      return {
-        newHires,
-        terminations,
-        netChange,
-        currentHeadcount,
-        startOfYearHeadcount,
-        monthlyBreakdown,
-      };
+      return { newHires, terminations, netChange: newHires - terminations, currentHeadcount, startOfYearHeadcount, monthlyBreakdown };
     },
   });
 }

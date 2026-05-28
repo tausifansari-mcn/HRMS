@@ -25,7 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
 
@@ -109,51 +109,30 @@ function MiniBar({ label, value, tone }: { label: string; value: number; tone: s
   );
 }
 
-async function getCount(table: string, filter?: (query: any) => any) {
-  try {
-    let query = (supabase as any).from(table).select("*", { count: "exact", head: true });
-    if (filter) query = filter(query);
-    const { count, error } = await query;
-    if (error) return 0;
-    return count ?? 0;
-  } catch {
-    return 0;
-  }
-}
-
 async function getDashboardStats() {
   const today = new Date().toISOString().slice(0, 10);
-
-  const [
-    employees,
-    departments,
-    pendingLeaves,
-    approvedLeaves,
-    attendanceToday,
-    onboarding,
-    assets,
-    payroll,
-  ] = await Promise.all([
-    getCount("employees"),
-    getCount("departments"),
-    getCount("leave_requests", (q) => q.eq("status", "pending")),
-    getCount("leave_requests", (q) => q.eq("status", "approved")),
-    getCount("attendance", (q) => q.eq("date", today)),
-    getCount("onboarding_requests"),
-    getCount("assets"),
-    getCount("payroll"),
-  ]);
-
-  return {
-    employees,
-    departments,
-    pendingLeaves,
-    approvedLeaves,
-    attendanceToday,
-    onboarding,
-    assets,
-    payroll,
-  };
+  try {
+    const [empRes, leaveRes, wfmRes, atsRes] = await Promise.allSettled([
+      hrmsApi.get<any>('/api/employees?limit=1'),
+      hrmsApi.get<any>('/api/leave/requests?status=pending&limit=1'),
+      hrmsApi.get<any>(`/api/wfm/live?date=${today}`),
+      hrmsApi.get<any>('/api/ats/stats'),
+    ]);
+    return {
+      employees: empRes.status === 'fulfilled' ? (empRes.value.total ?? 0) : 0,
+      pendingLeaves: leaveRes.status === 'fulfilled' ? (leaveRes.value.data?.length ?? 0) : 0,
+      approvedLeaves: 0,
+      departments: 0,
+      attendanceToday: wfmRes.status === 'fulfilled' ? (wfmRes.value.data?.summary?.logged_in ?? 0) : 0,
+      attendanceRate: wfmRes.status === 'fulfilled' ? (wfmRes.value.data?.summary?.overall_adherence_pct ?? 0) : 0,
+      atsCandidates: atsRes.status === 'fulfilled' ? (atsRes.value.data?.total ?? 0) : 0,
+      onboarding: 0,
+      assets: 0,
+      payroll: 0,
+    };
+  } catch {
+    return { employees: 0, pendingLeaves: 0, approvedLeaves: 0, departments: 0, attendanceToday: 0, attendanceRate: 0, atsCandidates: 0, onboarding: 0, assets: 0, payroll: 0 };
+  }
 }
 
 export default function Dashboard() {
@@ -172,15 +151,16 @@ export default function Dashboard() {
     pendingLeaves: 0,
     approvedLeaves: 0,
     attendanceToday: 0,
+    attendanceRate: 0,
+    atsCandidates: 0,
     onboarding: 0,
     assets: 0,
     payroll: 0,
   };
 
   const attendanceRate = useMemo(() => {
-    if (!stats.employees) return 0;
-    return Math.min(100, Math.round((stats.attendanceToday / stats.employees) * 100));
-  }, [stats.attendanceToday, stats.employees]);
+    return Math.min(100, Math.round(stats.attendanceRate));
+  }, [stats.attendanceRate]);
 
   const approvalHealth = stats.pendingLeaves > 10 ? 62 : stats.pendingLeaves > 4 ? 78 : 92;
   const workforceCoverage = stats.departments > 0 ? 86 : 45;
@@ -279,13 +259,13 @@ export default function Dashboard() {
         </section>
 
         {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {[1, 2, 3, 4].map((item) => (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            {[1, 2, 3, 4, 5].map((item) => (
               <Card key={item} className="h-36 animate-pulse rounded-[22px] border-slate-100 bg-slate-100/80" />
             ))}
           </div>
         ) : (
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <MetricCard
               label="Total Employees"
               value={stats.employees}
@@ -313,6 +293,13 @@ export default function Dashboard() {
               helper="active org units"
               tone="blue"
               icon={<BuildingIcon />}
+            />
+            <MetricCard
+              label="ATS Candidates"
+              value={stats.atsCandidates}
+              helper="in recruitment pipeline"
+              tone="violet"
+              icon={<BadgeCheck className="h-5 w-5" />}
             />
           </section>
         )}

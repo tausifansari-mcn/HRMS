@@ -12,6 +12,7 @@ import {
   ClipboardList,
   Clock,
   CreditCard,
+  Database,
   Home,
   LogOut,
   Menu,
@@ -21,6 +22,7 @@ import {
   Settings,
   Target,
   User,
+  UserMinus,
   UserPlus,
   Users,
   X,
@@ -126,6 +128,8 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Settings", href: "/settings", icon: <Settings className="h-4 w-4" />, adminOnly: true, description: "System settings" },
       { label: "Notifications", href: "/notification-preferences", icon: <Bell className="h-4 w-4" />, description: "Notification preferences" },
+      { label: "Migration Console", href: "/migration-console", icon: <Database className="h-4 w-4" />, adminOnly: true, description: "Supabase → MySQL migration status" },
+      { label: "Exit Management", href: "/exit-management", icon: <UserMinus className="h-4 w-4" />, adminOnly: true, description: "Resignations, terminations and clearance workflow" },
     ],
   },
 ];

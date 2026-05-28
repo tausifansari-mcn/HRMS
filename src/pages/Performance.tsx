@@ -64,7 +64,7 @@ const Performance = () => {
             <h2 className="text-2xl font-bold text-foreground">Performance</h2>
             <p className="text-muted-foreground">Track KPIs and view performance reviews</p>
           </div>
-          <Card>
+          <Card className="bg-white/80 backdrop-blur-sm border border-white/60 shadow-xl shadow-slate-200/60">
             <CardContent className="py-12 text-center">
               <User className="mx-auto h-12 w-12 text-muted-foreground" />
               <h3 className="mt-4 text-lg font-semibold">No Employee Profile</h3>
@@ -83,15 +83,24 @@ const Performance = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Performance</h2>
-          <p className="text-muted-foreground">
-            {employeeData.isManager 
-              ? "Track your KPIs, view reviews, and manage your team's performance"
-              : "Track your KPIs and view performance reviews"
-            }
-          </p>
-        </div>
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-sm shadow-sm">
+          <div className="relative p-5 sm:p-6">
+            <div className="absolute inset-y-0 left-0 w-1 bg-slate-950" />
+            <div className="pl-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">
+                Performance Management
+              </p>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                Performance
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                {employeeData.isManager
+                  ? "Track your KPIs, view reviews, and manage your team's performance."
+                  : "Track your KPIs and view performance reviews."}
+              </p>
+            </div>
+          </div>
+        </section>
 
         <Tabs defaultValue="kpis" className="space-y-4">
           <TabsList>

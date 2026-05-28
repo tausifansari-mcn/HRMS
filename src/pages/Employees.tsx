@@ -97,7 +97,7 @@ const EmployeeMetricCard = ({
   const style = metricToneMap[tone];
 
   return (
-    <div className={`rounded-2xl border p-4 shadow-sm ${style.card}`}>
+    <div className={`rounded-2xl border p-4 shadow-sm hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-200 cursor-pointer ${style.card}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
@@ -534,7 +534,7 @@ const Employees = () => {
         </section>
 
         {/* Filters */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <section className="rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-sm p-4 shadow-sm">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-sm font-semibold tracking-tight text-slate-950">
@@ -617,7 +617,7 @@ const Employees = () => {
         </section>
 
         {/* Table */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <section className="rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-sm p-4 shadow-sm">
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-sm font-semibold tracking-tight text-slate-950">

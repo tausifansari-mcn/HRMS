@@ -330,3 +330,18 @@ tbody td {
     padding: 0 !important;
   }
 }
+
+@layer utilities {
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-sm border border-white/60 shadow-xl shadow-slate-200/60;
+  }
+  .stat-card {
+    @apply glass-card rounded-2xl p-5 hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-200 cursor-pointer;
+  }
+  .table-row-hover {
+    @apply hover:bg-slate-50/80 transition-colors duration-150 cursor-pointer;
+  }
+  .btn-interactive {
+    @apply hover:scale-[1.02] active:scale-[0.98] transition-transform duration-150;
+  }
+}

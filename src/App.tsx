@@ -46,6 +46,8 @@ import NativeWFMRoster from "./pages/NativeWFMRoster";
 import UnifiedPerformanceCommandCenter from "./pages/UnifiedPerformanceCommandCenter";
 import UnifiedAccessControl from "./pages/UnifiedAccessControl";
 import NativePlaceholderPage from "./pages/NativePlaceholderPage";
+import NativeMigrationConsole from "./pages/NativeMigrationConsole";
+import NativeExitManagement from "./pages/NativeExitManagement";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -124,6 +126,9 @@ const App = () => (
             <Route path="/portal/login" element={<PortalLogin />} />
             <Route path="/portal" element={<PortalRoute><PortalOverview /></PortalRoute>} />
             <Route path="/portal/processes/:id" element={<PortalRoute><PortalProcessDashboard /></PortalRoute>} />
+
+            <Route path="/migration-console" element={<ProtectedRoute><NativeMigrationConsole /></ProtectedRoute>} />
+            <Route path="/exit-management" element={<ProtectedRoute><NativeExitManagement /></ProtectedRoute>} />
 
             <Route path="/changelog" element={<ProtectedRoute><Changelog /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
