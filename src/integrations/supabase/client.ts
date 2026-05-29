@@ -3,7 +3,7 @@ import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://bebminxoqdjzzfhnrsge.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  'sb_publishable_djqNhT51UKmkO5UXwxzNyA_pMgvaF2b';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlYm1pbnhvcWRqenpmaG5yc2dlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MTI4NzAsImV4cCI6MjA5NDA4ODg3MH0.DX6ojTanhH-IG6NWZnEg5r5JQM_bzauYEzyivGwxzdA';
 
 const realSupabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
