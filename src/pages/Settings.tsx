@@ -276,8 +276,9 @@ const Settings = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Settings</h2>
-          <p className="text-muted-foreground">Manage system configurations</p>
+          <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">System</p>
+          <h2 className="mt-1 text-3xl font-black text-slate-950">Settings</h2>
+          <p className="text-slate-600">Manage system configurations</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -341,7 +342,7 @@ const Settings = () => {
                   }
                 }}>
                   <DialogTrigger asChild>
-                    <Button>
+                    <Button className="bg-slate-950 text-white hover:bg-slate-800 rounded-2xl px-5 py-2.5 font-semibold cursor-pointer transition-colors">
                       <Plus className="mr-2 h-4 w-4" />
                       Add Department
                     </Button>
@@ -405,13 +406,13 @@ const Settings = () => {
                           <TableCell className="text-muted-foreground">{dept.description || '-'}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
-                              <Button variant="ghost" size="icon" onClick={() => handleEditDept(dept)}>
+                              <Button variant="ghost" size="icon" className="cursor-pointer" onClick={() => handleEditDept(dept)}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="text-destructive hover:text-destructive"
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="cursor-pointer text-destructive hover:text-destructive"
                                 onClick={() => deleteDeptMutation.mutate(dept.id)}
                                 disabled={deleteDeptMutation.isPending}
                               >
@@ -444,7 +445,7 @@ const Settings = () => {
                   }
                 }}>
                   <DialogTrigger asChild>
-                    <Button>
+                    <Button className="bg-slate-950 text-white hover:bg-slate-800 rounded-2xl px-5 py-2.5 font-semibold cursor-pointer transition-colors">
                       <Plus className="mr-2 h-4 w-4" />
                       Add Leave Type
                     </Button>
@@ -537,13 +538,13 @@ const Settings = () => {
                           <TableCell className="text-muted-foreground">{leave.description || '-'}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
-                              <Button variant="ghost" size="icon" onClick={() => handleEditLeave(leave)}>
+                              <Button variant="ghost" size="icon" className="cursor-pointer" onClick={() => handleEditLeave(leave)}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="text-destructive hover:text-destructive"
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="cursor-pointer text-destructive hover:text-destructive"
                                 onClick={() => deleteLeaveMutation.mutate(leave.id)}
                                 disabled={deleteLeaveMutation.isPending}
                               >

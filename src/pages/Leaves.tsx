@@ -747,15 +747,15 @@ const Leaves = () => {
               <div className="absolute inset-y-0 left-0 w-1 bg-slate-950" />
 
               <div className="pl-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">
+                <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">
                   Leave Management
                 </p>
 
-                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                <h1 className="mt-2 text-3xl font-black text-slate-950">
                   Leaves
                 </h1>
 
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
                   Apply, review, approve and track leave requests from one clean
                   workspace.
                 </p>
@@ -771,7 +771,7 @@ const Leaves = () => {
               />
 
               <Button
-                className="h-10 rounded-xl bg-slate-950 px-4 text-xs font-semibold text-white hover:bg-slate-800"
+                className="bg-slate-950 text-white hover:bg-slate-800 rounded-2xl px-5 py-2.5 font-semibold cursor-pointer transition-colors"
                 onClick={() => setIsNewRequestOpen(true)}
               >
                 <Plus className="mr-2 h-4 w-4" />

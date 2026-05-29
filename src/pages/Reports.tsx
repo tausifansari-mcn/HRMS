@@ -100,8 +100,9 @@ const Reports = () => {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Reports & Analytics</h2>
-          <p className="text-muted-foreground">Insights and data visualization</p>
+          <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">Analytics</p>
+          <h2 className="mt-1 text-3xl font-black text-slate-950">Reports & Analytics</h2>
+          <p className="text-slate-600">Insights and data visualization</p>
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
@@ -137,7 +138,7 @@ const Reports = () => {
           {reportCards.map((report) => (
             <Card
               key={report.title}
-              className="cursor-pointer transition-all hover:shadow-lg"
+              className="rounded-3xl border bg-white p-5 shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
               onClick={() => {
                 document.getElementById(report.sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
               }}

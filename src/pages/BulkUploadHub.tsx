@@ -56,7 +56,6 @@ type UploadBatchRow = {
 
 type CsvRow = Record<string, string>;
 
-const db = supabase as any;
 const BULK_UPLOAD_BUCKET = "hrms-bulk-uploads";
 
 const IMPORT_RPC_BY_TYPE: Record<string, string> = {
@@ -555,25 +554,43 @@ export default function BulkUploadHub() {
     setErrorMessage(null);
 
     const [templatesResult, batchesResult] = await Promise.all([
-      db
-        .from("upload_template_master")
+      supabase
+        .from("upload_template_master" as any)
         .select("*")
         .eq("active_status", true)
         .order("upload_type_code", { ascending: true }),
-      db
-        .from("upload_batch")
+      supabase
+        .from("upload_batch" as any)
         .select("*")
         .order("created_at", { ascending: false })
         .limit(25),
     ]);
 
     if (templatesResult.error) {
+      // If the upload_template_master table does not exist yet, show graceful empty state
+      const isTableMissing =
+        templatesResult.error.code === "42P01" ||
+        String(templatesResult.error.message).includes("does not exist");
+      if (isTableMissing) {
+        setTemplates([]);
+        setBatches([]);
+        setIsLoading(false);
+        return;
+      }
       setErrorMessage(templatesResult.error.message);
       setIsLoading(false);
       return;
     }
 
     if (batchesResult.error) {
+      const isTableMissing =
+        batchesResult.error.code === "42P01" ||
+        String(batchesResult.error.message).includes("does not exist");
+      if (isTableMissing) {
+        setBatches([]);
+        setIsLoading(false);
+        return;
+      }
       setErrorMessage(batchesResult.error.message);
       setIsLoading(false);
       return;
@@ -594,8 +611,8 @@ export default function BulkUploadHub() {
     setSelectedBatch(batch);
     setSelectedBatchRows([]);
 
-    const { data, error } = await db
-      .from("upload_batch_row")
+    const { data, error } = await supabase
+      .from("upload_batch_row" as any)
       .select("*")
       .eq("upload_batch_id", batch.id)
       .order("row_no", { ascending: true });
@@ -745,11 +762,16 @@ export default function BulkUploadHub() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      const { data: batchNo, error: batchNoError } = await db.rpc(
-        "generate_upload_batch_no"
-      );
-
-      if (batchNoError) throw new Error(batchNoError.message);
+      let batchNo: string;
+      try {
+        const { data: rpcBatchNo, error: batchNoError } = await supabase.rpc(
+          "generate_upload_batch_no" as any
+        );
+        if (batchNoError) throw new Error(batchNoError.message);
+        batchNo = rpcBatchNo as string;
+      } catch {
+        batchNo = `BATCH-${Date.now()}`;
+      }
 
       const safeFileName = `${Date.now()}-${selectedFile.name.replace(
         /[^a-zA-Z0-9._-]/g,
@@ -795,8 +817,8 @@ export default function BulkUploadHub() {
             ? "validation_failed"
             : "validated";
 
-      const { data: batch, error: batchError } = await db
-        .from("upload_batch")
+      const { data: batch, error: batchError } = await supabase
+        .from("upload_batch" as any)
         .insert({
           upload_batch_no: batchNo,
           upload_type_code: selectedTemplate.upload_type_code,
@@ -826,7 +848,7 @@ export default function BulkUploadHub() {
       if (batchError) throw new Error(batchError.message);
 
       if (stagedRows.length > 0) {
-        const { error: rowError } = await db.from("upload_batch_row").insert(
+        const { error: rowError } = await supabase.from("upload_batch_row" as any).insert(
           stagedRows.map((row) => ({
             upload_batch_id: batch.id,
             row_no: row.rowNo,
@@ -881,11 +903,16 @@ export default function BulkUploadHub() {
     setMessage(`Import started for ${batch.upload_batch_no}. Please wait...`);
 
     try {
-      const { data, error } = await db.rpc(rpcName, {
+      const { data, error } = await supabase.rpc(rpcName as any, {
         p_batch_id: batch.id,
       });
 
       if (error) {
+        if (error.code === "42883" || error.message?.includes("does not exist")) {
+          throw new Error(
+            `Import function for ${batch.upload_type_code} is not set up on this Supabase project yet. Please run the migration to create the import RPCs.`
+          );
+        }
         throw new Error(error.message || "Import RPC failed.");
       }
 

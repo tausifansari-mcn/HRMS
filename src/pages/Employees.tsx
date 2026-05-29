@@ -441,15 +441,15 @@ const Employees = () => {
               <div className="absolute inset-y-0 left-0 w-1 bg-slate-950" />
 
               <div className="pl-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">
+                <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">
                   People Management
                 </p>
 
-                <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                <h1 className="mt-2 text-3xl font-black text-slate-950">
                   {isAdminOrHR ? "Employee Directory" : "Team Directory"}
                 </h1>
 
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
                   {isAdminOrHR
                     ? "Manage employees, documents, status, departments, exports and bulk actions."
                     : "View your team members and employee information."}
@@ -468,7 +468,7 @@ const Employees = () => {
 
                 <Button
                   asChild
-                  className="h-10 rounded-xl bg-slate-950 px-4 text-xs font-semibold text-white hover:bg-slate-800"
+                  className="bg-slate-950 text-white hover:bg-slate-800 rounded-2xl px-5 py-2.5 font-semibold cursor-pointer transition-colors"
                 >
                   <Link to="/onboarding">
                     <UserPlus className="mr-2 h-4 w-4" />
@@ -663,7 +663,7 @@ const Employees = () => {
                 {employees.length === 0 && isAdminOrHR && (
                   <Button
                     asChild
-                    className="mt-5 h-10 rounded-xl bg-slate-950 px-4 text-xs font-semibold text-white hover:bg-slate-800"
+                    className="mt-5 bg-slate-950 text-white hover:bg-slate-800 rounded-2xl px-5 py-2.5 font-semibold cursor-pointer transition-colors"
                   >
                     <Link to="/onboarding">
                       <UserPlus className="mr-2 h-4 w-4" />
