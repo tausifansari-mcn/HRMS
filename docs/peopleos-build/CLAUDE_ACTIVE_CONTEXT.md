@@ -8,7 +8,7 @@
 
 ## 1. Permanent Execution Rule
 
-Start every user-facing Claude instruction/work cycle with:
+Start every Claude instruction/work cycle with:
 
 ```text
 /using-superpowers
@@ -63,67 +63,95 @@ Merged completed work:
 - PR #17/#19: payroll/F&F foundation plus safety corrections.
 - PR #18: management surfaces + portal hardening.
 - PR #20: Roster & Shift Governance completed and merged.
+- PR #21: Attendance, Leave, WFM and RTA Completion completed and merged.
+- PR #22: CEO Demo Readiness, Role Access, Account Control foundation, Workforce Mandate/Capacity foundation, CI-only validation and manual-only Vercel workflow completed and merged.
 
-PR #20 final rules:
-- Process Manager + WFM jointly own weekly roster draft→publish in mapped `user_assignment_scope`.
-- TL/AM monitor and raise/resolve coverage actions only.
-- TL/AM cannot freely edit published roster truth.
-- Employee sees/acknowledges own roster only.
-- Client Portal receives aggregate roster readiness only.
+PR #22 merge SHA: `dfa17813b3aca5ad2e22b72fc06f10890b72465c`
+
+Important PR #22 notes:
+- PeopleOS CI Validation passed before merge.
+- Vercel deploy workflow is manual-only (`workflow_dispatch`).
+- PR validation workflow is `.github/workflows/peopleos-ci.yml`.
+- Demo login still requires non-production Supabase Auth users and mapping Supabase Auth UUIDs to `mas_hrms.user_roles`; use `docs/demo/CEO_DEMO_AUTH_MAPPING_RUNBOOK.md`.
 
 ---
 
-## 5. Current Open / Next Work
+## 5. Current Open Work
 
-Current open package:
-- **PR #21 — Package C: Attendance, Leave, WFM and RTA Completion**
-- Branch: `package-c/attendance-leave-wfm-rta`
-- Reported validation: 50 test files, 711 tests, 0 failures; frontend/backend builds clean.
-- Migration: `021_attendance_leave_rta.sql` additive and unexecuted.
+No open active build PR is currently tracked in this context after PR #22 merge.
 
 Next action:
-1. Review PR #21.
-2. If full validation is green and no hard gate exists, squash-merge PR #21 to `main` and delete branch.
-3. Start urgent CEO demo branch.
+1. Create the next package branch from latest `main`.
+2. Begin **Frontend Role Journey Completion**.
+3. Keep source-only changes until validation passes; no SQL execution and no Vercel deployment without explicit approval.
 
 ---
 
-## 6. Urgent CEO Demo Branch
+## 6. Deployment Workflow State
 
-Create branch after PR #21 merge:
-
-```text
-demo/ceo-access-capacity-readiness
-```
-
-Goal: demo-ready role access + staffing intelligence without SQL execution or deployment.
-
-Build:
-1. `shivam.giri@teammas.in` Super Admin via safe source-only seed/runbook.
-2. Demo users/role matrix for Super Admin, HR Admin, Recruiter, Employee, WFM, Process Manager, AM, TL, QA, Trainer, Payroll/Finance, Branch Head, CEO, Client User.
-3. Temporary demo password source: `PEOPLEOS_DEMO_PASSWORD`; fallback `Demo@12345!` only outside production; no plaintext password storage.
-4. Account control foundation: forgot password, admin reset link/temp reset, force reset, unlock, disable, revoke sessions, audit.
-5. Workforce Mandate & Capacity demo: mandate HC, buffer %, shortage/surplus, production vs support HC, support role split, training/joining pipeline, certified pending, on-notice, risk status.
-6. Demo cards/pages for CEO, WFM, Process Manager and Client Portal.
-7. Client Portal aggregate staffing readiness only; no employee/payroll/PII leakage.
+- `.github/workflows/deploy-vercel.yml` is now **manual-only** using `workflow_dispatch`.
+- PR validation is handled by `.github/workflows/peopleos-ci.yml`.
+- Do not use Vercel deployment as PR validation.
+- Run Vercel only manually when a demo/release URL is explicitly needed.
 
 ---
 
-## 7. New Packages Added
+## 7. Next Product Packages
 
-Package M — Account Control / Password Recovery:
-- Supabase Auth + MySQL audit bridge.
-- Employee forgot password.
-- Admin reset/unlock/disable/revoke session.
-- No plaintext passwords.
+Priority order:
 
-Package N — Workforce Mandate & Capacity Planning:
-- Client/process/branch/LOB/role-group mandate.
-- Buffer/shrinkage/attrition/training buffer.
-- Production vs Support HC.
-- Support roles: TL, QA, RTM/RTA, SME, AM, Process Manager, Manager, Trainer, WFM, MIS, HR, IT.
-- Target HC, active eligible HC, pipeline, training projection, shortage/surplus and risk.
-- Client Portal aggregate only.
+1. **Frontend Role Journey Completion**
+   - Ensure every role page is actually usable, not only backend-ready.
+   - Super Admin, HR, Recruiter, Employee, WFM, Process Manager, AM, TL, QA, Trainer, Payroll, CEO, Client User.
+   - Build real navigation/module visibility and connect existing APIs where available.
+
+2. **Account Control Production Completion**
+   - Supabase Auth reset integration.
+   - Admin reset link/temp reset design.
+   - Lock/unlock/disable/revoke-session enforcement.
+   - MFA/OTP reset design.
+   - Full audit trail.
+
+3. **Workforce Mandate & Capacity Planning Production Completion**
+   - Real mandate master UI.
+   - Support ratio UI.
+   - Pipeline/training/LMS snapshot integration.
+   - Client Portal aggregate staffing readiness.
+
+4. **Integration Hub Full Build**
+   - Manual upload CSV/XLSX.
+   - Header mapping.
+   - Validation and rejected-row file.
+   - SQL/API/file/device connectors.
+   - Scheduled sync and data lineage.
+
+5. **LMS Integration Snapshot Layer**
+   - LMS user/batch/process mapping.
+   - Progress/certification/training projection snapshots.
+   - No LMS rebuild.
+
+6. **Client Portal Full Expansion**
+   - Client access matrix.
+   - Published metrics layer.
+   - SOW/SLA, staffing readiness, quality summary, actions/MOM, client requests.
+   - Aggregate-only boundary.
+
+7. **Operations + Quality + Call Master Integration**
+   - Process performance, quality scorecards, coaching/TNI/CAPA.
+   - Client-safe quality summary.
+
+8. **Payroll Production Completion**
+   - PF/UAN/ESIC/TDS/gratuity policy validation.
+   - Payslip workflow, maker-checker, disbursement export, F&F UAT.
+
+9. **ERP / Benefits / Engagement / Upskilling**
+   - Vendor/procurement/expense/contract/cost centre.
+   - Benefits, claims, employee pulse, recognition, skills/upskilling analytics.
+
+10. **Health, Compliance, UAT and Deployment Readiness**
+    - System/data/security/integration health.
+    - Migration/runbook/backup/rollback.
+    - Final UAT and controlled deployment.
 
 ---
 
@@ -145,7 +173,7 @@ Required before merge:
 - all backend tests pass;
 - backend production build pass;
 - no SQL execution;
-- no Vercel deployment;
+- no Vercel deployment unless explicitly requested;
 - no external DB/LMS access;
 - no secrets committed;
 - no sensitive data leakage.
