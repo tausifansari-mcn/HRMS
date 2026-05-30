@@ -39,7 +39,8 @@ export async function fetchFromDatabase(
   });
 
   try {
-    const [rows] = await pool.execute(query, params as any[]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [rows] = await pool.execute(query, params as any);
     const durationMs = Date.now() - start;
     await pool.end();
     return {

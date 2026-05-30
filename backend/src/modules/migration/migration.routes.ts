@@ -5,7 +5,8 @@ import { migrationService } from "./migration.service.js";
 export const migrationRouter = Router();
 migrationRouter.use(requireAuth);
 
-const h = (fn: Function) => (req: any, res: any, next: any) => fn(req, res).catch(next);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
 migrationRouter.get("/status", h(async (_req: any, res: any) => {
   const data = await migrationService.getModuleStatus();

@@ -78,7 +78,8 @@ describe("runConnector", () => {
     mockExecute.mockResolvedValue([{ affectedRows: 1 }]);
 
     await runConnector("dialer_1", rawPayload, "user-1");
-    const calls = mockExecute.mock.calls.map(([sql]: [string]) => sql);
+    const calls = mockExecute.mock.calls.map(// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ([sql]: any) => sql as string);
     expect(calls.some((s: string) => /integration_raw_payload/i.test(s))).toBe(true);
   });
 
@@ -91,7 +92,8 @@ describe("runConnector", () => {
     mockExecute.mockResolvedValue([{ affectedRows: 1 }]);
 
     await runConnector("dialer_1", rawPayload, "user-1");
-    const calls = mockExecute.mock.calls.map(([sql]: [string]) => sql);
+    const calls = mockExecute.mock.calls.map(// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ([sql]: any) => sql as string);
     expect(calls.some((s: string) => /integration_schema_snapshot/i.test(s))).toBe(true);
   });
 
@@ -104,7 +106,8 @@ describe("runConnector", () => {
     mockExecute.mockResolvedValue([{ affectedRows: 1 }]);
 
     await runConnector("dialer_1", rawPayload, "user-1");
-    const calls = mockExecute.mock.calls.map(([sql]: [string]) => sql);
+    const calls = mockExecute.mock.calls.map(// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ([sql]: any) => sql as string);
     expect(calls.some((s: string) => /integration_field_map_suggestion/i.test(s))).toBe(true);
   });
 
@@ -129,7 +132,8 @@ describe("runConnector", () => {
     mockExecute.mockResolvedValue([{ affectedRows: 1 }]);
 
     await runConnector("dialer_1", rawPayload, "user-1");
-    const calls = mockExecute.mock.calls.map(([sql]: [string]) => sql);
+    const calls = mockExecute.mock.calls.map(// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ([sql]: any) => sql as string);
     const updateCall = calls.find((s: string) => /UPDATE.*integration_connector_run/i.test(s));
     expect(updateCall).toBeDefined();
   });
@@ -143,7 +147,8 @@ describe("runConnector", () => {
     mockExecute.mockResolvedValue([{ affectedRows: 1 }]);
 
     await runConnector("dialer_1", rawPayload, "user-1");
-    const calls = mockExecute.mock.calls.map(([sql]: [string, unknown[]]) => sql);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const calls = mockExecute.mock.calls.map(([sql]: any) => sql as string);
     const failUpdate = calls.find((s: string) => /UPDATE.*integration_connector_run/i.test(s));
     expect(failUpdate).toBeDefined();
   });

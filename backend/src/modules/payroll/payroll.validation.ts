@@ -21,8 +21,8 @@ export const createStructureSchema = z.object({
   structureCode: z.string().trim().min(1).max(50),
   structureName: z.string().trim().min(1).max(255),
   description: z.string().trim().nullable().optional(),
-  basicPct: z.number().min(1).max(100).default(40),
-  hraPct: z.number().min(0).max(100).default(20),
+  basicPct: z.number().min(1).max(100).optional(),
+  hraPct: z.number().min(0).max(100).optional(),
 });
 
 export const bulkAssignSchema = z.object({

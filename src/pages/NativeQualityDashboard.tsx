@@ -1,25 +1,110 @@
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, RefreshCcw, Search, ShieldCheck, Target, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  Bell,
+  BellOff,
+  BookOpen,
+  CheckCircle2,
+  Loader,
+  RefreshCcw,
+  ShieldAlert,
+  Target,
+  Trophy,
+  Users,
+} from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { hrmsApi } from "@/lib/hrmsApi";
 
-type Row = Record<string, any>;
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-const today = () => new Date().toISOString().slice(0, 10);
-const monthStart = () => {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+interface LeaderboardEntry {
+  rank: number;
+  employee_id: string;
+  employee_name: string;
+  employee_code: string;
+  department: string;
+  kpi_score: number;
+  kpi_template: string;
+  period: string;
+}
+
+interface Alert {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  employee_code: string;
+  alert_type: string;
+  severity: "critical" | "high" | "medium" | "low" | "info";
+  message: string;
+  is_acknowledged: boolean;
+  created_at: string;
+}
+
+interface CoachingSession {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  employee_code: string;
+  coach_name: string;
+  session_type: string;
+  session_date: string;
+  status: "scheduled" | "completed" | "cancelled" | "pending";
+  notes: string | null;
+}
+
+type Period = "monthly" | "quarterly" | "yearly";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const SCORE_COLOR = (score: number): string => {
+  if (score >= 90) return "text-emerald-600";
+  if (score >= 75) return "text-amber-600";
+  return "text-red-600";
 };
-const rate = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 10 : 0);
-const uniq = (v: string[]) => ["All", ...Array.from(new Set(v.filter(Boolean))).sort()];
 
-function Stat({ title, value, sub, icon, tone }: { title: string; value: string | number; sub?: string; icon: React.ReactNode; tone: string }) {
+const SCORE_BG = (score: number): string => {
+  if (score >= 90) return "bg-emerald-50 text-emerald-700";
+  if (score >= 75) return "bg-amber-50 text-amber-700";
+  return "bg-red-50 text-red-700";
+};
+
+const SEVERITY_COLORS: Record<Alert["severity"], string> = {
+  critical: "bg-red-100 text-red-700 border-red-200",
+  high:     "bg-orange-50 text-orange-700 border-orange-200",
+  medium:   "bg-amber-50 text-amber-700 border-amber-200",
+  low:      "bg-slate-50 text-slate-700 border-slate-200",
+  info:     "bg-blue-50 text-blue-700 border-blue-200",
+};
+
+const SESSION_STATUS_COLORS: Record<string, string> = {
+  scheduled:  "bg-blue-50 text-blue-700",
+  completed:  "bg-emerald-50 text-emerald-700",
+  cancelled:  "bg-slate-100 text-slate-500",
+  pending:    "bg-amber-50 text-amber-700",
+};
+
+const RANK_ICONS: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
+
+function StatCard({
+  title,
+  value,
+  sub,
+  icon,
+  tone,
+}: {
+  title: string;
+  value: string | number;
+  sub?: string;
+  icon: React.ReactNode;
+  tone: string;
+}) {
   return (
     <div className="rounded-3xl border bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-slate-500">{title}</p>
-          <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
-          {sub && <p className="mt-1 text-xs font-semibold text-slate-500">{sub}</p>}
+          <p className="mt-2 text-3xl font-black tracking-tight text-slate-950">{value}</p>
+          {sub && <p className="mt-1 text-xs font-semibold text-slate-400">{sub}</p>}
         </div>
         <div className={`rounded-2xl p-3 ${tone}`}>{icon}</div>
       </div>
@@ -27,145 +112,396 @@ function Stat({ title, value, sub, icon, tone }: { title: string; value: string 
   );
 }
 
-function MiniBars({ rows, label, value }: { rows: Row[]; label: string; value: string }) {
-  const max = Math.max(1, ...rows.map((r) => Number(r[value]) || 0));
-  if (!rows.length) return <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-slate-500">No data.</div>;
+function SessionStatusBadge({ status }: { status: string }) {
+  const cls = SESSION_STATUS_COLORS[status] ?? "bg-slate-100 text-slate-600";
   return (
-    <div className="space-y-3">
-      {rows.slice(0, 10).map((r, i) => (
-        <div key={i}>
-          <div className="mb-1 flex justify-between text-sm"><b>{r[label] || "-"}</b><b>{r[value]}</b></div>
-          <div className="h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-slate-950" style={{ width: `${Math.max(6, ((Number(r[value]) || 0) / max) * 100)}%` }} /></div>
-        </div>
-      ))}
-    </div>
+    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${cls}`}>
+      {status}
+    </span>
   );
 }
 
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 export default function NativeQualityDashboard() {
-  const [fromDate, setFromDate] = useState(monthStart());
-  const [toDate, setToDate] = useState(today());
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [rows, setRows] = useState<Row[]>([]);
-  const [search, setSearch] = useState("");
-  const [branch, setBranch] = useState("All");
-  const [process, setProcess] = useState("All");
-  const [team, setTeam] = useState("All");
 
-  const load = async () => {
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [coaching, setCoaching] = useState<CoachingSession[]>([]);
+  const [period, setPeriod] = useState<Period>("monthly");
+  const [acknowledgingId, setAcknowledgingId] = useState<string | null>(null);
+
+  // ─── Loaders ────────────────────────────────────────────────────────────────
+
+  const loadAll = async () => {
     setLoading(true);
     setMessage("");
     try {
-      const { data, error } = await db
-        .from("quality_score_log")
-        .select("*")
-        .gte("audit_date", fromDate)
-        .lte("audit_date", toDate)
-        .order("audit_date", { ascending: false })
-        .limit(3000);
-      if (error) throw error;
-      setRows(data || []);
-    } catch (err: any) {
-      setMessage(err.message || "Unable to load Quality Dashboard. Run Phase 8D SQL if tables are missing.");
+      const [lbRes, alertsRes, coachRes] = await Promise.all([
+        hrmsApi.get<{ success: boolean; data: LeaderboardEntry[] }>(
+          `/api/kpi/leaderboard?period=${period}`
+        ),
+        hrmsApi.get<{ success: boolean; data: Alert[] }>("/api/management/alerts"),
+        hrmsApi.get<{ success: boolean; data: CoachingSession[] }>(
+          "/api/management/coaching"
+        ),
+      ]);
+      setLeaderboard(lbRes.data ?? []);
+      setAlerts(alertsRes.data ?? []);
+      setCoaching(coachRes.data ?? []);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load Quality Dashboard data";
+      setMessage(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    void loadAll();
+  }, [period]);
 
-  const branches = useMemo(() => uniq(rows.map((r) => r.branch_name || "Unmapped")), [rows]);
-  const processes = useMemo(() => uniq(rows.map((r) => r.process_name || "Unmapped")), [rows]);
-  const teams = useMemo(() => uniq(rows.map((r) => r.team_name || "Unmapped")), [rows]);
+  // ─── Derived ────────────────────────────────────────────────────────────────
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
-      const text = [r.employee_code, r.employee_name, r.branch_name, r.process_name, r.team_name, r.auditor_name, r.defect_category, r.defect_sub_category].join(" ").toLowerCase();
-      return (!q || text.includes(q))
-        && (branch === "All" || (r.branch_name || "Unmapped") === branch)
-        && (process === "All" || (r.process_name || "Unmapped") === process)
-        && (team === "All" || (r.team_name || "Unmapped") === team);
-    });
-  }, [rows, search, branch, process, team]);
+  const qualityAlerts = alerts.filter(
+    (a) => a.severity === "critical" || a.severity === "high"
+  );
+  const unacknowledgedAlerts = qualityAlerts.filter((a) => !a.is_acknowledged);
 
-  const metrics = useMemo(() => {
-    const audits = filtered.length;
-    const avg = audits ? Math.round((filtered.reduce((a, r) => a + Number(r.quality_score || 0), 0) / audits) * 10) / 10 : 0;
-    const critical = filtered.reduce((a, r) => a + Number(r.fatal_count || 0), 0);
-    const defects = filtered.reduce((a, r) => a + Number(r.error_count || 0), 0);
-    const coaching = filtered.filter((r) => r.coaching_required).length;
-    const excellent = filtered.filter((r) => Number(r.quality_score || 0) >= 95).length;
-    const low = filtered.filter((r) => Number(r.quality_score || 0) < 85).length;
-    return { audits, avg, critical, defects, coaching, excellent, low, excellentRate: rate(excellent, audits) };
-  }, [filtered]);
+  const qualityCoaching = coaching.filter(
+    (s) => s.session_type === "quality"
+  );
 
-  const group = (key: string, valueKey = "audits") => {
-    const map = new Map<string, Row>();
-    filtered.forEach((r) => {
-      const k = r[key] || "Unmapped";
-      const item = map.get(k) || { name: k, audits: 0, defects: 0, critical: 0, scoreTotal: 0, avgScore: 0 };
-      item.audits += 1;
-      item.defects += Number(r.error_count || 0);
-      item.critical += Number(r.fatal_count || 0);
-      item.scoreTotal += Number(r.quality_score || 0);
-      item.avgScore = Math.round((item.scoreTotal / item.audits) * 10) / 10;
-      map.set(k, item);
-    });
-    return Array.from(map.values()).sort((a, b) => Number(b[valueKey]) - Number(a[valueKey]));
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const coachingThisMonth = qualityCoaching.filter(
+    (s) => s.session_date?.startsWith(thisMonth)
+  ).length;
+
+  const totalTracked = leaderboard.length;
+  const avgScore =
+    totalTracked > 0
+      ? Math.round(
+          (leaderboard.reduce((sum, e) => sum + (e.kpi_score || 0), 0) / totalTracked) * 10
+        ) / 10
+      : 0;
+
+  const acknowledgeAlert = async (id: string) => {
+    setAcknowledgingId(id);
+    try {
+      await hrmsApi.post(`/api/management/alerts/${id}/acknowledge`, {});
+      setAlerts((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, is_acknowledged: true } : a))
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Acknowledge failed";
+      setMessage(msg);
+    } finally {
+      setAcknowledgingId(null);
+    }
   };
 
-  const branchRows = group("branch_name");
-  const processRows = group("process_name");
-  const analystRows = group("employee_name");
-  const defectRows = group("defect_category", "defects");
+  // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Page Header */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">Quality Command Center</p>
+            <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">
+              Quality Command Center
+            </p>
             <h1 className="mt-2 text-3xl font-black text-slate-950">Quality Dashboard</h1>
-            <p className="mt-2 max-w-5xl text-slate-600">Analyst, branch, process and team quality trends with score, defect and coaching visibility.</p>
+            <p className="mt-2 max-w-4xl text-slate-600">
+              KPI-based quality indicators, performance alerts, and coaching session tracking.
+            </p>
           </div>
-          <button disabled={loading} onClick={load} className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:bg-slate-300"><RefreshCcw className="h-4 w-4" /> Refresh</button>
+          <button
+            onClick={() => void loadAll()}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCcw className="h-4 w-4" />
+            Refresh
+          </button>
         </div>
 
-        {message && <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-800">{message}</div>}
+        {/* Phase Banner */}
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+          <ShieldAlert className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+          <span>
+            <strong>Note:</strong> Full QA audit integration (Call Master / quality scoring) is in
+            Phase 7. This dashboard shows KPI-based quality indicators.
+          </span>
+        </div>
 
-        <div className="rounded-3xl border bg-white p-4 shadow-sm">
-          <div className="grid gap-3 lg:grid-cols-[1.4fr_170px_170px_1fr_1fr_1fr]">
-            <label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search analyst, auditor, defect..." className="h-12 w-full rounded-2xl border bg-slate-50 pl-10 pr-4 text-sm outline-none" /></label>
-            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="rounded-2xl border bg-slate-50 px-4 py-3" />
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="rounded-2xl border bg-slate-50 px-4 py-3" />
-            <select value={branch} onChange={(e) => setBranch(e.target.value)} className="rounded-2xl border bg-slate-50 px-4 py-3">{branches.map((x) => <option key={x}>{x}</option>)}</select>
-            <select value={process} onChange={(e) => setProcess(e.target.value)} className="rounded-2xl border bg-slate-50 px-4 py-3">{processes.map((x) => <option key={x}>{x}</option>)}</select>
-            <select value={team} onChange={(e) => setTeam(e.target.value)} className="rounded-2xl border bg-slate-50 px-4 py-3">{teams.map((x) => <option key={x}>{x}</option>)}</select>
+        {/* Error Banner */}
+        {message && (
+          <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            {message}
           </div>
+        )}
+
+        {/* Stat Cards */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <StatCard
+            title="Active Employees Tracked"
+            value={totalTracked}
+            icon={<Users className="h-5 w-5" />}
+            tone="bg-slate-100 text-slate-700"
+          />
+          <StatCard
+            title="Avg KPI Score"
+            value={`${avgScore}%`}
+            sub="across all tracked employees"
+            icon={<Target className="h-5 w-5" />}
+            tone="bg-emerald-50 text-emerald-700"
+          />
+          <StatCard
+            title="Open Alerts"
+            value={unacknowledgedAlerts.length}
+            sub="critical &amp; high severity"
+            icon={<Bell className="h-5 w-5" />}
+            tone={unacknowledgedAlerts.length > 0 ? "bg-red-50 text-red-600" : "bg-slate-100 text-slate-500"}
+          />
+          <StatCard
+            title="Coaching Sessions"
+            value={coachingThisMonth}
+            sub="quality sessions this month"
+            icon={<BookOpen className="h-5 w-5" />}
+            tone="bg-violet-50 text-violet-700"
+          />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-7">
-          <Stat title="Audits" value={metrics.audits} icon={<ShieldCheck className="h-5 w-5" />} tone="bg-blue-50 text-blue-700" />
-          <Stat title="Avg Quality" value={`${metrics.avg}%`} sub="target 95%" icon={<Target className="h-5 w-5" />} tone="bg-emerald-50 text-emerald-700" />
-          <Stat title="Critical" value={metrics.critical} icon={<AlertTriangle className="h-5 w-5" />} tone="bg-rose-50 text-rose-700" />
-          <Stat title="Defects" value={metrics.defects} icon={<AlertTriangle className="h-5 w-5" />} tone="bg-orange-50 text-orange-700" />
-          <Stat title="Coaching" value={metrics.coaching} sub="required" icon={<Users className="h-5 w-5" />} tone="bg-violet-50 text-violet-700" />
-          <Stat title="Excellent" value={metrics.excellent} sub={`${metrics.excellentRate}%`} icon={<CheckCircle2 className="h-5 w-5" />} tone="bg-green-50 text-green-700" />
-          <Stat title="Low Score" value={metrics.low} sub="below 85%" icon={<AlertTriangle className="h-5 w-5" />} tone="bg-red-50 text-red-700" />
-        </div>
-
-        <div className="grid gap-5 xl:grid-cols-4">
-          <div className="rounded-3xl border bg-white p-5 shadow-sm"><h2 className="mb-4 font-black">Branch Quality</h2><MiniBars rows={branchRows} label="name" value="audits" /></div>
-          <div className="rounded-3xl border bg-white p-5 shadow-sm"><h2 className="mb-4 font-black">Process Quality</h2><MiniBars rows={processRows} label="name" value="audits" /></div>
-          <div className="rounded-3xl border bg-white p-5 shadow-sm"><h2 className="mb-4 font-black">Analyst Quality</h2><MiniBars rows={analystRows} label="name" value="audits" /></div>
-          <div className="rounded-3xl border bg-white p-5 shadow-sm"><h2 className="mb-4 font-black">Defect Categories</h2><MiniBars rows={defectRows} label="name" value="defects" /></div>
-        </div>
-
+        {/* KPI Leaderboard */}
         <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
-          <div className="border-b p-5"><h2 className="font-black text-slate-950">Quality Audit Register</h2><p className="text-sm text-slate-500">Latest audit rows for drilldown and coaching action.</p></div>
-          <div className="overflow-auto"><table className="w-full min-w-[1200px] text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-4">Date</th><th className="p-4">Analyst</th><th className="p-4">Branch / Process / Team</th><th className="p-4">Score</th><th className="p-4">Critical</th><th className="p-4">Defects</th><th className="p-4">Category</th><th className="p-4">Coaching</th><th className="p-4">Remarks</th></tr></thead><tbody>{filtered.map((r) => <tr key={r.id} className="border-t"><td className="p-4">{r.audit_date}</td><td className="p-4"><b>{r.employee_name || "-"}</b><p className="text-xs text-slate-500">{r.employee_code}</p></td><td className="p-4">{r.branch_name || "-"}<p className="text-xs text-slate-500">{r.process_name || "-"} · {r.team_name || "-"}</p></td><td className="p-4 font-black">{r.quality_score}%</td><td className="p-4">{r.fatal_count}</td><td className="p-4">{r.error_count}</td><td className="p-4">{r.defect_category || "-"}<p className="text-xs text-slate-500">{r.defect_sub_category || ""}</p></td><td className="p-4">{r.coaching_required ? "Required" : "No"}</td><td className="p-4">{r.remarks || "-"}</td></tr>)}</tbody></table></div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b p-5">
+            <div>
+              <h2 className="flex items-center gap-2 font-black text-slate-950">
+                <Trophy className="h-5 w-5 text-amber-500" />
+                KPI Leaderboard
+              </h2>
+              <p className="text-sm text-slate-500">Ranked by KPI score</p>
+            </div>
+            <div className="flex gap-1.5">
+              {(["monthly", "quarterly", "yearly"] as Period[]).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPeriod(p)}
+                  className={`cursor-pointer rounded-xl px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
+                    period === p
+                      ? "bg-slate-950 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader className="h-8 w-8 animate-spin text-slate-400" />
+            </div>
+          ) : leaderboard.length === 0 ? (
+            <div className="py-16 text-center">
+              <Trophy className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+              <p className="font-semibold text-slate-400">No leaderboard data for this period.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] text-sm">
+                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                  <tr>
+                    {["Rank", "Employee", "Department", "KPI Template", "Score"].map((h) => (
+                      <th key={h} className="p-4 font-semibold">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboard.map((entry) => (
+                    <tr
+                      key={entry.employee_id}
+                      className="border-t hover:bg-slate-50/80 transition-colors"
+                    >
+                      <td className="p-4">
+                        <span className="text-lg">
+                          {RANK_ICONS[entry.rank] ?? (
+                            <span className="font-bold text-slate-500">#{entry.rank}</span>
+                          )}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-bold text-slate-950">{entry.employee_name}</div>
+                        <div className="font-mono text-xs text-slate-400">
+                          {entry.employee_code}
+                        </div>
+                      </td>
+                      <td className="p-4 text-slate-600">{entry.department || "–"}</td>
+                      <td className="p-4 text-slate-500">{entry.kpi_template || "–"}</td>
+                      <td className="p-4">
+                        <span
+                          className={`inline-block rounded-full px-3 py-1 text-sm font-black ${SCORE_BG(entry.kpi_score)}`}
+                        >
+                          {entry.kpi_score}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Quality Alerts */}
+        <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b p-5">
+            <div>
+              <h2 className="flex items-center gap-2 font-black text-slate-950">
+                <ShieldAlert className="h-5 w-5 text-red-500" />
+                Quality Alerts
+              </h2>
+              <p className="text-sm text-slate-500">
+                Critical and high severity alerts · {unacknowledgedAlerts.length} unacknowledged
+              </p>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader className="h-8 w-8 animate-spin text-slate-400" />
+            </div>
+          ) : qualityAlerts.length === 0 ? (
+            <div className="py-14 text-center">
+              <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-emerald-300" />
+              <p className="font-semibold text-slate-400">No critical or high alerts. All clear.</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {qualityAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className={`flex items-start gap-4 px-5 py-4 transition-opacity ${
+                    alert.is_acknowledged ? "opacity-50" : ""
+                  }`}
+                >
+                  <div
+                    className={`mt-0.5 flex-shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold uppercase ${
+                      SEVERITY_COLORS[alert.severity]
+                    }`}
+                  >
+                    {alert.severity}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <span className="font-bold text-slate-950">{alert.employee_name}</span>
+                      <span className="font-mono text-xs text-slate-400">
+                        {alert.employee_code}
+                      </span>
+                      <span className="text-xs text-slate-500 capitalize">
+                        · {alert.alert_type?.replace(/_/g, " ")}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-600">{alert.message}</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {alert.created_at?.slice(0, 16).replace("T", " ")}
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    {alert.is_acknowledged ? (
+                      <span className="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                        <BellOff className="h-3.5 w-3.5" />
+                        Acknowledged
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => void acknowledgeAlert(alert.id)}
+                        disabled={acknowledgingId === alert.id}
+                        className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl bg-slate-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
+                      >
+                        {acknowledgingId === alert.id ? (
+                          <Loader className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Bell className="h-3.5 w-3.5" />
+                        )}
+                        Acknowledge
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Coaching Sessions */}
+        <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
+          <div className="border-b p-5">
+            <h2 className="flex items-center gap-2 font-black text-slate-950">
+              <BookOpen className="h-5 w-5 text-violet-500" />
+              Quality Coaching Sessions
+            </h2>
+            <p className="text-sm text-slate-500">
+              Sessions filtered by session_type: quality · {qualityCoaching.length} total
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader className="h-8 w-8 animate-spin text-slate-400" />
+            </div>
+          ) : qualityCoaching.length === 0 ? (
+            <div className="py-14 text-center">
+              <BookOpen className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+              <p className="font-semibold text-slate-400">No quality coaching sessions found.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px] text-sm">
+                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                  <tr>
+                    {["Employee", "Coach", "Session Date", "Status", "Notes"].map((h) => (
+                      <th key={h} className="p-4 font-semibold">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {qualityCoaching.map((session) => (
+                    <tr
+                      key={session.id}
+                      className="border-t hover:bg-slate-50/80 transition-colors"
+                    >
+                      <td className="p-4">
+                        <div className="font-bold text-slate-950">{session.employee_name}</div>
+                        <div className="font-mono text-xs text-slate-400">
+                          {session.employee_code}
+                        </div>
+                      </td>
+                      <td className="p-4 text-slate-700">{session.coach_name || "–"}</td>
+                      <td className="p-4 font-mono text-xs text-slate-500">
+                        {session.session_date?.slice(0, 10) || "–"}
+                      </td>
+                      <td className="p-4">
+                        <SessionStatusBadge status={session.status} />
+                      </td>
+                      <td className="p-4 max-w-xs">
+                        <p className="truncate text-slate-500">{session.notes || "–"}</p>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>

@@ -18,7 +18,8 @@ const upload = multer({
 export const rosterRouter = Router();
 rosterRouter.use(requireAuth);
 
-const h = (fn: Function) => (req: any, res: any, next: any) => fn(req, res).catch(next);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
 // Plans
 rosterRouter.post("/plans",              h(c.createPlan.bind(c)));

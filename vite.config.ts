@@ -28,7 +28,7 @@ function versionUpdatePlugin(): Plugin {
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
+    host: "0.0.0.0",
     port: 8080,
   },
   plugins: [
@@ -83,6 +83,19 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-react":   ["react", "react-dom", "react-router-dom"],
+          "vendor-query":   ["@tanstack/react-query"],
+          "vendor-ui":      ["@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu", "@radix-ui/react-select", "@radix-ui/react-tabs", "@radix-ui/react-tooltip"],
+          "vendor-supabase": ["@supabase/supabase-js"],
+          "vendor-utils":   ["date-fns", "clsx", "tailwind-merge", "class-variance-authority"],
+        },
+      },
     },
   },
 }));

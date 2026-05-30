@@ -408,6 +408,39 @@ const Auth = () => {
                     </Button>
                   </form>
 
+                  <div className="relative mt-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-slate-200" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-white px-2 text-slate-400 font-bold tracking-wider">OR</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setIsLoading(true);
+                        await signIn("demo@mascallnet.com", "demo123");
+                        setIsLoading(false);
+                      }}
+                      className="group relative flex w-full items-center justify-between overflow-hidden rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 via-indigo-50/50 to-purple-50 p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:border-sky-400 hover:shadow-lg hover:shadow-sky-100/50"
+                    >
+                      <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-sky-200/20 blur-xl transition group-hover:scale-150" />
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-md shadow-sky-500/20">
+                          <ShieldCheck className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900 tracking-tight">Explore Demo Portal</p>
+                          <p className="text-[11px] font-medium text-slate-500">Access Admin/HR Command Center instantly</p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-sky-600 transition-transform duration-300 group-hover:translate-x-1" />
+                    </button>
+                  </div>
+
                   {showForgotPassword && (
                     <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
                       <form

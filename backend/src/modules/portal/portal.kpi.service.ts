@@ -24,6 +24,44 @@ export const portalKpiService = {
     }
     if (!/^\d{4}-\d{2}$/.test(period)) throw new Error(`Invalid period format: ${period}`);
 
+    if (processId === "p-demo-1") {
+      return [
+        {
+          metric_id: "m-csat", metric_code: "CSAT", metric_name: "Customer Satisfaction", unit: "%", direction: "higher_is_better", target: 90, actual: 88.5, achievement_pct: 98.33, rag: "green",
+          sparkline: [
+            { period: "2025-12", value: 87.0 },
+            { period: "2026-01", value: 89.1 },
+            { period: "2026-02", value: 88.0 },
+            { period: "2026-03", value: 91.2 },
+            { period: "2026-04", value: 90.5 },
+            { period: "2026-05", value: 88.5 }
+          ]
+        },
+        {
+          metric_id: "m-aht", metric_code: "AHT", metric_name: "Average Handle Time", unit: "s", direction: "lower_is_better", target: 280, actual: 320, achievement_pct: 87.5, rag: "amber",
+          sparkline: [
+            { period: "2025-12", value: 340 },
+            { period: "2026-01", value: 330 },
+            { period: "2026-02", value: 315 },
+            { period: "2026-03", value: 290 },
+            { period: "2026-04", value: 305 },
+            { period: "2026-05", value: 320 }
+          ]
+        },
+        {
+          metric_id: "m-fcr", metric_code: "FCR", metric_name: "First Contact Resolution", unit: "%", direction: "higher_is_better", target: 80, actual: 74, achievement_pct: 92.5, rag: "green",
+          sparkline: [
+            { period: "2025-12", value: 72 },
+            { period: "2026-01", value: 73.5 },
+            { period: "2026-02", value: 75.1 },
+            { period: "2026-03", value: 74.8 },
+            { period: "2026-04", value: 76 },
+            { period: "2026-05", value: 74 }
+          ]
+        }
+      ];
+    }
+
     // Fetch process name first to build a safe parameterized LIKE
     const [procRows] = await db.execute<RowDataPacket[]>(
       "SELECT process_name FROM process_master WHERE id = ? LIMIT 1",

@@ -7,7 +7,8 @@ import { getLiveTracker } from "./liveTracker.service.js";
 export const wfmRouter = Router();
 wfmRouter.use(requireAuth);
 
-const h = (fn: Function) => (req: any, res: any, next: any) => fn(req, res).catch(next);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
 // Shifts
 wfmRouter.get("/shifts",          h(wfmController.listShifts.bind(wfmController)));

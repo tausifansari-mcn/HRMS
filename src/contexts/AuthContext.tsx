@@ -23,9 +23,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    // Check if we are in local demo mode first
+    const localDemo = localStorage.getItem("hrms_demo_session");
+    if (localDemo) {
+      try {
+        const demoData = JSON.parse(localDemo);
+        setSession(demoData);
+        setUser(demoData.user);
+        setIsLoading(false);
+        return;
+      } catch (e) {
+        console.error("Failed to parse demo session", e);
+      }
+    }
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        // If a demo session is in progress, do not overwrite it with null
+        if (localStorage.getItem("hrms_demo_session")) return;
+
         setSession(session);
         setUser(session?.user ?? null);
         setIsLoading(false);
@@ -44,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (localStorage.getItem("hrms_demo_session")) return;
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
@@ -53,6 +71,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    // Direct local demo sign-in bypass
+    if (email === "demo@mascallnet.com") {
+      const mockSession = {
+        access_token: "mock-token",
+        token_type: "bearer",
+        expires_in: 3600,
+        refresh_token: "mock-refresh-token",
+        user: {
+          id: "demo-user-id",
+          aud: "authenticated",
+          role: "authenticated",
+          email: "demo@mascallnet.com",
+          email_confirmed_at: new Date().toISOString(),
+          phone: "",
+          confirmed_at: new Date().toISOString(),
+          last_sign_in_at: new Date().toISOString(),
+          app_metadata: { provider: "email", providers: ["email"] },
+          user_metadata: { full_name: "Demo Admin" },
+          identities: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+      };
+      
+      localStorage.setItem("hrms_demo_session", JSON.stringify(mockSession));
+      setSession(mockSession as any);
+      setUser(mockSession.user as any);
+      
+      // Invalidate queries to reload all statistics in demo mode
+      queryClient.invalidateQueries();
+      return { error: null };
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -113,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     setIsSigningOut(true);
     try {
+      localStorage.removeItem("hrms_demo_session");
       await supabase.auth.signOut({ scope: 'local' });
     } catch (error) {
       console.error('Sign out error:', error);

@@ -8,6 +8,18 @@ export const portalGovernanceService = {
   async getChecklist(processId: string, period: string): Promise<GovernanceActivity[]> {
     if (!/^\d{4}-\d{2}$/.test(period)) throw new Error(`Invalid period format: ${period}`);
 
+    if (processId === "p-demo-1") {
+      return [
+        { activity_id: "gov-1", activity_name: "Adherence Check", level: "analyst", frequency: "daily", required_count: 20, completed_count: 18, completion_pct: 90, rag: "amber" },
+        { activity_id: "gov-2", activity_name: "QA Calibration Attendance", level: "analyst", frequency: "monthly", required_count: 2, completed_count: 2, completion_pct: 100, rag: "green" },
+        { activity_id: "gov-3", activity_name: "Floor Walk", level: "tl", frequency: "weekly", required_count: 4, completed_count: 4, completion_pct: 100, rag: "green" },
+        { activity_id: "gov-4", activity_name: "Team Briefing", level: "tl", frequency: "weekly", required_count: 4, completed_count: 3, completion_pct: 75, rag: "amber" },
+        { activity_id: "gov-5", activity_name: "Coaching Session", level: "tl", frequency: "monthly", required_count: 4, completed_count: 1, completion_pct: 25, rag: "red" },
+        { activity_id: "gov-6", activity_name: "MIS Review", level: "process_manager", frequency: "weekly", required_count: 4, completed_count: 4, completion_pct: 100, rag: "green" },
+        { activity_id: "gov-7", activity_name: "Escalation Review", level: "process_manager", frequency: "weekly", required_count: 2, completed_count: 2, completion_pct: 100, rag: "green" },
+      ];
+    }
+
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT
          a.id AS activity_id, a.activity_name, a.level, a.frequency, a.required_count,
@@ -35,6 +47,7 @@ export const portalGovernanceService = {
   },
 
   async updateLog(input: UpdateGovernanceInput, userId: string): Promise<void> {
+    if (input.processId === "p-demo-1") return;
     await db.execute(
       `INSERT INTO governance_checklist_log (id, process_id, period, activity_id, completed_count, updated_by)
        VALUES (?, ?, ?, ?, ?, ?)

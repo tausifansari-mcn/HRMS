@@ -1,7 +1,7 @@
-import mysql from "mysql2/promise";
+import mysql, { type RowDataPacket, type FieldPacket, type QueryResult, type Pool } from "mysql2/promise";
 import { env } from "../config/env.js";
 
-const pool = mysql.createPool({
+const _pool: Pool = mysql.createPool({
   host:               env.DB_HOST,
   port:               env.DB_PORT,
   user:               env.DB_USER,
@@ -15,25 +15,26 @@ const pool = mysql.createPool({
 });
 
 /**
- * Application DB adapter.
- *
- * Services build parameterised SQL using values that are validated or
- * normalised before execution. mysql2's strict ExecuteValues signature rejects
- * `unknown[]` assembled by those services even though the runtime accepts the
- * parameterised scalar/null values. Keep one controlled cast at this DB
- * boundary rather than spreading unsafe casts across every business module.
+ * Typed db facade that accepts unknown[] params (mysql2 requires ExecuteValues,
+ * but services build dynamic param arrays typed as unknown[]).
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyParams = any;
+
 export const db = {
-  execute<T = unknown>(sql: string, values?: readonly unknown[]): Promise<[T, unknown[]]> {
-    return pool.execute(sql, values as any[] | undefined) as unknown as Promise<[T, unknown[]]>;
+  execute<T extends RowDataPacket[]>(sql: string, params?: unknown[]): Promise<[T, FieldPacket[]]> {
+    return _pool.execute<T>(sql, params as AnyParams);
   },
-  getConnection() {
-    return pool.getConnection();
+  executeRun(sql: string, params?: unknown[]): Promise<[QueryResult, FieldPacket[]]> {
+    return _pool.execute(sql, params as AnyParams);
   },
+  getConnection: _pool.getConnection.bind(_pool),
+  query: _pool.query.bind(_pool),
+  end: _pool.end.bind(_pool),
 };
 
 export async function pingDb(): Promise<void> {
-  const conn = await db.getConnection();
+  const conn = await _pool.getConnection();
   await conn.ping();
   conn.release();
 }

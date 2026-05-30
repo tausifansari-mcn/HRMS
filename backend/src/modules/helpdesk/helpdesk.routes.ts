@@ -7,7 +7,8 @@ import { getEmployeeForUser, hasRole } from "../../shared/accessGuard.js";
 import { helpdeskService } from "./helpdesk.service.js";
 
 const router = Router();
-const h = (fn: Function) => (req: any, res: any, next: any) => fn(req, res).catch(next);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
 router.use(requireAuth);
 
@@ -45,7 +46,7 @@ router.post("/tickets", h(async (req: AuthenticatedRequest, res: Response) => {
 // Ticket detail: admin/hr see any; employee sees own only
 router.get("/tickets/:id", h(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.authUser!.id;
-  const ticket = await helpdeskService.getTicket(req.params.id);
+  const ticket = await helpdeskService.getTicket(req.params.id) as (Record<string, unknown> & { employee_id: string; comments?: Record<string, unknown>[] }) | null;
   if (!ticket) return res.status(404).json({ error: "Not found" });
 
   const isAdminHr = await hasRole(userId, "admin", "hr");
@@ -59,7 +60,7 @@ router.get("/tickets/:id", h(async (req: AuthenticatedRequest, res: Response) =>
   // Strip internal comments from non-admin/hr responses
   const data = isAdminHr
     ? ticket
-    : { ...ticket, comments: (ticket.comments ?? []).filter((c: any) => !c.is_internal) };
+    : { ...ticket, comments: (ticket.comments ?? []).filter((c) => !c["is_internal"]) };
 
   res.json({ data });
 }));
@@ -81,7 +82,7 @@ router.post("/tickets/:id/comments", h(async (req: AuthenticatedRequest, res: Re
   }
 
   // Verify caller has access to this ticket
-  const ticket = await helpdeskService.getTicket(req.params.id);
+  const ticket = await helpdeskService.getTicket(req.params.id) as (Record<string, unknown> & { employee_id: string; comments?: Record<string, unknown>[] }) | null;
   if (!ticket) return res.status(404).json({ error: "Not found" });
   if (!(await hasRole(userId, "admin", "hr"))) {
     const emp = await getEmployeeForUser(userId);

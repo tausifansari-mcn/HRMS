@@ -178,7 +178,8 @@ describe("RBAC authority — MySQL is the backend authority", () => {
     expect(r.status).toBe(200);
     // Only one execute call should have happened for the MySQL user_roles query
     // (requireRole check + access.service query = 2 execute calls, no INSERT/UPDATE)
-    const writeCalls = mockExecute.mock.calls.filter(([sql]: [string]) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const writeCalls = mockExecute.mock.calls.filter(([sql]: any) =>
       typeof sql === "string" && /INSERT|UPDATE|DELETE/i.test(sql)
     );
     expect(writeCalls).toHaveLength(0);

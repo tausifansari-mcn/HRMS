@@ -55,7 +55,8 @@ vi.mock("../src/modules/portal/portal.commentary.service.js", () => ({
 import { app } from "../src/app.js";
 import { portalAuthService } from "../src/modules/portal/portal.auth.service.js";
 
-const svcAuth = portalAuthService as { [K: string]: ReturnType<typeof vi.fn> };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const svcAuth = portalAuthService as unknown as { [K: string]: ReturnType<typeof vi.fn> };
 const PORTAL_AUTH = { Authorization: "Bearer mock.jwt.token" };
 
 beforeEach(() => vi.clearAllMocks());

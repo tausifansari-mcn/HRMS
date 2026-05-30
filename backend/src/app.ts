@@ -33,6 +33,16 @@ import { rtaRouter } from "./modules/rta/rta.routes.js";
 import { demoRouter } from "./modules/demo/demo.routes.js";
 import { accountControlRouter } from "./modules/account-control/account.control.routes.js";
 import { workforceMandateRouter } from "./modules/workforce-mandate/workforce.mandate.routes.js";
+import { lmsRouter } from "./modules/lms/lms.routes.js";
+import { benefitsRouter } from "./modules/benefits/benefits.routes.js";
+import { careerRouter } from "./modules/career/career.routes.js";
+import { erpRouter } from "./modules/erp/erp.routes.js";
+import { inboxRouter } from "./modules/inbox/inbox.routes.js";
+import { mobilityRouter } from "./modules/mobility/mobility.routes.js";
+import { goalsRouter } from "./modules/goals/goals.routes.js";
+import { jobsRouter } from "./modules/jobs/jobs.routes.js";
+import { complianceRouter } from "./modules/compliance/compliance.routes.js";
+import { privacyRouter } from "./modules/privacy/privacy.routes.js";
 
 export const app = express();
 
@@ -95,6 +105,16 @@ app.use("/api/rta", rtaRouter);
 app.use("/api/demo", demoRouter);
 app.use("/api/account-control", accountControlRouter);
 app.use("/api/workforce-mandate", workforceMandateRouter);
+app.use("/api/lms", lmsRouter);
+app.use("/api/benefits", benefitsRouter);
+app.use("/api/career", careerRouter);
+app.use("/api/erp", erpRouter);
+app.use("/api/inbox", inboxRouter);
+app.use("/api/mobility", mobilityRouter);
+app.use("/api/goals", goalsRouter);
+app.use("/api/jobs", jobsRouter);
+app.use("/api/compliance", complianceRouter);
+app.use("/api/privacy", privacyRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

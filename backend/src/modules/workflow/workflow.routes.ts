@@ -6,7 +6,8 @@ import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 import { workflowService } from "./workflow.service.js";
 
 const router = Router();
-const h = (fn: Function) => (req: any, res: any, next: any) => fn(req, res).catch(next);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
 router.use(requireAuth);
 

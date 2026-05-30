@@ -137,7 +137,8 @@ describe("ATS audit: POST /api/ats-ext/duplicates/:id/resolve", () => {
       .send({ note: "Same person, earlier application" });
 
     expect(r.status).toBe(200);
-    const auditCall = mockExecute.mock.calls.find(([sql]: [string]) =>
+    const auditCall = mockExecute.mock.calls.find(// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ([sql]: any) =>
       typeof sql === "string" && sql.includes("sensitive_action_log")
     );
     expect(auditCall).toBeDefined();
@@ -158,7 +159,8 @@ describe("WFM audit: POST /api/wfm-ext/roster/swaps/:id/review", () => {
       .send({ status: "approved" });
 
     expect(r.status).toBe(200);
-    const auditCall = mockExecute.mock.calls.find(([sql]: [string]) =>
+    const auditCall = mockExecute.mock.calls.find(// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ([sql]: any) =>
       typeof sql === "string" && sql.includes("sensitive_action_log")
     );
     expect(auditCall).toBeDefined();
@@ -175,7 +177,8 @@ describe("WFM audit: POST /api/wfm-ext/roster/swaps/:id/review", () => {
       .send({ status: "rejected" });
 
     expect(r.status).toBe(200);
-    const auditCall = mockExecute.mock.calls.find(([sql]: [string]) =>
+    const auditCall = mockExecute.mock.calls.find(// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ([sql]: any) =>
       typeof sql === "string" && sql.includes("sensitive_action_log")
     );
     expect(auditCall).toBeDefined();
@@ -195,7 +198,8 @@ describe("WFM audit: POST /api/wfm-ext/roster/conflicts/:id/resolve", () => {
       .set(ADMIN);
 
     expect(r.status).toBe(200);
-    const auditCall = mockExecute.mock.calls.find(([sql]: [string]) =>
+    const auditCall = mockExecute.mock.calls.find(// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ([sql]: any) =>
       typeof sql === "string" && sql.includes("sensitive_action_log")
     );
     expect(auditCall).toBeDefined();
@@ -222,7 +226,8 @@ describe("WFM audit: POST /api/wfm-ext/coverage/snapshot", () => {
       });
 
     expect(r.status).toBe(200);
-    const auditCall = mockExecute.mock.calls.find(([sql]: [string]) =>
+    const auditCall = mockExecute.mock.calls.find(// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ([sql]: any) =>
       typeof sql === "string" && sql.includes("sensitive_action_log")
     );
     expect(auditCall).toBeDefined();
@@ -248,7 +253,8 @@ describe("WFM audit: POST /api/wfm-ext/attrition/record", () => {
       });
 
     expect(r.status).toBe(201);
-    const auditCall = mockExecute.mock.calls.find(([sql]: [string]) =>
+    const auditCall = mockExecute.mock.calls.find(// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ([sql]: any) =>
       typeof sql === "string" && sql.includes("sensitive_action_log")
     );
     expect(auditCall).toBeDefined();
@@ -276,7 +282,8 @@ describe("ATS duplicate idempotency: logDuplicate skips existing unresolved pair
     expect(selectCall).toContain("SELECT");
 
     // Verify no INSERT was executed
-    const insertCall = mockExecute.mock.calls.find(([sql]: [string]) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const insertCall = mockExecute.mock.calls.find(([sql]: any) =>
       typeof sql === "string" && sql.toUpperCase().includes("INSERT")
     );
     expect(insertCall).toBeUndefined();

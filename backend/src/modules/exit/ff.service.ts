@@ -3,6 +3,7 @@ import type { Request } from "express";
 import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
 import { logSensitiveAction } from "../../shared/auditLog.js";
+import { calculateGratuity } from "../payroll/payrollCalculate.service.js";
 
 export interface FfInput {
   calculationDate: string;
@@ -266,6 +267,50 @@ export const ffService = {
       amount: Math.round(amount * 100) / 100,
       status: "draft",
       note: "Draft calculation. Requires verification before F&F approval.",
+    };
+  },
+
+  /**
+   * Compute gratuity for an employee by looking up their current salary assignment
+   * and delegating to the payroll calculateGratuity helper.
+   * Formula: (last_basic / 26) * 15 * years_served
+   * Uses the employee's active salary assignment basic component.
+   */
+  async calculateGratuityFromEmployee(employeeId: string): Promise<GratuityCalculation> {
+    // Fetch current active salary assignment to derive last basic
+    const [salRows] = await db.execute<RowDataPacket[]>(
+      `SELECT esa.ctc_annual, ss.basic_pct
+         FROM employee_salary_assignment esa
+         JOIN salary_structure_master ss ON ss.id = esa.structure_id
+        WHERE esa.employee_id = ? AND esa.active_status = 1
+        ORDER BY esa.effective_from DESC
+        LIMIT 1`,
+      [employeeId]
+    );
+    const sal = (salRows as Array<{ ctc_annual: number; basic_pct: number }>)[0];
+    if (!sal) {
+      return {
+        amount: 0,
+        status: "pending_configuration",
+        note: "No active salary assignment found for employee.",
+      };
+    }
+
+    const lastBasicMonthly = (sal.ctc_annual / 12) * ((sal.basic_pct ?? 40) / 100);
+    const result = await calculateGratuity(employeeId, lastBasicMonthly);
+
+    if (!result.eligible) {
+      return {
+        amount: 0,
+        status: "not_eligible",
+        note: `Minimum service period not completed (${result.years} complete years).`,
+      };
+    }
+
+    return {
+      amount: result.amount,
+      status: "draft",
+      note: `Draft calculation: (${lastBasicMonthly.toFixed(2)} / 26) × 15 × ${result.years} years. Requires verification before F&F approval.`,
     };
   },
 };

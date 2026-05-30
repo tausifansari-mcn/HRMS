@@ -6,6 +6,127 @@ import type { SalaryPrepRun } from "./payroll.types.js";
 
 const LOCKED_STATUSES = new Set(["locked", "disbursed"]);
 
+// ─── Gratuity ─────────────────────────────────────────────────────────────────
+
+export interface GratuityResult {
+  eligible: boolean;
+  amount: number;
+  years: number;
+}
+
+/**
+ * Calculate gratuity for an employee using the Payment of Gratuity Act formula:
+ * amount = (lastBasicMonthly / 26) * 15 * completedYears
+ * Eligibility: >= 60 months (5 years) of continuous service.
+ */
+export async function calculateGratuity(
+  employeeId: string,
+  lastBasicMonthly: number
+): Promise<GratuityResult> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    "SELECT date_of_joining FROM employees WHERE id = ? LIMIT 1",
+    [employeeId]
+  );
+  const emp = (rows as Array<{ date_of_joining: string }>)[0];
+  if (!emp?.date_of_joining) {
+    return { eligible: false, amount: 0, years: 0 };
+  }
+
+  const joinDate = new Date(emp.date_of_joining);
+  const today = new Date();
+  const diffMs = today.getTime() - joinDate.getTime();
+  const totalMonths = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.4375));
+  const completedYears = Math.floor(totalMonths / 12);
+
+  if (totalMonths < 60) {
+    return { eligible: false, amount: 0, years: completedYears };
+  }
+
+  const amount = Math.round(((lastBasicMonthly / 26) * 15 * completedYears) * 100) / 100;
+  return { eligible: true, amount, years: completedYears };
+}
+
+// ─── TDS ──────────────────────────────────────────────────────────────────────
+
+export interface TdsResult {
+  tds_annual: number;
+  tds_monthly: number;
+  effective_rate: number;
+}
+
+interface StatutoryConfigMap {
+  [key: string]: number;
+}
+
+/**
+ * Calculate TDS under New Regime (Section 115BAC) FY 2025-26.
+ * Applies standard deduction and 87A rebate from statutory_config.
+ */
+export function calculateTds(
+  annualTaxableIncome: number,
+  statutoryConfig: StatutoryConfigMap
+): TdsResult {
+  const stdDeduction = statutoryConfig["tds_standard_deduction"] ?? 75000;
+  const rebateLimit  = statutoryConfig["tds_rebate_87a_limit"]   ?? 700000;
+
+  const taxableIncome = Math.max(0, annualTaxableIncome - stdDeduction);
+
+  // New regime slabs FY 2025-26
+  const slabs: Array<{ from: number; to: number; rate: number }> = [
+    { from: 0,       to: 300000,  rate: (statutoryConfig["tds_slab_0_300000"]        ?? 0)  / 100 },
+    { from: 300001,  to: 700000,  rate: (statutoryConfig["tds_slab_300001_700000"]   ?? 5)  / 100 },
+    { from: 700001,  to: 1000000, rate: (statutoryConfig["tds_slab_700001_1000000"]  ?? 10) / 100 },
+    { from: 1000001, to: 1200000, rate: (statutoryConfig["tds_slab_1000001_1200000"] ?? 15) / 100 },
+    { from: 1200001, to: 1500000, rate: (statutoryConfig["tds_slab_1200001_1500000"] ?? 20) / 100 },
+    { from: 1500001, to: Infinity, rate: (statutoryConfig["tds_slab_1500001_above"]  ?? 30) / 100 },
+  ];
+
+  let tax = 0;
+  for (const slab of slabs) {
+    if (taxableIncome <= slab.from - 1) break;
+    const slabMax = slab.to === Infinity ? taxableIncome : Math.min(taxableIncome, slab.to);
+    const slabMin = slab.from - 1;
+    tax += (slabMax - slabMin) * slab.rate;
+  }
+
+  // Section 87A rebate: nil tax if total income <= rebateLimit
+  if (annualTaxableIncome <= rebateLimit) {
+    tax = 0;
+  }
+
+  const tds_annual  = Math.round(tax * 100) / 100;
+  const tds_monthly = Math.round((tds_annual / 12) * 100) / 100;
+  const effective_rate = annualTaxableIncome > 0
+    ? Math.round((tds_annual / annualTaxableIncome) * 10000) / 100
+    : 0;
+
+  return { tds_annual, tds_monthly, effective_rate };
+}
+
+// ─── Professional Tax from Slab ───────────────────────────────────────────────
+
+/**
+ * Look up PT amount for a given state and monthly income from pt_slab_master.
+ * Falls back to 200 if no matching slab is found.
+ */
+export async function getPtFromSlab(
+  stateCode: string,
+  monthlyIncome: number
+): Promise<number> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT pt_amount FROM pt_slab_master
+      WHERE state_code = ?
+        AND is_active = 1
+        AND income_from <= ?
+        AND (income_to IS NULL OR income_to >= ?)
+      ORDER BY income_from DESC
+      LIMIT 1`,
+    [stateCode, monthlyIncome, monthlyIncome]
+  );
+  const row = (rows as Array<{ pt_amount: number }>)[0];
+  return row ? Number(row.pt_amount) : 200;
+}
+
 export interface CalculateResult {
   run_id: string;
   status: string;
@@ -21,6 +142,7 @@ interface EmployeeRow {
   ctc_annual: number;
   basic_pct: number;
   hra_pct: number;
+  state_code: string | null;
 }
 
 interface AttendanceRow {
@@ -75,11 +197,13 @@ export async function calculatePayrollRun(runId: string, userId: string): Promis
 
   const [empRows] = await db.execute<RowDataPacket[]>(
     `SELECT e.id AS employee_id, e.employee_code,
-            esa.ctc_annual, ss.basic_pct, ss.hra_pct
+            esa.ctc_annual, ss.basic_pct, ss.hra_pct,
+            bm.state_code
        FROM employees e
        JOIN employee_salary_assignment esa ON esa.employee_id = e.id
        JOIN salary_structure_master ss      ON ss.id = esa.structure_id
        LEFT JOIN process_master pm          ON pm.id = e.process_id
+       LEFT JOIN branch_master bm           ON bm.id = e.branch_id
       WHERE e.employment_status = 'active' AND ${empConds.join(" AND ")}`,
     empParams
   );
@@ -125,6 +249,11 @@ export async function calculatePayrollRun(runId: string, userId: string): Promis
 
     const grossMonthly = emp.ctc_annual / 12;
 
+    // Resolve PT from slab when employee has a state_code, else fall back to config value
+    const professionalTax = emp.state_code
+      ? await getPtFromSlab(emp.state_code, grossMonthly)
+      : stat.professional_tax;
+
     const calc = payrollService.calculateNetSalary({
       grossMonthlyCTC: grossMonthly,
       workingDays: att.working_days || defaultWorkingDays,
@@ -133,7 +262,7 @@ export async function calculatePayrollRun(runId: string, userId: string): Promis
       esicEmployeePct: stat.esic_employee_pct,
       esicWageLimit: stat.esic_wage_limit,
       pfWageLimit: stat.pf_wage_limit,
-      professionalTax: stat.professional_tax,
+      professionalTax,
       tds: 0, // TDS computed separately at annual projection
       basicPct: emp.basic_pct ?? 40,
       hraPct: emp.hra_pct ?? 20,

@@ -34,11 +34,11 @@ const fakeLine = {
   working_days: 26, present_days: 24, lwp_days: 2,
 };
 const fakePayslip = {
-  id: "ps-1", run_id: "run-1", employee_id: "emp-1",
+  ...fakeLine,
+  id: "ps-1",
   payslip_ref: "PS-2026-05-MCN001",
   generated_at: "2026-05-29T10:00:00Z", generated_by: "admin-1",
   file_url: null, acknowledged_at: null,
-  ...fakeLine,
 };
 const fakeExit = { id: "exit-1", employee_id: "emp-1" };
 const fakeFf = {

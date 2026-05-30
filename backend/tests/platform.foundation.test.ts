@@ -183,7 +183,8 @@ describe("POST /api/access/roles/assign", () => {
     expect(r.status).toBe(200);
     expect(r.body.ok).toBe(true);
     // Verify audit INSERT was called
-    const auditCall = mockExecute.mock.calls.find(([sql]: [string]) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const auditCall = mockExecute.mock.calls.find(([sql]: any) =>
       typeof sql === "string" && sql.includes("sensitive_action_log")
     );
     expect(auditCall).toBeDefined();
@@ -199,7 +200,8 @@ describe("POST /api/access/roles/revoke", () => {
     const r = await request(app).post("/api/access/roles/revoke").set(ADMIN_TOKEN)
       .send({ user_id: "u-target", role_key: "tl" });
     expect(r.status).toBe(200);
-    const auditCall = mockExecute.mock.calls.find(([sql]: [string]) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const auditCall = mockExecute.mock.calls.find(([sql]: any) =>
       typeof sql === "string" && sql.includes("sensitive_action_log")
     );
     expect(auditCall).toBeDefined();

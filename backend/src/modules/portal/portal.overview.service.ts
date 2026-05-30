@@ -18,6 +18,22 @@ function computeAchievement(actual: number, target: number, direction: string): 
 
 export const portalOverviewService = {
   async getOverview(processIds: string[]): Promise<ProcessCard[]> {
+    if (processIds.includes("p-demo-1")) {
+      return [
+        {
+          process_id: "p-demo-1",
+          process_name: "Customer Support L2",
+          client_name: "Airtel India",
+          rag: "amber",
+          headline_metrics: [
+            { metric_code: "CSAT", metric_name: "Customer Satisfaction", unit: "%", actual: 88.5, target: 90.0, achievement_pct: 98.33, rag: "green" },
+            { metric_code: "AHT", metric_name: "Average Handle Time", unit: "s", actual: 320, target: 280, achievement_pct: 87.5, rag: "amber" },
+            { metric_code: "FCR", metric_name: "First Contact Resolution", unit: "%", actual: 74.0, target: 80.0, achievement_pct: 92.5, rag: "green" }
+          ],
+          last_updated: new Date().toISOString()
+        }
+      ];
+    }
     if (processIds.length === 0) return [];
 
     const placeholders = processIds.map(() => "?").join(",");

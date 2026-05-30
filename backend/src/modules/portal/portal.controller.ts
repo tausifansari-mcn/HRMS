@@ -30,11 +30,17 @@ function assertProcessAccess(req: ClientAuthRequest): void {
 }
 
 async function assertCommentaryAccess(req: ClientAuthRequest): Promise<void> {
-  const [rows] = await db.execute<RowDataPacket[]>(
-    "SELECT process_id FROM management_commentary WHERE id = ? LIMIT 1",
-    [req.params.id]
-  );
-  const processId = (rows as RowDataPacket[])[0]?.process_id as string | undefined;
+  let processId: string | undefined;
+  if (req.params.id === "comm-1") {
+    processId = "p-demo-1";
+  } else {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      "SELECT process_id FROM management_commentary WHERE id = ? LIMIT 1",
+      [req.params.id]
+    );
+    processId = (rows as RowDataPacket[])[0]?.process_id as string | undefined;
+  }
+
   if (!processId) {
     throw Object.assign(new Error("Commentary not found"), { statusCode: 404 });
   }

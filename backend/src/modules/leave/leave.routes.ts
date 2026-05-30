@@ -5,7 +5,8 @@ import { leaveController } from "./leave.controller.js";
 export const leaveRouter = Router();
 leaveRouter.use(requireAuth);
 
-const h = (fn: Function) => (req: any, res: any, next: any) => fn(req, res).catch(next);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
 leaveRouter.get("/types",                         h(leaveController.listLeaveTypes.bind(leaveController)));
 leaveRouter.post("/types",                        h(leaveController.createLeaveType.bind(leaveController)));

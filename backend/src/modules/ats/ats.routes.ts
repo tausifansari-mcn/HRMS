@@ -5,7 +5,8 @@ import { atsController as c } from "./ats.controller.js";
 export const atsRouter = Router();
 atsRouter.use(requireAuth);
 
-const h = (fn: Function) => (req: any, res: any, next: any) => fn(req, res).catch(next);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
 // Candidates
 atsRouter.get("/candidates",                     h(c.listCandidates.bind(c)));

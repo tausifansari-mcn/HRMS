@@ -12,7 +12,7 @@ export const createEmployeeSchema = z.object({
   dateOfBirth: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD").optional(),
   dateOfJoining: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
   salaryStartDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD").optional(),
-  employmentType: z.string().trim().default("Full Time"),
+  employmentType: z.string().trim().optional(),
   branchId: z.string().uuid().nullable().optional(),
   departmentId: z.string().uuid().nullable().optional(),
   processId: z.string().uuid().nullable().optional(),

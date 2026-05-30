@@ -36,7 +36,7 @@ export const recordScoreSchema = z.object({
   metricId: z.string().uuid(),
   period: z.string().regex(MONTH_REGEX, "period must be YYYY-MM"),
   actualValue: z.number(),
-  source: z.enum(["manual", "system", "dialer"]).default("manual"),
+  source: z.enum(["manual", "system", "dialer"]).optional(),
 });
 
 export const bulkScoreSchema = z.object({
@@ -45,7 +45,7 @@ export const bulkScoreSchema = z.object({
     employeeId: z.string().uuid(),
     metricId: z.string().uuid(),
     actualValue: z.number(),
-    source: z.enum(["manual", "system", "dialer"]).default("manual"),
+    source: z.enum(["manual", "system", "dialer"]).optional(),
   })).min(1),
 });
 
@@ -54,7 +54,7 @@ export const leaderboardFiltersSchema = z.object({
   templateId: z.string().uuid().optional(),
   branchId: z.string().uuid().optional(),
   processId: z.string().uuid().optional(),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
 });
 
 export type CreateMetricInput = z.infer<typeof createMetricSchema>;

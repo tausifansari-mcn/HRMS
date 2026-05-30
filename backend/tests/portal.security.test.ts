@@ -63,7 +63,8 @@ import { db } from "../src/db/mysql.js";
 import { portalAuthService } from "../src/modules/portal/portal.auth.service.js";
 
 const mockExecute = db.execute as ReturnType<typeof vi.fn>;
-const mockAuth = portalAuthService as { [K: string]: ReturnType<typeof vi.fn> };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockAuth = portalAuthService as unknown as { [K: string]: ReturnType<typeof vi.fn> };
 
 const PORTAL_TOKEN = { Authorization: "Bearer mock.jwt.token" };
 
@@ -135,7 +136,8 @@ describe("portal access logging", () => {
     expect(r.status).toBe(200);
     // logAccess calls db.execute with INSERT INTO portal_access_log
     const insertCall = mockExecute.mock.calls.find(
-      ([sql]: [string]) => typeof sql === "string" && sql.includes("portal_access_log")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ([sql]: any) => typeof sql === "string" && sql.includes("portal_access_log")
     );
     expect(insertCall).toBeDefined();
     expect(insertCall![0]).toMatch(/INSERT INTO portal_access_log/i);
@@ -151,7 +153,8 @@ describe("portal access logging", () => {
       .set(PORTAL_TOKEN);
     expect(r.status).toBe(200);
     const insertCall = mockExecute.mock.calls.find(
-      ([sql]: [string]) => typeof sql === "string" && sql.includes("portal_access_log")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ([sql]: any) => typeof sql === "string" && sql.includes("portal_access_log")
     );
     expect(insertCall).toBeDefined();
     expect(insertCall![1]).toContain("/portal/processes/p-allowed/kpis");
@@ -163,7 +166,8 @@ describe("portal access logging", () => {
       .set(PORTAL_TOKEN);
     expect(r.status).toBe(200);
     const insertCall = mockExecute.mock.calls.find(
-      ([sql]: [string]) => typeof sql === "string" && sql.includes("portal_access_log")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ([sql]: any) => typeof sql === "string" && sql.includes("portal_access_log")
     );
     expect(insertCall).toBeDefined();
   });
@@ -174,7 +178,8 @@ describe("portal access logging", () => {
       .set(PORTAL_TOKEN);
     expect(r.status).toBe(200);
     const insertCall = mockExecute.mock.calls.find(
-      ([sql]: [string]) => typeof sql === "string" && sql.includes("portal_access_log")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ([sql]: any) => typeof sql === "string" && sql.includes("portal_access_log")
     );
     expect(insertCall).toBeDefined();
   });
@@ -185,7 +190,8 @@ describe("portal access logging", () => {
       .set(PORTAL_TOKEN);
     expect(r.status).toBe(200);
     const insertCall = mockExecute.mock.calls.find(
-      ([sql]: [string]) => typeof sql === "string" && sql.includes("portal_access_log")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ([sql]: any) => typeof sql === "string" && sql.includes("portal_access_log")
     );
     expect(insertCall).toBeDefined();
   });

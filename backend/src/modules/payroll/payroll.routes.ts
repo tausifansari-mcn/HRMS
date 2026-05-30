@@ -7,11 +7,14 @@ import { calculatePayrollRun } from "./payrollCalculate.service.js";
 import { payslipService } from "./payslip.service.js";
 import { taxDeclarationService } from "./taxDeclaration.service.js";
 import { logSensitiveAction } from "../../shared/auditLog.js";
+import { db } from "../../db/mysql.js";
 import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 import type { Response } from "express";
+import type { RowDataPacket } from "mysql2";
 
 const router = Router();
-const h = (fn: Function) => (req: any, res: any, next: any) => fn(req, res).catch(next);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
 router.use(requireAuth);
 
@@ -154,6 +157,177 @@ router.post("/tax-declaration/:employeeId/:year", h(async (req: AuthenticatedReq
 
   const data = await taxDeclarationService.upsert(req.params.employeeId, year, req.body, req.authUser!.id);
   return res.json({ success: true, data, message: "Tax declaration saved" });
+}));
+
+// ─── UAN ─────────────────────────────────────────────────────────────────────
+
+// GET /api/payroll/uan/:employeeId — admin/hr/finance/payroll or self
+router.get("/uan/:employeeId", h(async (req: AuthenticatedRequest, res: Response) => {
+  const { employeeId } = req.params;
+  const isPrivileged = await hasRole(req.authUser!.id, "admin", "hr", "finance", "payroll");
+  if (!isPrivileged) {
+    const callerEmp = await getEmployeeForUser(req.authUser!.id);
+    if (!callerEmp || callerEmp.id !== employeeId) {
+      return res.status(403).json({ success: false, message: "Forbidden" });
+    }
+  }
+  const [rows] = await db.execute<RowDataPacket[]>(
+    "SELECT * FROM employee_uan WHERE employee_id = ? LIMIT 1",
+    [employeeId]
+  );
+  return res.json({ success: true, data: (rows as RowDataPacket[])[0] ?? null });
+}));
+
+// POST /api/payroll/uan/:employeeId — upsert UAN (admin/hr/finance)
+router.post("/uan/:employeeId", requireRole("admin", "hr", "finance"), h(async (req: AuthenticatedRequest, res: Response) => {
+  const { employeeId } = req.params;
+  const { uan, member_id, epf_join_date } = req.body as {
+    uan: string;
+    member_id?: string;
+    epf_join_date?: string;
+  };
+  if (!uan) return res.status(400).json({ success: false, message: "uan is required" });
+
+  await db.execute(
+    `INSERT INTO employee_uan (id, employee_id, uan, member_id, epf_join_date)
+       VALUES (UUID(), ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         uan = VALUES(uan),
+         member_id = VALUES(member_id),
+         epf_join_date = VALUES(epf_join_date),
+         updated_at = NOW()`,
+    [employeeId, uan, member_id ?? null, epf_join_date ?? null]
+  );
+  const [rows] = await db.execute<RowDataPacket[]>(
+    "SELECT * FROM employee_uan WHERE employee_id = ? LIMIT 1",
+    [employeeId]
+  );
+  return res.status(201).json({ success: true, data: (rows as RowDataPacket[])[0] });
+}));
+
+// ─── PT Slabs ─────────────────────────────────────────────────────────────────
+
+// GET /api/payroll/pt-slabs — list PT slabs; optional ?state_code=
+router.get("/pt-slabs", h(async (req: AuthenticatedRequest, res: Response) => {
+  const { state_code } = req.query as { state_code?: string };
+  const params: unknown[] = [];
+  let where = "WHERE is_active = 1";
+  if (state_code) {
+    where += " AND state_code = ?";
+    params.push(state_code);
+  }
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT * FROM pt_slab_master ${where} ORDER BY state_code, income_from`,
+    params
+  );
+  return res.json({ success: true, data: rows });
+}));
+
+// ─── Minimum Wages ────────────────────────────────────────────────────────────
+
+// GET /api/payroll/minimum-wages — list minimum wages; optional ?state_code=
+router.get("/minimum-wages", h(async (req: AuthenticatedRequest, res: Response) => {
+  const { state_code } = req.query as { state_code?: string };
+  const params: unknown[] = [];
+  let where = "WHERE is_active = 1";
+  if (state_code) {
+    where += " AND state_code = ?";
+    params.push(state_code);
+  }
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT * FROM minimum_wage_master ${where} ORDER BY state_code, category`,
+    params
+  );
+  return res.json({ success: true, data: rows });
+}));
+
+// ─── ECR / ESIC Challan ───────────────────────────────────────────────────────
+
+// GET /api/payroll/runs/:id/ecr — ECR-format data for a run
+router.get("/runs/:id/ecr", requireRole("admin", "finance", "payroll"), h(async (req: AuthenticatedRequest, res: Response) => {
+  const runId = req.params.id;
+
+  // Verify run exists
+  const [runRows] = await db.execute<RowDataPacket[]>(
+    "SELECT id, run_month FROM salary_prep_run WHERE id = ? LIMIT 1",
+    [runId]
+  );
+  if (!(runRows as RowDataPacket[]).length) {
+    return res.status(404).json({ success: false, message: "Run not found" });
+  }
+
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT
+       eu.uan,
+       eu.member_id,
+       CONCAT_WS(' ', e.first_name, e.last_name) AS member_name,
+       spl.gross_salary                           AS wages,
+       spl.pf_employee                            AS epf_contribution,
+       (spl.pf_employer - ROUND(spl.pf_employer * 3.67 / 12, 2)) AS eps_contribution
+     FROM salary_prep_line spl
+     JOIN employees e        ON e.id  = spl.employee_id
+     LEFT JOIN employee_uan eu ON eu.employee_id = spl.employee_id
+     WHERE spl.run_id = ? AND spl.status != 'cancelled'
+     ORDER BY e.employee_code`,
+    [runId]
+  );
+
+  return res.json({ success: true, run_id: runId, data: rows });
+}));
+
+// GET /api/payroll/runs/:id/esic-challan — ESIC challan data for a run
+router.get("/runs/:id/esic-challan", requireRole("admin", "finance", "payroll"), h(async (req: AuthenticatedRequest, res: Response) => {
+  const runId = req.params.id;
+
+  const [runRows] = await db.execute<RowDataPacket[]>(
+    "SELECT id, run_month FROM salary_prep_run WHERE id = ? LIMIT 1",
+    [runId]
+  );
+  const run = (runRows as Array<{ id: string; run_month: string }>)[0];
+  if (!run) {
+    return res.status(404).json({ success: false, message: "Run not found" });
+  }
+
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT
+       e.employee_code,
+       CONCAT_WS(' ', e.first_name, e.last_name) AS employee_name,
+       spl.gross_salary                           AS wages,
+       spl.esic_employee                          AS employee_contribution,
+       spl.esic_employer                          AS employer_contribution
+     FROM salary_prep_line spl
+     JOIN employees e ON e.id = spl.employee_id
+     WHERE spl.run_id = ? AND spl.status != 'cancelled'
+     ORDER BY e.employee_code`,
+    [runId]
+  );
+
+  const lines = rows as Array<{
+    employee_code: string;
+    employee_name: string;
+    wages: number;
+    employee_contribution: number;
+    employer_contribution: number;
+  }>;
+
+  const totals = lines.reduce(
+    (acc, l) => {
+      acc.total_wages        += Number(l.wages);
+      acc.employee_total     += Number(l.employee_contribution);
+      acc.employer_total     += Number(l.employer_contribution);
+      return acc;
+    },
+    { total_wages: 0, employee_total: 0, employer_total: 0 }
+  );
+
+  return res.json({
+    success: true,
+    run_id: runId,
+    period: run.run_month,
+    employee_count: lines.length,
+    ...totals,
+    data: lines,
+  });
 }));
 
 export { router as payrollRouter };

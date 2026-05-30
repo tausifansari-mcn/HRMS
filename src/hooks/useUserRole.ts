@@ -55,6 +55,42 @@ export const useUserRole = () => {
     queryFn: async (): Promise<UserRoleData | null> => {
       if (!user?.id) return null;
 
+      // Local demo mode bypass
+      if (user.id === "demo-user-id") {
+        const allPageCodes = [
+          "ATS_DASHBOARD",
+          "ATS_RECRUITER_QUEUE",
+          "LMS_MY_LEARNING",
+          "LMS_COORDINATOR",
+          "LMS_ADMIN",
+          "LMS_MANAGEMENT_DASHBOARD",
+          "WFM_ROSTER",
+          "WFM_LIVE_TRACKER",
+          "QUALITY_DASHBOARD",
+          "OPERATIONS_DASHBOARD",
+          "WORKFORCE_COMMAND_CENTER",
+          "ACCESS_CONTROL"
+        ];
+        
+        return {
+          roles: ["admin", "hr"],
+          roleKeys: ["admin", "hr", "manager", "employee"],
+          primaryRole: "admin",
+          employeeId: "demo-employee-id",
+          employeeCode: "EMP-DEMO-001",
+          employeeName: "Demo Admin",
+          scopes: [],
+          pages: allPageCodes.map(code => ({
+            page_code: code,
+            can_view: true,
+            can_create: true,
+            can_edit: true,
+            can_delete: true,
+            can_export: true,
+          })),
+        };
+      }
+
       const [{ data: roleRows, error: roleError }, { data: employeeRows, error: employeeError }, { data: scopeRows, error: scopeError }] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", user.id),
         supabase

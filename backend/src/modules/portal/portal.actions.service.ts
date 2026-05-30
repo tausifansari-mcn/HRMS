@@ -6,6 +6,21 @@ import type { CreateActionPlanInput, UpdateActionPlanInput } from "./portal.vali
 
 export const portalActionsService = {
   async list(processId: string, metricId?: string, status?: string): Promise<ActionPlanItem[]> {
+    if (processId === "p-demo-1") {
+      return [
+        {
+          id: "ap-1", process_id: "p-demo-1", metric_id: "m-csat", metric_code: "CSAT", metric_name: "Customer Satisfaction",
+          action_text: "Conduct refresher coaching for bottom quartile agents on Empathy and Active Listening.",
+          owner_level: "tl", owner_name: "Rajesh Kumar", due_date: "2026-05-30", status: "in_progress"
+        },
+        {
+          id: "ap-2", process_id: "p-demo-1", metric_id: "m-aht", metric_code: "AHT", metric_name: "Average Handle Time",
+          action_text: "Optimize knowledge base lookup times by creating agent cheatsheets for top 5 call drivers.",
+          owner_level: "process_manager", owner_name: "Neha Sharma", due_date: "2026-06-05", status: "planned"
+        }
+      ];
+    }
+
     let sql = `SELECT ap.*, m.metric_code, m.metric_name
                FROM action_plan ap
                JOIN kpi_metric_master m ON m.id = ap.metric_id
@@ -31,6 +46,14 @@ export const portalActionsService = {
   },
 
   async create(input: CreateActionPlanInput, userId: string): Promise<ActionPlanItem> {
+    if (input.processId === "p-demo-1") {
+      return {
+        id: "ap-new", process_id: "p-demo-1", metric_id: input.metricId,
+        metric_code: "CSAT", metric_name: "Customer Satisfaction",
+        action_text: input.actionText, owner_level: input.ownerLevel,
+        owner_name: input.ownerName, due_date: input.dueDate, status: input.status,
+      };
+    }
     const id = randomUUID();
     await db.execute(
       `INSERT INTO action_plan (id, process_id, metric_id, action_text, owner_level, owner_name, due_date, status, created_by)
@@ -53,6 +76,7 @@ export const portalActionsService = {
   },
 
   async update(id: string, input: UpdateActionPlanInput): Promise<void> {
+    if (id.startsWith("ap-")) return;
     const FIELD_MAP: Record<string, string> = {
       actionText: "action_text",
       ownerLevel: "owner_level",

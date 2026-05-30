@@ -64,7 +64,8 @@ describe("POST /api/ats-ext/requisitions", () => {
     const r = await request(app).post("/api/ats-ext/requisitions").set(HR)
       .send({ requested_count: 5, priority: "high", reason: "Expansion" });
     expect(r.status).toBe(201);
-    const auditCall = mockExecute.mock.calls.find(([sql]: [string]) =>
+    const auditCall = mockExecute.mock.calls.find(// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ([sql]: any) =>
       typeof sql === "string" && sql.includes("sensitive_action_log")
     );
     expect(auditCall).toBeDefined();
@@ -127,7 +128,8 @@ describe("POST /api/ats-ext/offers", () => {
     const r = await request(app).post("/api/ats-ext/offers").set(HR)
       .send({ candidate_id: "c-1", offer_date: "2026-06-01", offered_ctc: 300000 });
     expect(r.status).toBe(201);
-    const auditCall = mockExecute.mock.calls.find(([sql]: [string]) =>
+    const auditCall = mockExecute.mock.calls.find(// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ([sql]: any) =>
       typeof sql === "string" && sql.includes("sensitive_action_log")
     );
     expect(auditCall).toBeDefined();

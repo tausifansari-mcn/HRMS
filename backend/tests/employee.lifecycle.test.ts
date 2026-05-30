@@ -128,7 +128,8 @@ describe("POST /api/assets-mgmt/:id/assign", () => {
     const r = await request(app).post("/api/assets-mgmt/a-1/assign").set(HR_AUTH)
       .send({ employee_id: "emp-1" });
     expect(r.status).toBe(201);
-    const auditCall = mockExecute.mock.calls.find(([sql]: [string]) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const auditCall = mockExecute.mock.calls.find(([sql]: any) =>
       typeof sql === "string" && sql.includes("sensitive_action_log")
     );
     expect(auditCall).toBeDefined();

@@ -282,6 +282,7 @@ export default function NativeATSCandidateRegistration() {
   const [uploadMessage, setUploadMessage] = useState("Preparing file upload…");
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [selfiePreview, setSelfiePreview] = useState<string>("");
+  const [consentGiven, setConsentGiven] = useState(false);
 
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -542,6 +543,19 @@ export default function NativeATSCandidateRegistration() {
       setResult(res);
       setScreen("success");
 
+      // Record DPDP consent (non-blocking)
+      try {
+        await hrmsApi.post("/api/privacy/consent", {
+          principal_type: "candidate",
+          purpose_code: "recruitment",
+          consent_text_version: "v1.0",
+          consent_text_hash: "candidate_registration_v1",
+          channel: "web",
+        });
+      } catch {
+        // Consent logging failure must not block successful registration
+      }
+
       const candidateDbId = res.candidateDbId || "";
       const hasResume = !!form.resumeFile;
       const hasSelfie = !!form.selfieFile;
@@ -717,6 +731,20 @@ export default function NativeATSCandidateRegistration() {
             {section.fields.map(buildField)}
           </div>
         ))}
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4" style={{ marginTop: 16 }}>
+          <input
+            type="checkbox"
+            id="consent"
+            checked={consentGiven}
+            onChange={(e) => setConsentGiven(e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-gray-300"
+          />
+          <label htmlFor="consent" className="text-sm text-slate-700">
+            I consent to the processing of my personal data for recruitment purposes as per the{" "}
+            <a href="/privacy-policy" target="_blank" rel="noreferrer" className="text-blue-600 underline">Privacy Policy</a>{" "}
+            and the Digital Personal Data Protection Act 2023. I understand I may withdraw this consent at any time.
+          </label>
+        </div>
       </div>
     </div>
   );
@@ -807,7 +835,7 @@ export default function NativeATSCandidateRegistration() {
         {screen === "form" && (
           <div className="native-ats-bnav">
             <button className="native-ats-btn-back" onClick={goBack}>‹ Back</button>
-            <button className="native-ats-btn-next" onClick={submitForm}>Finish & Submit ✓</button>
+            <button className="native-ats-btn-next" onClick={submitForm} disabled={!consentGiven}>Finish & Submit ✓</button>
           </div>
         )}
 

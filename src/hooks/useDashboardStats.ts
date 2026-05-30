@@ -72,6 +72,21 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: ["dashboard-stats", user?.id, isAdminOrHR],
     queryFn: async () => {
+      // Local demo mode bypass
+      if (user?.id === "demo-user-id") {
+        return {
+          totalEmployees: 142,
+          onLeaveToday: 0,
+          assetsAssigned: 3,
+          pendingPayroll: 2,
+          pendingApprovals: 5,
+          isEmployee: true,
+          totalLeaves: 30,
+          usedLeaves: 8,
+          availableLeaves: 22,
+        };
+      }
+
       // For regular employees, show personal stats only
       if (!isAdminOrHR) {
         // Get current employee's data
@@ -229,6 +244,40 @@ export function useRecentActivity() {
   return useQuery({
     queryKey: ["recent-activity"],
     queryFn: async () => {
+      // Return high-fidelity local activity logs for seamless demo rendering
+      if (localStorage.getItem("hrms_demo_session")) {
+        return [
+          {
+            id: "act-1",
+            action: "onboarded",
+            entity_type: "employee",
+            details: { name: "Ananya Sharma", department: "Operations" },
+            created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+          },
+          {
+            id: "act-2",
+            action: "approved",
+            entity_type: "leave",
+            details: { name: "Rajesh Kumar", type: "Sick Leave" },
+            created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+          },
+          {
+            id: "act-3",
+            action: "allocated",
+            entity_type: "asset",
+            details: { name: "MacBook Pro M3", employee: "Ananya Sharma" },
+            created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
+          },
+          {
+            id: "act-4",
+            action: "generated",
+            entity_type: "payroll",
+            details: { period: "May 2026", status: "Draft" },
+            created_at: new Date(Date.now() - 3600000 * 48).toISOString(),
+          }
+        ];
+      }
+
       const { data, error } = await supabase
         .from("activity_logs")
         .select(`

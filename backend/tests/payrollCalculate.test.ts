@@ -72,7 +72,8 @@ describe("calculatePayrollRun", () => {
 
     await calculatePayrollRun("run-1", "user-1");
 
-    const calls = mockExecute.mock.calls.map(([sql]: [string]) => sql);
+    const calls = mockExecute.mock.calls.map(// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ([sql]: any) => sql as string);
     const empQuery = calls.find((s: string) => /process_filter|process_id|process_name/i.test(s));
     expect(empQuery).toBeDefined();
   });
@@ -88,7 +89,8 @@ describe("calculatePayrollRun", () => {
 
     await calculatePayrollRun("run-1", "user-1");
 
-    const calls = mockExecute.mock.calls.map(([sql]: [string]) => sql);
+    const calls = mockExecute.mock.calls.map(// eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ([sql]: any) => sql as string);
     const upsert = calls.find((s: string) => /salary_prep_line/i.test(s) && /INSERT|REPLACE/i.test(s));
     expect(upsert).toBeDefined();
   });

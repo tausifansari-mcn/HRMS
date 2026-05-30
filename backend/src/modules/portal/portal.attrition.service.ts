@@ -12,6 +12,24 @@ export const portalAttritionService = {
     }
     if (!/^\d{4}-\d{2}$/.test(period)) throw new Error(`Invalid period format: ${period}`);
 
+    if (processId === "p-demo-1") {
+      return {
+        period,
+        attrition_pct: 2.15,
+        voluntary_count: 3,
+        involuntary_count: 1,
+        headcount: 186,
+        sanctioned_strength: 200,
+        open_positions: 14,
+        avg_tenure_months: 14,
+        top_exit_reasons: [
+          { reason: "Higher Education", count: 2 },
+          { reason: "Better Career Opportunity", count: 1 },
+          { reason: "Performance", count: 1 }
+        ]
+      };
+    }
+
     const [hcRows] = await db.execute<RowDataPacket[]>(
       `SELECT COUNT(*) AS headcount,
               AVG(TIMESTAMPDIFF(MONTH, date_of_joining, CURDATE())) AS avg_tenure

@@ -11,7 +11,8 @@ import type { Response } from "express";
 export const exitRouter = Router();
 exitRouter.use(requireAuth);
 
-const h = (fn: Function) => (req: any, res: any, next: any) => fn(req, res).catch(next);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
 // ─── Exit Request Routes ───────────────────────────────────────────────────────
 

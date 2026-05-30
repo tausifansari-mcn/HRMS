@@ -27,6 +27,23 @@ export const portalGlideService = {
   async getGlidePaths(processId: string, period: string): Promise<GlidePath[]> {
     if (!/^\d{4}-\d{2}$/.test(period)) throw new Error(`Invalid period format: ${period}`);
 
+    if (processId === "p-demo-1") {
+      return [
+        {
+          metric_id: "m-csat", metric_code: "CSAT", metric_name: "Customer Satisfaction", unit: "%", direction: "higher_is_better", target: 90,
+          points: [
+            { month: "2026-02", actual: 88, committed: 87.5, target: 90 },
+            { month: "2026-03", actual: 91.2, committed: 88.0, target: 90 },
+            { month: "2026-04", actual: 90.5, committed: 89.0, target: 90 },
+            { month: "2026-05", actual: 88.5, committed: 89.5, target: 90 },
+            { month: "2026-06", actual: null, committed: 90.0, target: 90 },
+            { month: "2026-07", actual: null, committed: 90.0, target: 90 },
+          ],
+          behind_commitment: true
+        }
+      ];
+    }
+
     const [procRows] = await db.execute<RowDataPacket[]>(
       "SELECT process_name FROM process_master WHERE id = ? LIMIT 1",
       [processId]
@@ -105,6 +122,7 @@ export const portalGlideService = {
   },
 
   async setCommitment(input: SetGlideInput, userId: string): Promise<void> {
+    if (input.processId === "p-demo-1") return;
     await db.execute(
       `INSERT INTO glide_path_commitment (id, process_id, metric_id, month, committed_value, committed_by)
        VALUES (?, ?, ?, ?, ?, ?)

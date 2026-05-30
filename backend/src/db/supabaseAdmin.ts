@@ -1,3 +1,9 @@
+// @ts-expect-error no bundled types for ws; polyfilling globalThis for Supabase realtime
+import WS from "ws";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const WebSocket = WS as any;
+(globalThis as any).WebSocket = WebSocket;
+
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../config/env.js";
 

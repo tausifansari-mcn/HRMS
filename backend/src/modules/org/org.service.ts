@@ -183,3 +183,49 @@ export const gradeBandService = {
   },
   delete: (id: string) => softDelete("grade_band_master", id),
 };
+
+// ── Location ──────────────────────────────────────────────────────────────────
+
+export const locationService = {
+  list: () => listActive("location_master", "location_name"),
+  getById: (id: string) => getById("location_master", id),
+  async create(data: Record<string, unknown>) {
+    const id = randomUUID();
+    await db.execute(
+      "INSERT INTO location_master (id, location_name, location_code, address, city, state, pincode, branch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [id, data.location_name, data.location_code ?? null, data.address ?? null, data.city ?? null, data.state ?? null, data.pincode ?? null, data.branch_id ?? null]
+    );
+    return getById("location_master", id);
+  },
+  async update(id: string, data: Record<string, unknown>) {
+    await db.execute(
+      "UPDATE location_master SET location_name = COALESCE(?, location_name), city = COALESCE(?, city), state = COALESCE(?, state), updated_at = NOW() WHERE id = ?",
+      [data.location_name ?? null, data.city ?? null, data.state ?? null, id]
+    );
+    return getById("location_master", id);
+  },
+  delete: (id: string) => softDelete("location_master", id),
+};
+
+// ── Policy ────────────────────────────────────────────────────────────────────
+
+export const policyService = {
+  list: () => listActive("policy_master", "policy_name"),
+  getById: (id: string) => getById("policy_master", id),
+  async create(data: Record<string, unknown>) {
+    const id = randomUUID();
+    await db.execute(
+      "INSERT INTO policy_master (id, policy_name, policy_code, description, effective_date, version) VALUES (?, ?, ?, ?, ?, ?)",
+      [id, data.policy_name, data.policy_code ?? null, data.description ?? null, data.effective_date ?? null, data.version ?? null]
+    );
+    return getById("policy_master", id);
+  },
+  async update(id: string, data: Record<string, unknown>) {
+    await db.execute(
+      "UPDATE policy_master SET policy_name = COALESCE(?, policy_name), policy_code = COALESCE(?, policy_code), description = COALESCE(?, description), effective_date = COALESCE(?, effective_date), version = COALESCE(?, version), updated_at = NOW() WHERE id = ?",
+      [data.policy_name ?? null, data.policy_code ?? null, data.description ?? null, data.effective_date ?? null, data.version ?? null, id]
+    );
+    return getById("policy_master", id);
+  },
+  delete: (id: string) => softDelete("policy_master", id),
+};

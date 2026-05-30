@@ -12,7 +12,8 @@ import { managementService } from "./management.service.js";
 // Re-enable per endpoint when scope mapping supports it.
 
 const router = Router();
-const h = (fn: Function) => (req: any, res: any, next: any) => fn(req, res).catch(next);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 router.use(requireAuth);
 
 router.get("/team-kpi", requireRole("admin","hr"), h(async (req: AuthenticatedRequest, res: Response) => {

@@ -5,10 +5,12 @@ import { requireRole } from "../../middleware/requireRole.js";
 import {
   branchService, departmentService, lobService, designationService,
   campaignService, costCentreService, gradeBandService,
+  locationService, policyService,
 } from "./org.service.js";
 
 const router = Router();
-const h = (fn: Function) => (req: any, res: any, next: any) => fn(req, res).catch(next);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
 router.use(requireAuth);
 
@@ -48,5 +50,7 @@ buildCrud("/designations",  designationService);
 buildCrud("/campaigns",     campaignService);
 buildCrud("/cost-centres",  costCentreService);
 buildCrud("/grade-bands",   gradeBandService);
+buildCrud("/locations",     locationService);
+buildCrud("/policies",      policyService);
 
 export { router as orgRouter };

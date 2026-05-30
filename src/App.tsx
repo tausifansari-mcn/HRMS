@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,58 +10,117 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import WorkforcePageGate from "@/components/security/WorkforcePageGate";
 import ScrollToTop from "@/components/layout/ScrollToTop";
-import Landing from "./pages/Landing";
-import Features from "./pages/Features";
-import HowItWorks from "./pages/HowItWorks";
-import Pricing from "./pages/Pricing";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import TermsOfService from "./pages/TermsOfService";
-import Security from "./pages/Security";
-import Index from "./pages/Index";
-import Employees from "./pages/Employees";
-import Onboarding from "./pages/Onboarding";
-import Leaves from "./pages/Leaves";
-import Assets from "./pages/Assets";
-import Payroll from "./pages/Payroll";
-import Reports from "./pages/Reports";
-import Settings from "./pages/Settings";
-import Profile from "./pages/Profile";
-import Performance from "./pages/Performance";
-import ReviewsManagement from "./pages/ReviewsManagement";
+import { PortalRoute } from "./components/portal/PortalRoute";
 
-import Attendance from "./pages/Attendance";
-import AttendanceRegularization from "./pages/AttendanceRegularization";
-import BulkUploadHub from "./pages/BulkUploadHub";
-import Departments from "./pages/Departments";
-import CompanyCalendar from "./pages/CompanyCalendar";
-import NotificationPreferences from "./pages/NotificationPreferences";
-import Changelog from "./pages/Changelog";
-
-import ModuleLauncher from "./pages/ModuleLauncher";
-import NativeATSDashboard from "./pages/NativeATSDashboard";
-import NativeATSCandidateRegistration from "./pages/NativeATSCandidateRegistration";
-import NativeATSRecruiterDashboard from "./pages/NativeATSRecruiterDashboard";
-import NativeLMSMyLearning from "./pages/NativeLMSMyLearning";
-import NativeLMSCoordinator from "./pages/NativeLMSCoordinator";
-import NativeWFMRoster from "./pages/NativeWFMRoster";
-import UnifiedPerformanceCommandCenter from "./pages/UnifiedPerformanceCommandCenter";
-import UnifiedAccessControl from "./pages/UnifiedAccessControl";
-import NativePlaceholderPage from "./pages/NativePlaceholderPage";
-import NativeMigrationConsole from "./pages/NativeMigrationConsole";
-import NativeExitManagement from "./pages/NativeExitManagement";
+// ── Core (eager — needed before auth resolves) ────────────────────────────────
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
-import PortalLogin from "./pages/portal/PortalLogin";
-import PortalOverview from "./pages/portal/PortalOverview";
-import PortalProcessDashboard from "./pages/portal/PortalProcessDashboard";
-import { PortalRoute } from "./components/portal/PortalRoute";
+// ── Lazy page chunks ──────────────────────────────────────────────────────────
+const Landing                       = lazy(() => import("./pages/Landing"));
+const Features                      = lazy(() => import("./pages/Features"));
+const HowItWorks                    = lazy(() => import("./pages/HowItWorks"));
+const Pricing                       = lazy(() => import("./pages/Pricing"));
+const PrivacyPolicy                 = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService                = lazy(() => import("./pages/TermsOfService"));
+const Security                      = lazy(() => import("./pages/Security"));
+const Index                         = lazy(() => import("./pages/Index"));
+const Employees                     = lazy(() => import("./pages/Employees"));
+const Onboarding                    = lazy(() => import("./pages/Onboarding"));
+const Leaves                        = lazy(() => import("./pages/Leaves"));
+const Assets                        = lazy(() => import("./pages/Assets"));
+const Payroll                       = lazy(() => import("./pages/Payroll"));
+const Reports                       = lazy(() => import("./pages/Reports"));
+const Settings                      = lazy(() => import("./pages/Settings"));
+const Profile                       = lazy(() => import("./pages/Profile"));
+const Performance                   = lazy(() => import("./pages/Performance"));
+const ReviewsManagement             = lazy(() => import("./pages/ReviewsManagement"));
+const Attendance                    = lazy(() => import("./pages/Attendance"));
+const AttendanceRegularization      = lazy(() => import("./pages/AttendanceRegularization"));
+const BulkUploadHub                 = lazy(() => import("./pages/BulkUploadHub"));
+const Departments                   = lazy(() => import("./pages/Departments"));
+const CompanyCalendar               = lazy(() => import("./pages/CompanyCalendar"));
+const NotificationPreferences       = lazy(() => import("./pages/NotificationPreferences"));
+const Changelog                     = lazy(() => import("./pages/Changelog"));
+const ModuleLauncher                = lazy(() => import("./pages/ModuleLauncher"));
 
+// ATS
+const NativeATSDashboard            = lazy(() => import("./pages/NativeATSDashboard"));
+const NativeATSCandidateRegistration = lazy(() => import("./pages/NativeATSCandidateRegistration"));
+const NativeATSRecruiterDashboard   = lazy(() => import("./pages/NativeATSRecruiterDashboard"));
+const NativeATSOnboardingBridge     = lazy(() => import("./pages/NativeATSOnboardingBridge"));
+const NativeATSWaitingQueue         = lazy(() => import("./pages/NativeATSWaitingQueue"));
+const NativeATSCandidateMaster      = lazy(() => import("./pages/NativeATSCandidateMaster"));
+const NativeATSRecruiterWorkspace   = lazy(() => import("./pages/NativeATSRecruiterWorkspace"));
+const NativeATSDashboardV2          = lazy(() => import("./pages/NativeATSDashboardV2"));
+const NativeATSSourcingAnalysis     = lazy(() => import("./pages/NativeATSSourcingAnalysis"));
+const NativeATSExtensions           = lazy(() => import("./pages/NativeATSExtensions"));
+
+// LMS
+const NativeLMSMyLearning           = lazy(() => import("./pages/NativeLMSMyLearning"));
+const NativeLMSCoordinator         = lazy(() => import("./pages/NativeLMSCoordinator"));
+const NativePlaceholderPage         = lazy(() => import("./pages/NativePlaceholderPage"));
+const NativeLMSIntegration          = lazy(() => import("./pages/NativeLMSIntegration"));
+
+// WFM
+const NativeWFMRoster               = lazy(() => import("./pages/NativeWFMRoster"));
+const NativeWFMExtensions           = lazy(() => import("./pages/NativeWFMExtensions"));
+
+// Performance & Management
+const UnifiedPerformanceCommandCenter = lazy(() => import("./pages/UnifiedPerformanceCommandCenter"));
+const UnifiedAccessControl          = lazy(() => import("./pages/UnifiedAccessControl"));
+const NativeManagementDashboard     = lazy(() => import("./pages/NativeManagementDashboard"));
+
+// HR Ops
+const NativeAssetsManager           = lazy(() => import("./pages/NativeAssetsManager"));
+const NativeHelpdesk                = lazy(() => import("./pages/NativeHelpdesk"));
+const NativeLetters                 = lazy(() => import("./pages/NativeLetters"));
+const NativeLifecycle               = lazy(() => import("./pages/NativeLifecycle"));
+const NativeOrgMasters              = lazy(() => import("./pages/NativeOrgMasters"));
+const NativeWorkflowAdmin           = lazy(() => import("./pages/NativeWorkflowAdmin"));
+const NativeBenefitsClaims          = lazy(() => import("./pages/NativeBenefitsClaims"));
+const NativeCareerPlanning          = lazy(() => import("./pages/NativeCareerPlanning"));
+const NativePIPManagement           = lazy(() => import("./pages/NativePIPManagement"));
+const NativeERP                     = lazy(() => import("./pages/NativeERP"));
+const NativeGoalsAppraisal          = lazy(() => import("./pages/NativeGoalsAppraisal"));
+const NativeWorkInbox               = lazy(() => import("./pages/NativeWorkInbox"));
+const NativeMobilityManagement      = lazy(() => import("./pages/NativeMobilityManagement"));
+const NativeJobsPortal              = lazy(() => import("./pages/NativeJobsPortal"));
+const NativeAdvancedReports         = lazy(() => import("./pages/NativeAdvancedReports"));
+const NativeStatutoryCompliance     = lazy(() => import("./pages/NativeStatutoryCompliance"));
+const NativeLabourCompliance        = lazy(() => import("./pages/NativeLabourCompliance"));
+const NativeDPDPCompliance          = lazy(() => import("./pages/NativeDPDPCompliance"));
+const NativeIntegrationHub          = lazy(() => import("./pages/NativeIntegrationHub"));
+const NativeClientMaster            = lazy(() => import("./pages/NativeClientMaster"));
+const NativeLocationPolicyMasters   = lazy(() => import("./pages/NativeLocationPolicyMasters"));
+
+// Payroll
+const NativePayslipCenter           = lazy(() => import("./pages/NativePayslipCenter"));
+const NativeTaxDeclaration          = lazy(() => import("./pages/NativeTaxDeclaration"));
+const NativeFullFinal               = lazy(() => import("./pages/NativeFullFinal"));
+const NativeStatutoryConfig         = lazy(() => import("./pages/NativeStatutoryConfig"));
+
+// System
+const NativeMigrationConsole        = lazy(() => import("./pages/NativeMigrationConsole"));
+const NativeExitManagement          = lazy(() => import("./pages/NativeExitManagement"));
+
+// Portal
+const PortalLogin                   = lazy(() => import("./pages/portal/PortalLogin"));
+const PortalOverview                = lazy(() => import("./pages/portal/PortalOverview"));
+const PortalProcessDashboard        = lazy(() => import("./pages/portal/PortalProcessDashboard"));
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const queryClient = new QueryClient();
 
 const Gate = ({ pageCode, children }: { pageCode: string; children: React.ReactNode }) => (
   <WorkforcePageGate pageCode={pageCode}>{children}</WorkforcePageGate>
+);
+
+const PageLoader = () => (
+  <div className="flex h-screen items-center justify-center bg-slate-50">
+    <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-800" />
+  </div>
 );
 
 const App = () => (
@@ -71,68 +131,118 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <ScrollToTop />
-          <Routes>
-            <Route path="/" element={<Navigate to="/auth" replace />} />
-            <Route path="/features" element={<Features />} />
-            <Route path="/how-it-works" element={<HowItWorks />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/terms-of-service" element={<TermsOfService />} />
-            <Route path="/security" element={<Security />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/auth" replace />} />
+              <Route path="/features" element={<Features />} />
+              <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms-of-service" element={<TermsOfService />} />
+              <Route path="/security" element={<Security />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
 
-            <Route path="/interview-registration" element={<NativeATSCandidateRegistration />} />
-            <Route path="/candidate-registration" element={<Navigate to="/interview-registration" replace />} />
-            <Route path="/walkin-registration" element={<Navigate to="/interview-registration" replace />} />
+              <Route path="/interview-registration" element={<NativeATSCandidateRegistration />} />
+              <Route path="/candidate-registration" element={<Navigate to="/interview-registration" replace />} />
+              <Route path="/walkin-registration" element={<Navigate to="/interview-registration" replace />} />
 
-            <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
-            <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
-            <Route path="/onboarding-requests" element={<Navigate to="/onboarding?tab=requests" replace />} />
-            <Route path="/leaves" element={<ProtectedRoute><Leaves /></ProtectedRoute>} />
-            <Route path="/leave-approvals" element={<Navigate to="/leaves" replace />} />
-            <Route path="/assets" element={<ProtectedRoute><Assets /></ProtectedRoute>} />
-            <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-            <Route path="/performance" element={<ProtectedRoute><Performance /></ProtectedRoute>} />
-            <Route path="/reviews-management" element={<ProtectedRoute><ReviewsManagement /></ProtectedRoute>} />
-            <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
-            <Route path="/attendance-regularization" element={<ProtectedRoute><AttendanceRegularization /></ProtectedRoute>} />
-            <Route path="/bulk-upload" element={<ProtectedRoute><BulkUploadHub /></ProtectedRoute>} />
-            <Route path="/departments" element={<ProtectedRoute><Departments /></ProtectedRoute>} />
-            <Route path="/calendar" element={<ProtectedRoute><CompanyCalendar /></ProtectedRoute>} />
-            <Route path="/notification-preferences" element={<ProtectedRoute><NotificationPreferences /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+              <Route path="/employees" element={<ProtectedRoute><Employees /></ProtectedRoute>} />
+              <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+              <Route path="/onboarding-requests" element={<Navigate to="/onboarding?tab=requests" replace />} />
+              <Route path="/leaves" element={<ProtectedRoute><Leaves /></ProtectedRoute>} />
+              <Route path="/leave-approvals" element={<Navigate to="/leaves" replace />} />
+              <Route path="/assets" element={<ProtectedRoute><Assets /></ProtectedRoute>} />
+              <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
+              <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/performance" element={<ProtectedRoute><Performance /></ProtectedRoute>} />
+              <Route path="/reviews-management" element={<ProtectedRoute><ReviewsManagement /></ProtectedRoute>} />
+              <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
+              <Route path="/attendance-regularization" element={<ProtectedRoute><AttendanceRegularization /></ProtectedRoute>} />
+              <Route path="/bulk-upload" element={<ProtectedRoute><BulkUploadHub /></ProtectedRoute>} />
+              <Route path="/departments" element={<ProtectedRoute><Departments /></ProtectedRoute>} />
+              <Route path="/calendar" element={<ProtectedRoute><CompanyCalendar /></ProtectedRoute>} />
+              <Route path="/notification-preferences" element={<ProtectedRoute><NotificationPreferences /></ProtectedRoute>} />
 
-            <Route path="/modules" element={<ProtectedRoute><ModuleLauncher /></ProtectedRoute>} />
-            <Route path="/ats/dashboard" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativeATSDashboard /></Gate></ProtectedRoute>} />
-            <Route path="/ats/candidate-registration" element={<ProtectedRoute><NativeATSCandidateRegistration /></ProtectedRoute>} />
-            <Route path="/ats/recruiter/my-candidates" element={<ProtectedRoute><Gate pageCode="ATS_RECRUITER_QUEUE"><NativeATSRecruiterDashboard /></Gate></ProtectedRoute>} />
-            <Route path="/ats/sourcing-analysis" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativePlaceholderPage title="ATS Sourcing Analysis" module="ATS" /></Gate></ProtectedRoute>} />
-            <Route path="/lms/my-learning" element={<ProtectedRoute><Gate pageCode="LMS_MY_LEARNING"><NativeLMSMyLearning /></Gate></ProtectedRoute>} />
-            <Route path="/lms/coordinator" element={<ProtectedRoute><Gate pageCode="LMS_COORDINATOR"><NativeLMSCoordinator /></Gate></ProtectedRoute>} />
-            <Route path="/lms/admin" element={<ProtectedRoute><Gate pageCode="LMS_ADMIN"><NativePlaceholderPage title="LMS Admin" module="LMS" /></Gate></ProtectedRoute>} />
-            <Route path="/lms/management-dashboard" element={<ProtectedRoute><Gate pageCode="LMS_MANAGEMENT_DASHBOARD"><NativePlaceholderPage title="LMS Management Dashboard" module="LMS" /></Gate></ProtectedRoute>} />
-            <Route path="/wfm/roster" element={<ProtectedRoute><Gate pageCode="WFM_ROSTER"><NativeWFMRoster /></Gate></ProtectedRoute>} />
-            <Route path="/wfm/live-tracker" element={<ProtectedRoute><Gate pageCode="WFM_LIVE_TRACKER"><NativePlaceholderPage title="WFM Live Tracker" module="WFM" /></Gate></ProtectedRoute>} />
-            <Route path="/quality/dashboard" element={<ProtectedRoute><Gate pageCode="QUALITY_DASHBOARD"><NativePlaceholderPage title="Quality Dashboard" module="Quality" /></Gate></ProtectedRoute>} />
-            <Route path="/operations/dashboard" element={<ProtectedRoute><Gate pageCode="OPERATIONS_DASHBOARD"><NativePlaceholderPage title="Operations Dashboard" module="Operations" /></Gate></ProtectedRoute>} />
-            <Route path="/performance/command-center" element={<ProtectedRoute><Gate pageCode="WORKFORCE_COMMAND_CENTER"><UnifiedPerformanceCommandCenter /></Gate></ProtectedRoute>} />
-            <Route path="/settings/access-control" element={<ProtectedRoute><Gate pageCode="ACCESS_CONTROL"><UnifiedAccessControl /></Gate></ProtectedRoute>} />
+              <Route path="/modules" element={<ProtectedRoute><ModuleLauncher /></ProtectedRoute>} />
 
-            {/* Client Portal Routes */}
-            <Route path="/portal/login" element={<PortalLogin />} />
-            <Route path="/portal" element={<PortalRoute><PortalOverview /></PortalRoute>} />
-            <Route path="/portal/processes/:id" element={<PortalRoute><PortalProcessDashboard /></PortalRoute>} />
+              {/* ATS */}
+              <Route path="/ats/dashboard" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativeATSDashboard /></Gate></ProtectedRoute>} />
+              <Route path="/ats/candidate-registration" element={<ProtectedRoute><NativeATSCandidateRegistration /></ProtectedRoute>} />
+              <Route path="/ats/recruiter/my-candidates" element={<ProtectedRoute><Gate pageCode="ATS_RECRUITER_QUEUE"><NativeATSRecruiterDashboard /></Gate></ProtectedRoute>} />
+              <Route path="/ats/onboarding-bridge" element={<ProtectedRoute><Gate pageCode="ATS_ONBOARDING_BRIDGE"><NativeATSOnboardingBridge /></Gate></ProtectedRoute>} />
+              <Route path="/ats/waiting-queue" element={<ProtectedRoute><Gate pageCode="ATS_WAITING_QUEUE"><NativeATSWaitingQueue /></Gate></ProtectedRoute>} />
+              <Route path="/ats/candidate-master" element={<ProtectedRoute><Gate pageCode="ATS_CANDIDATE_MASTER"><NativeATSCandidateMaster /></Gate></ProtectedRoute>} />
+              <Route path="/ats/recruiter/workspace" element={<ProtectedRoute><Gate pageCode="ATS_RECRUITER_WORKSPACE"><NativeATSRecruiterWorkspace /></Gate></ProtectedRoute>} />
+              <Route path="/ats/dashboard-v2" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativeATSDashboardV2 /></Gate></ProtectedRoute>} />
+              <Route path="/ats/sourcing-analysis" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativeATSSourcingAnalysis /></Gate></ProtectedRoute>} />
+              <Route path="/ats/extensions" element={<ProtectedRoute><Gate pageCode="ATS_EXTENSIONS"><NativeATSExtensions /></Gate></ProtectedRoute>} />
 
-            <Route path="/migration-console" element={<ProtectedRoute><NativeMigrationConsole /></ProtectedRoute>} />
-            <Route path="/exit-management" element={<ProtectedRoute><NativeExitManagement /></ProtectedRoute>} />
+              {/* LMS */}
+              <Route path="/lms/my-learning" element={<ProtectedRoute><Gate pageCode="LMS_MY_LEARNING"><NativeLMSMyLearning /></Gate></ProtectedRoute>} />
+              <Route path="/lms/coordinator" element={<ProtectedRoute><Gate pageCode="LMS_COORDINATOR"><NativeLMSCoordinator /></Gate></ProtectedRoute>} />
+              <Route path="/lms/admin" element={<ProtectedRoute><Gate pageCode="LMS_ADMIN"><NativePlaceholderPage title="LMS Admin" module="LMS" /></Gate></ProtectedRoute>} />
+              <Route path="/lms/management-dashboard" element={<ProtectedRoute><Gate pageCode="LMS_MANAGEMENT_DASHBOARD"><NativePlaceholderPage title="LMS Management Dashboard" module="LMS" /></Gate></ProtectedRoute>} />
+              <Route path="/lms/integration" element={<ProtectedRoute><Gate pageCode="LMS_INTEGRATION"><NativeLMSIntegration /></Gate></ProtectedRoute>} />
 
-            <Route path="/changelog" element={<ProtectedRoute><Changelog /></ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              {/* WFM */}
+              <Route path="/wfm/roster" element={<ProtectedRoute><Gate pageCode="WFM_ROSTER"><NativeWFMRoster /></Gate></ProtectedRoute>} />
+              <Route path="/wfm/live-tracker" element={<ProtectedRoute><Gate pageCode="WFM_LIVE_TRACKER"><NativePlaceholderPage title="WFM Live Tracker" module="WFM" /></Gate></ProtectedRoute>} />
+              <Route path="/wfm/extensions" element={<ProtectedRoute><Gate pageCode="WFM_EXTENSIONS"><NativeWFMExtensions /></Gate></ProtectedRoute>} />
+
+              {/* Quality / Ops */}
+              <Route path="/quality/dashboard" element={<ProtectedRoute><Gate pageCode="QUALITY_DASHBOARD"><NativePlaceholderPage title="Quality Dashboard" module="Quality" /></Gate></ProtectedRoute>} />
+              <Route path="/operations/dashboard" element={<ProtectedRoute><Gate pageCode="OPERATIONS_DASHBOARD"><NativePlaceholderPage title="Operations Dashboard" module="Operations" /></Gate></ProtectedRoute>} />
+
+              {/* Performance */}
+              <Route path="/performance/command-center" element={<ProtectedRoute><Gate pageCode="WORKFORCE_COMMAND_CENTER"><UnifiedPerformanceCommandCenter /></Gate></ProtectedRoute>} />
+              <Route path="/settings/access-control" element={<ProtectedRoute><Gate pageCode="ACCESS_CONTROL"><UnifiedAccessControl /></Gate></ProtectedRoute>} />
+
+              {/* Client Portal */}
+              <Route path="/portal/login" element={<PortalLogin />} />
+              <Route path="/portal" element={<PortalRoute><PortalOverview /></PortalRoute>} />
+              <Route path="/portal/processes/:id" element={<PortalRoute><PortalProcessDashboard /></PortalRoute>} />
+
+              {/* HR Ops */}
+              <Route path="/assets-manager" element={<ProtectedRoute><Gate pageCode="ASSETS_MANAGER"><NativeAssetsManager /></Gate></ProtectedRoute>} />
+              <Route path="/helpdesk" element={<ProtectedRoute><Gate pageCode="HELPDESK"><NativeHelpdesk /></Gate></ProtectedRoute>} />
+              <Route path="/letters" element={<ProtectedRoute><Gate pageCode="LETTERS"><NativeLetters /></Gate></ProtectedRoute>} />
+              <Route path="/employee-lifecycle" element={<ProtectedRoute><Gate pageCode="EMPLOYEE_LIFECYCLE"><NativeLifecycle /></Gate></ProtectedRoute>} />
+              <Route path="/org-masters" element={<ProtectedRoute><Gate pageCode="ORG_MASTERS"><NativeOrgMasters /></Gate></ProtectedRoute>} />
+              <Route path="/org-masters/locations-policies" element={<ProtectedRoute><Gate pageCode="ORG_MASTERS"><NativeLocationPolicyMasters /></Gate></ProtectedRoute>} />
+              <Route path="/workflow-admin" element={<ProtectedRoute><Gate pageCode="WORKFLOW_ADMIN"><NativeWorkflowAdmin /></Gate></ProtectedRoute>} />
+              <Route path="/management/dashboard" element={<ProtectedRoute><Gate pageCode="MANAGEMENT_DASHBOARD"><NativeManagementDashboard /></Gate></ProtectedRoute>} />
+              <Route path="/benefits" element={<ProtectedRoute><Gate pageCode="BENEFITS"><NativeBenefitsClaims /></Gate></ProtectedRoute>} />
+              <Route path="/career-planning" element={<ProtectedRoute><Gate pageCode="CAREER_PLANNING"><NativeCareerPlanning /></Gate></ProtectedRoute>} />
+              <Route path="/pip-management" element={<ProtectedRoute><Gate pageCode="PIP_MANAGEMENT"><NativePIPManagement /></Gate></ProtectedRoute>} />
+              <Route path="/erp" element={<ProtectedRoute><Gate pageCode="ERP"><NativeERP /></Gate></ProtectedRoute>} />
+              <Route path="/goals" element={<ProtectedRoute><Gate pageCode="GOALS"><NativeGoalsAppraisal /></Gate></ProtectedRoute>} />
+              <Route path="/work-inbox" element={<ProtectedRoute><NativeWorkInbox /></ProtectedRoute>} />
+              <Route path="/mobility" element={<ProtectedRoute><Gate pageCode="MOBILITY"><NativeMobilityManagement /></Gate></ProtectedRoute>} />
+              <Route path="/jobs" element={<ProtectedRoute><Gate pageCode="JOBS_PORTAL"><NativeJobsPortal /></Gate></ProtectedRoute>} />
+              <Route path="/advanced-reports" element={<ProtectedRoute><Gate pageCode="ADVANCED_REPORTS"><NativeAdvancedReports /></Gate></ProtectedRoute>} />
+              <Route path="/compliance/statutory" element={<ProtectedRoute><Gate pageCode="STATUTORY_COMPLIANCE"><NativeStatutoryCompliance /></Gate></ProtectedRoute>} />
+              <Route path="/compliance/labour" element={<ProtectedRoute><Gate pageCode="LABOUR_COMPLIANCE"><NativeLabourCompliance /></Gate></ProtectedRoute>} />
+              <Route path="/compliance/dpdp" element={<ProtectedRoute><Gate pageCode="DPDP_COMPLIANCE"><NativeDPDPCompliance /></Gate></ProtectedRoute>} />
+              <Route path="/integration-hub" element={<ProtectedRoute><Gate pageCode="INTEGRATION_HUB"><NativeIntegrationHub /></Gate></ProtectedRoute>} />
+              <Route path="/client-master" element={<ProtectedRoute><Gate pageCode="CLIENT_MASTER"><NativeClientMaster /></Gate></ProtectedRoute>} />
+
+              {/* Payroll */}
+              <Route path="/payroll/payslips" element={<ProtectedRoute><Gate pageCode="PAYROLL_PAYSLIPS"><NativePayslipCenter /></Gate></ProtectedRoute>} />
+              <Route path="/payroll/tax-declaration" element={<ProtectedRoute><Gate pageCode="TAX_DECLARATION"><NativeTaxDeclaration /></Gate></ProtectedRoute>} />
+              <Route path="/payroll/full-final" element={<ProtectedRoute><Gate pageCode="FULL_FINAL"><NativeFullFinal /></Gate></ProtectedRoute>} />
+              <Route path="/payroll/statutory-config" element={<ProtectedRoute><Gate pageCode="STATUTORY_CONFIG"><NativeStatutoryConfig /></Gate></ProtectedRoute>} />
+
+              {/* System */}
+              <Route path="/migration-console" element={<ProtectedRoute><NativeMigrationConsole /></ProtectedRoute>} />
+              <Route path="/exit-management" element={<ProtectedRoute><NativeExitManagement /></ProtectedRoute>} />
+              <Route path="/changelog" element={<ProtectedRoute><Changelog /></ProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
           <CookieConsent />
           <OfflineFallback />
         </AuthProvider>
