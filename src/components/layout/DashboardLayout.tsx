@@ -10,6 +10,7 @@ import {
   Calendar,
   CalendarDays,
   ChevronRight,
+  ClipboardCheck,
   ClipboardList,
   Clock,
   CreditCard,
@@ -121,6 +122,15 @@ const navGroups: NavGroup[] = [
       { label: "Payslips", href: "/payroll/payslips", icon: <CreditCard className="h-4 w-4" />, adminOnly: true, description: "Payslip generation and acknowledgement" },
       { label: "Tax Declaration", href: "/payroll/tax-declaration", icon: <Landmark className="h-4 w-4" />, description: "Investment declaration" },
       { label: "Full & Final", href: "/payroll/full-final", icon: <Zap className="h-4 w-4" />, adminOnly: true, description: "F&F settlement for exits" },
+    ],
+  },
+  {
+    title: "Performance Feedback",
+    items: [
+      { label: "My Feedback", href: "/performance-feedback/my-reports", icon: <FileText className="h-4 w-4" />, description: "View and manage feedback received" },
+      { label: "My Assignments", href: "/performance-feedback/assignments", icon: <ClipboardCheck className="h-4 w-4" />, adminOnly: true, description: "Pending feedback assignments" },
+      { label: "Team Feedback", href: "/performance-feedback/team-reports", icon: <Users className="h-4 w-4" />, adminOnly: true, description: "Team feedback reports and analytics" },
+      { label: "Development Plans", href: "/performance-feedback/development-plan", icon: <Target className="h-4 w-4" />, description: "Personal development plans and goals" },
     ],
   },
   {
