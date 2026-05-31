@@ -72,6 +72,14 @@ const UnifiedPerformanceCommandCenter = lazy(() => import("./pages/UnifiedPerfor
 const UnifiedAccessControl          = lazy(() => import("./pages/UnifiedAccessControl"));
 const NativeManagementDashboard     = lazy(() => import("./pages/NativeManagementDashboard"));
 
+// Performance Feedback
+const NativePerformanceFeedbackMyReports = lazy(() => import("./pages/NativePerformanceFeedbackMyReports"));
+const NativePerformanceFeedbackReportDetail = lazy(() => import("./pages/NativePerformanceFeedbackReportDetail"));
+const NativePerformanceFeedbackDevelopmentPlan = lazy(() => import("./pages/NativePerformanceFeedbackDevelopmentPlan"));
+const NativePerformanceFeedbackAssignments = lazy(() => import("./pages/NativePerformanceFeedbackAssignments"));
+const NativePerformanceFeedbackForm = lazy(() => import("./pages/NativePerformanceFeedbackForm"));
+const NativePerformanceFeedbackTeamReports = lazy(() => import("./pages/NativePerformanceFeedbackTeamReports"));
+
 // HR Ops
 const NativeAssetsManager           = lazy(() => import("./pages/NativeAssetsManager"));
 const NativeHelpdesk                = lazy(() => import("./pages/NativeHelpdesk"));
@@ -209,6 +217,14 @@ const App = () => (
               {/* Performance */}
               <Route path="/performance/command-center" element={<ProtectedRoute><Gate pageCode="WORKFORCE_COMMAND_CENTER"><UnifiedPerformanceCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/settings/access-control" element={<ProtectedRoute><Gate pageCode="ACCESS_CONTROL"><UnifiedAccessControl /></Gate></ProtectedRoute>} />
+
+              {/* Performance Feedback */}
+              <Route path="/performance-feedback/my-reports" element={<ProtectedRoute><NativePerformanceFeedbackMyReports /></ProtectedRoute>} />
+              <Route path="/performance-feedback/reports/:id" element={<ProtectedRoute><NativePerformanceFeedbackReportDetail /></ProtectedRoute>} />
+              <Route path="/performance-feedback/development-plan" element={<ProtectedRoute><NativePerformanceFeedbackDevelopmentPlan /></ProtectedRoute>} />
+              <Route path="/performance-feedback/assignments" element={<ProtectedRoute><NativePerformanceFeedbackAssignments /></ProtectedRoute>} />
+              <Route path="/performance-feedback/form/:id" element={<ProtectedRoute><NativePerformanceFeedbackForm /></ProtectedRoute>} />
+              <Route path="/performance-feedback/team-reports" element={<ProtectedRoute><NativePerformanceFeedbackTeamReports /></ProtectedRoute>} />
 
               {/* Client Portal */}
               <Route path="/portal/login" element={<PortalLogin />} />
