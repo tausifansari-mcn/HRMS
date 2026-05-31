@@ -40,13 +40,16 @@ const fakeAttendance = {
   dialer_hours: 200,
 };
 
-const fakeStatutory = {
-  pf_employee_pct: 12,
-  esic_employee_pct: 0.75,
-  esic_wage_limit: 21000,
-  pf_wage_limit: 15000,
-  professional_tax: 200,
-};
+// Key-value rows matching SELECT config_key, config_value FROM statutory_config
+const fakeStatKvRows = [
+  { config_key: "pf_employee_pct",  config_value: 12 },
+  { config_key: "esic_employee_pct", config_value: 0.75 },
+  { config_key: "esic_wage_limit",  config_value: 21000 },
+  { config_key: "pf_wage_limit",    config_value: 15000 },
+  { config_key: "professional_tax", config_value: 200 },
+  { config_key: "tds_standard_deduction", config_value: 75000 },
+  { config_key: "tds_rebate_87a_limit", config_value: 700000 },
+];
 
 describe("calculatePayrollRun", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -61,15 +64,26 @@ describe("calculatePayrollRun", () => {
     await expect(calculatePayrollRun("run-1", "user-1")).rejects.toThrow("locked");
   });
 
-  it("fetches employees scoped to run's process_filter", async () => {
-    mockExecute.mockResolvedValueOnce([[fakeRun]]);           // getRun
-    mockExecute.mockResolvedValueOnce([[fakeStatutory]]);     // statutory
-    mockExecute.mockResolvedValueOnce([[fakeEmployee]]);      // employees
-    mockExecute.mockResolvedValueOnce([[fakeAttendance]]);    // attendance
-    mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]); // upsert line
-    mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]); // update run totals
-    mockExecute.mockResolvedValueOnce([[{ ...fakeRun, status: "processing" }]]); // re-fetch
+  // Helper: standard mock sequence for one employee run
+  // Query order: getRun, statKvRows, employees, attendance, tax_declaration, advance_recovery, upsert_line, update_totals, re-fetch_run
+  function mockOneEmployeeRun(overrideUpsert?: (sql: string, params: unknown[]) => unknown) {
+    mockExecute.mockResolvedValueOnce([[fakeRun]]);            // 1. getRun
+    mockExecute.mockResolvedValueOnce([fakeStatKvRows]);       // 2. statutory kv
+    mockExecute.mockResolvedValueOnce([[fakeEmployee]]);       // 3. employees
+    mockExecute.mockResolvedValueOnce([[fakeAttendance]]);     // 4. attendance
+    mockExecute.mockResolvedValueOnce([[/* no declaration */]]); // 5. tax_declaration
+    mockExecute.mockResolvedValueOnce([[{ monthly_recovery: 0 }]]); // 6. advance_recovery
+    if (overrideUpsert) {
+      mockExecute.mockImplementationOnce(overrideUpsert as Parameters<typeof mockExecute.mockImplementationOnce>[0]);
+    } else {
+      mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]); // 7. upsert line
+    }
+    mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]); // 8. update run totals
+    mockExecute.mockResolvedValueOnce([[{ ...fakeRun, status: "processing" }]]); // 9. re-fetch
+  }
 
+  it("fetches employees scoped to run's process_filter", async () => {
+    mockOneEmployeeRun();
     await calculatePayrollRun("run-1", "user-1");
 
     const calls = mockExecute.mock.calls.map(// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,14 +93,7 @@ describe("calculatePayrollRun", () => {
   });
 
   it("upserts one prep line per employee", async () => {
-    mockExecute.mockResolvedValueOnce([[fakeRun]]);
-    mockExecute.mockResolvedValueOnce([[fakeStatutory]]);
-    mockExecute.mockResolvedValueOnce([[fakeEmployee]]);
-    mockExecute.mockResolvedValueOnce([[fakeAttendance]]);
-    mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]); // upsert
-    mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]); // totals
-    mockExecute.mockResolvedValueOnce([[fakeRun]]);
-
+    mockOneEmployeeRun();
     await calculatePayrollRun("run-1", "user-1");
 
     const calls = mockExecute.mock.calls.map(// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -96,18 +103,11 @@ describe("calculatePayrollRun", () => {
   });
 
   it("calculates net salary correctly for single employee", async () => {
-    mockExecute.mockResolvedValueOnce([[fakeRun]]);
-    mockExecute.mockResolvedValueOnce([[fakeStatutory]]);
-    mockExecute.mockResolvedValueOnce([[fakeEmployee]]);
-    mockExecute.mockResolvedValueOnce([[fakeAttendance]]);
-
     let upsertParams: unknown[] = [];
-    mockExecute.mockImplementationOnce((_sql: string, params: unknown[]) => {
+    mockOneEmployeeRun((_sql: string, params: unknown[]) => {
       upsertParams = params;
       return [{ affectedRows: 1 }];
     });
-    mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]);
-    mockExecute.mockResolvedValueOnce([[fakeRun]]);
 
     await calculatePayrollRun("run-1", "user-1");
 
@@ -117,27 +117,13 @@ describe("calculatePayrollRun", () => {
   });
 
   it("updates run status to processing and sets totals", async () => {
-    mockExecute.mockResolvedValueOnce([[fakeRun]]);
-    mockExecute.mockResolvedValueOnce([[fakeStatutory]]);
-    mockExecute.mockResolvedValueOnce([[fakeEmployee]]);
-    mockExecute.mockResolvedValueOnce([[fakeAttendance]]);
-    mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]);
-    mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]);
-    mockExecute.mockResolvedValueOnce([[{ ...fakeRun, status: "processing" }]]);
-
+    mockOneEmployeeRun();
     const result = await calculatePayrollRun("run-1", "user-1");
     expect(result.status).toBe("processing");
   });
 
   it("returns result with employee count", async () => {
-    mockExecute.mockResolvedValueOnce([[fakeRun]]);
-    mockExecute.mockResolvedValueOnce([[fakeStatutory]]);
-    mockExecute.mockResolvedValueOnce([[fakeEmployee]]);
-    mockExecute.mockResolvedValueOnce([[fakeAttendance]]);
-    mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]);
-    mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]);
-    mockExecute.mockResolvedValueOnce([[fakeRun]]);
-
+    mockOneEmployeeRun();
     const result = await calculatePayrollRun("run-1", "user-1");
     expect(result.employees_processed).toBe(1);
   });
