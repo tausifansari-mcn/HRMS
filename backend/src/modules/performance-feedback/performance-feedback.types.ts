@@ -3,13 +3,15 @@
 // ===========================
 
 export interface PerformanceFeedbackCycle {
-  id: string;
+  cycle_id: string;
   cycle_name: string;
-  description: string | null;
+  period: string | null;
   start_date: string;
   end_date: string;
-  launch_date: string | null;
+  deadline: string | null;
   status: CycleStatus;
+  feedback_type: string;
+  appraisal_cycle_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -142,10 +144,11 @@ export interface PlanJson {
 
 export interface CreateCycleDto {
   cycle_name: string;
-  description?: string;
+  period: string;
   start_date: string;
   end_date: string;
-  created_by: string;
+  deadline: string;
+  appraisal_cycle_id?: string;
 }
 
 export interface LaunchCycleDto {
