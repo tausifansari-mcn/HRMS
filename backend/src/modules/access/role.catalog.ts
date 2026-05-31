@@ -46,6 +46,7 @@ export const MODULES = [
   "kpi",
   "quality",
   "performance",
+  "performance_feedback",
   "coaching",
   "lms",
   "exit",
@@ -77,7 +78,7 @@ export const ROLE_MODULE_ACCESS: Record<PeopleOSRole, PeopleOSModule[]> = {
     "dashboard", "employees", "ats", "documents", "lifecycle", "assets",
     "helpdesk", "leave", "attendance", "exit", "org", "workflow",
     "workforce_mandate", "reports", "audit_logs", "account_control",
-    "lms", "kpi",
+    "lms", "kpi", "performance_feedback",
   ],
 
   recruiter: [
@@ -87,7 +88,7 @@ export const ROLE_MODULE_ACCESS: Record<PeopleOSRole, PeopleOSModule[]> = {
   employee: [
     "dashboard", "employees", "documents", "assets", "helpdesk",
     "leave", "attendance", "payslip", "tax_declaration",
-    "lms", "performance", "wfm_roster",
+    "lms", "performance", "performance_feedback", "wfm_roster",
   ],
 
   wfm: [
@@ -98,17 +99,17 @@ export const ROLE_MODULE_ACCESS: Record<PeopleOSRole, PeopleOSModule[]> = {
   process_manager: [
     "dashboard", "employees", "attendance", "wfm_roster", "wfm_rta",
     "wfm_shrinkage", "workforce_mandate", "leave", "kpi", "performance",
-    "coaching", "reports", "helpdesk",
+    "performance_feedback", "coaching", "reports", "helpdesk",
   ],
 
   assistant_manager: [
     "dashboard", "employees", "attendance", "wfm_roster",
-    "leave", "kpi", "performance", "coaching", "helpdesk",
+    "leave", "kpi", "performance", "performance_feedback", "coaching", "helpdesk",
   ],
 
   team_leader: [
     "dashboard", "employees", "attendance", "leave",
-    "kpi", "performance", "coaching", "helpdesk",
+    "kpi", "performance", "performance_feedback", "coaching", "helpdesk",
   ],
 
   qa: [
@@ -133,12 +134,12 @@ export const ROLE_MODULE_ACCESS: Record<PeopleOSRole, PeopleOSModule[]> = {
   branch_head: [
     "dashboard", "employees", "attendance", "wfm_roster", "wfm_rta",
     "wfm_shrinkage", "workforce_mandate", "leave", "kpi", "performance",
-    "coaching", "reports", "ats",
+    "performance_feedback", "coaching", "reports", "ats",
   ],
 
   ceo: [
     "dashboard", "leadership_dashboard", "workforce_mandate",
-    "kpi", "performance", "reports", "wfm_shrinkage",
+    "kpi", "performance", "performance_feedback", "reports", "wfm_shrinkage",
     "client_portal", "org",
   ],
 

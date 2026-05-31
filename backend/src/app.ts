@@ -42,6 +42,7 @@ import { goalsRouter } from "./modules/goals/goals.routes.js";
 import { jobsRouter } from "./modules/jobs/jobs.routes.js";
 import { complianceRouter } from "./modules/compliance/compliance.routes.js";
 import { privacyRouter } from "./modules/privacy/privacy.routes.js";
+import { performanceFeedbackRouter } from "./modules/performance-feedback/performance-feedback.routes.js";
 
 export const app = express();
 
@@ -113,6 +114,7 @@ app.use("/api/goals", goalsRouter);
 app.use("/api/jobs", jobsRouter);
 app.use("/api/compliance", complianceRouter);
 app.use("/api/privacy", privacyRouter);
+app.use("/api/performance-feedback", performanceFeedbackRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
