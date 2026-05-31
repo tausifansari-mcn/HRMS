@@ -14,6 +14,7 @@ import {
   CreateDevelopmentPlanDto,
   CompetencyScore,
   KpiScore,
+  FormTemplateDto,
 } from "./performance-feedback.types";
 
 export class PerformanceFeedbackService {
@@ -351,5 +352,114 @@ export class PerformanceFeedbackService {
       "UPDATE competency_master SET is_active = 0 WHERE competency_id = ?",
       [competencyId]
     );
+  }
+
+  /**
+   * Get form template for feedback submission
+   */
+  async getFormTemplate(requestId: string): Promise<FormTemplateDto> {
+    // Get request
+    const request = await this.getRequestById(requestId);
+    if (!request) {
+      throw new Error("Request not found");
+    }
+
+    // Get employee info
+    const [empRows] = await db.execute<RowDataPacket[]>(
+      "SELECT emp_id, full_name, designation FROM employees WHERE emp_id = ?",
+      [request.employee_id]
+    );
+
+    if (empRows.length === 0) {
+      throw new Error("Employee not found");
+    }
+
+    // Get active competencies
+    const competencies = await this.getCompetencies({ is_active: true });
+
+    // Get employee's KPIs (if assigned)
+    const [kpiRows] = await db.execute<RowDataPacket[]>(
+      `SELECT
+         k.kpi_id, k.kpi_name, k.metric_name, k.unit,
+         k.target_value, k.actual_value
+       FROM kpi k
+       WHERE k.employee_id = ?
+         AND k.is_active = 1`,
+      [request.employee_id]
+    );
+
+    return {
+      employee: {
+        emp_id: empRows[0].emp_id,
+        full_name: empRows[0].full_name,
+        designation: empRows[0].designation,
+      },
+      competencies,
+      kpis: kpiRows as any[],
+    };
+  }
+
+  /**
+   * Submit feedback response
+   */
+  async submitFeedback(
+    data: SubmitFeedbackDto,
+    managerId: string
+  ): Promise<{ response_id: string }> {
+    // Verify request exists and manager is authorized
+    const request = await this.getRequestById(data.request_id);
+    if (!request) {
+      throw new Error("Request not found");
+    }
+    if (request.manager_id !== managerId) {
+      throw new Error("Unauthorized: not assigned manager");
+    }
+
+    // Check if response already exists
+    const [existing] = await db.execute<RowDataPacket[]>(
+      "SELECT response_id FROM performance_feedback_response WHERE request_id = ?",
+      [data.request_id]
+    );
+
+    let responseId: string;
+
+    if (existing.length > 0) {
+      // Update existing response
+      responseId = existing[0].response_id;
+      await db.execute(
+        `UPDATE performance_feedback_response
+         SET ratings_json = ?, overall_strengths = ?, development_areas = ?, submitted_at = NOW()
+         WHERE response_id = ?`,
+        [
+          JSON.stringify(data.ratings_json),
+          data.overall_strengths || null,
+          data.development_areas || null,
+          responseId,
+        ]
+      );
+    } else {
+      // Create new response
+      const [result] = await db.execute<ResultSetHeader>(
+        `INSERT INTO performance_feedback_response
+         (request_id, ratings_json, overall_strengths, development_areas, submitted_at)
+         VALUES (?, ?, ?, ?, NOW())`,
+        [
+          data.request_id,
+          JSON.stringify(data.ratings_json),
+          data.overall_strengths || null,
+          data.development_areas || null,
+        ]
+      );
+
+      responseId = result.insertId.toString();
+    }
+
+    // Update request status
+    await db.execute(
+      "UPDATE performance_feedback_request SET status = 'submitted', submitted_at = NOW() WHERE request_id = ?",
+      [data.request_id]
+    );
+
+    return { response_id: responseId };
   }
 }

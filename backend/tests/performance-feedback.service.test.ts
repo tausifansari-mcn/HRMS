@@ -452,3 +452,346 @@ describe("PerformanceFeedbackService - Request Management", () => {
     });
   });
 });
+
+describe("PerformanceFeedbackService - Competency Management", () => {
+  let service: PerformanceFeedbackService;
+
+  beforeEach(() => {
+    service = new PerformanceFeedbackService();
+    vi.clearAllMocks();
+  });
+
+  describe("getCompetencies", () => {
+    it("should get all active competencies", async () => {
+      const mockCompetencies = [
+        {
+          competency_id: 1,
+          competency_name: "Communication",
+          description: "Clear communication",
+          category: "core",
+          is_active: true,
+        },
+        {
+          competency_id: 2,
+          competency_name: "Teamwork",
+          description: "Works well with team",
+          category: "core",
+          is_active: true,
+        },
+      ];
+
+      mockDb.execute.mockResolvedValueOnce([mockCompetencies, []]);
+
+      const competencies = await service.getCompetencies({ is_active: true });
+
+      expect(Array.isArray(competencies)).toBe(true);
+      expect(competencies.length).toBe(2);
+      expect(mockDb.execute).toHaveBeenCalledWith(
+        expect.stringContaining("SELECT * FROM competency_master"),
+        expect.any(Array)
+      );
+    });
+
+    it("should filter by category", async () => {
+      const mockCompetencies = [
+        {
+          competency_id: 1,
+          competency_name: "Leadership",
+          category: "leadership",
+        },
+      ];
+
+      mockDb.execute.mockResolvedValueOnce([mockCompetencies, []]);
+
+      const competencies = await service.getCompetencies({
+        category: "leadership",
+      });
+
+      expect(Array.isArray(competencies)).toBe(true);
+    });
+  });
+
+  describe("createCompetency", () => {
+    it("should create new competency", async () => {
+      const competencyData = {
+        competency_name: "Innovation",
+        description: "Creative thinking",
+        category: "behavioral",
+        display_order: 5,
+      };
+
+      const mockCompetency = {
+        competency_id: 11,
+        competency_name: "Innovation",
+        description: "Creative thinking",
+        category: "behavioral",
+        display_order: 5,
+        is_active: true,
+      };
+
+      mockDb.execute
+        .mockResolvedValueOnce([{ insertId: 11 }, []]) // INSERT
+        .mockResolvedValueOnce([[mockCompetency], []]); // SELECT
+
+      const result = await service.createCompetency(competencyData);
+
+      expect(result).toBeDefined();
+      expect(result.competency_id).toBe(11);
+      expect(result.competency_name).toBe("Innovation");
+    });
+  });
+
+  describe("updateCompetency", () => {
+    it("should update competency fields", async () => {
+      mockDb.execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]);
+
+      await service.updateCompetency("comp-1", {
+        competency_name: "Updated Name",
+        description: "Updated description",
+      });
+
+      expect(mockDb.execute).toHaveBeenCalledWith(
+        expect.stringContaining("UPDATE competency_master"),
+        expect.any(Array)
+      );
+    });
+  });
+
+  describe("deactivateCompetency", () => {
+    it("should deactivate competency (soft delete)", async () => {
+      mockDb.execute.mockResolvedValueOnce([{ affectedRows: 1 }, []]);
+
+      await service.deactivateCompetency("comp-123");
+
+      expect(mockDb.execute).toHaveBeenCalledWith(
+        "UPDATE competency_master SET is_active = 0 WHERE competency_id = ?",
+        ["comp-123"]
+      );
+    });
+  });
+});
+
+describe("PerformanceFeedbackService - Feedback Form & Submission", () => {
+  let service: PerformanceFeedbackService;
+
+  beforeEach(() => {
+    service = new PerformanceFeedbackService();
+    vi.clearAllMocks();
+  });
+
+  describe("getFormTemplate", () => {
+    it("should get form template with employee, competencies, and KPIs", async () => {
+      const mockRequest = {
+        request_id: "req-123",
+        cycle_id: "cycle-456",
+        employee_id: "emp-789",
+        manager_id: "mgr-111",
+        status: "pending",
+      };
+
+      const mockEmployee = {
+        emp_id: "emp-789",
+        full_name: "John Doe",
+        designation: "Senior Developer",
+      };
+
+      const mockCompetencies = [
+        {
+          competency_id: 1,
+          competency_name: "Communication",
+          description: "Clear communication",
+          category: "core",
+          is_active: true,
+        },
+        {
+          competency_id: 2,
+          competency_name: "Teamwork",
+          description: "Works well with team",
+          category: "core",
+          is_active: true,
+        },
+      ];
+
+      const mockKpis = [
+        {
+          kpi_id: "kpi-1",
+          metric_name: "Sales Target",
+          target_value: 100,
+          actual_value: 95,
+          unit: "deals",
+        },
+      ];
+
+      // Mock getRequestById
+      mockDb.execute
+        .mockResolvedValueOnce([[mockRequest], []]) // getRequestById
+        .mockResolvedValueOnce([[mockEmployee], []]) // employee query
+        .mockResolvedValueOnce([mockCompetencies, []]) // competencies query
+        .mockResolvedValueOnce([mockKpis, []]); // KPIs query
+
+      const result = await service.getFormTemplate("req-123");
+
+      expect(result).toBeDefined();
+      expect(result.employee).toEqual({
+        emp_id: "emp-789",
+        full_name: "John Doe",
+        designation: "Senior Developer",
+      });
+      expect(result.competencies).toHaveLength(2);
+      expect(result.kpis).toHaveLength(1);
+      expect(mockDb.execute).toHaveBeenCalledTimes(4);
+    });
+
+    it("should throw error if request not found", async () => {
+      mockDb.execute.mockResolvedValueOnce([[], []]); // getRequestById returns empty
+
+      await expect(service.getFormTemplate("non-existent")).rejects.toThrow(
+        "Request not found"
+      );
+    });
+
+    it("should throw error if employee not found", async () => {
+      const mockRequest = {
+        request_id: "req-123",
+        cycle_id: "cycle-456",
+        employee_id: "emp-789",
+        manager_id: "mgr-111",
+        status: "pending",
+      };
+
+      mockDb.execute
+        .mockResolvedValueOnce([[mockRequest], []]) // getRequestById
+        .mockResolvedValueOnce([[], []]); // employee not found
+
+      await expect(service.getFormTemplate("req-123")).rejects.toThrow(
+        "Employee not found"
+      );
+    });
+  });
+
+  describe("submitFeedback", () => {
+    it("should submit feedback and update request status", async () => {
+      const feedbackData = {
+        request_id: "req-123",
+        ratings_json: {
+          competencies: [
+            {
+              competency_id: "1",
+              competency_name: "Communication",
+              rating: 4,
+              comment: "Good communicator",
+            },
+          ],
+          kpis: [],
+        },
+        overall_strengths: "Strong team player",
+        development_areas: "Time management",
+      };
+
+      const mockRequest = {
+        request_id: "req-123",
+        cycle_id: "cycle-456",
+        employee_id: "emp-789",
+        manager_id: "mgr-111",
+        status: "pending",
+      };
+
+      // Mock getRequestById
+      mockDb.execute
+        .mockResolvedValueOnce([[mockRequest], []]) // getRequestById
+        .mockResolvedValueOnce([[], []]) // check existing response (none)
+        .mockResolvedValueOnce([{ insertId: "response-123" }, []]) // INSERT response
+        .mockResolvedValueOnce([{ affectedRows: 1 }, []]); // UPDATE request status
+
+      const result = await service.submitFeedback(feedbackData, "mgr-111");
+
+      expect(result).toBeDefined();
+      expect(result.response_id).toBe("response-123");
+      expect(mockDb.execute).toHaveBeenCalledWith(
+        expect.stringContaining("UPDATE performance_feedback_request SET status = 'submitted'"),
+        ["req-123"]
+      );
+    });
+
+    it("should throw error if request not found", async () => {
+      const feedbackData = {
+        request_id: "non-existent",
+        ratings_json: { competencies: [], kpis: [] },
+      };
+
+      mockDb.execute.mockResolvedValueOnce([[], []]); // getRequestById returns empty
+
+      await expect(
+        service.submitFeedback(feedbackData, "mgr-111")
+      ).rejects.toThrow("Request not found");
+    });
+
+    it("should throw error if manager unauthorized", async () => {
+      const feedbackData = {
+        request_id: "req-123",
+        ratings_json: { competencies: [], kpis: [] },
+      };
+
+      const mockRequest = {
+        request_id: "req-123",
+        cycle_id: "cycle-456",
+        employee_id: "emp-789",
+        manager_id: "mgr-111",
+        status: "pending",
+      };
+
+      mockDb.execute.mockResolvedValueOnce([[mockRequest], []]); // getRequestById
+
+      await expect(
+        service.submitFeedback(feedbackData, "wrong-manager")
+      ).rejects.toThrow("Unauthorized: not assigned manager");
+    });
+
+    it("should update existing response if already submitted", async () => {
+      const feedbackData = {
+        request_id: "req-123",
+        ratings_json: {
+          competencies: [
+            {
+              competency_id: "1",
+              competency_name: "Communication",
+              rating: 5,
+              comment: "Excellent",
+            },
+          ],
+          kpis: [],
+        },
+        overall_strengths: "Leadership",
+        development_areas: "None",
+      };
+
+      const mockRequest = {
+        request_id: "req-123",
+        cycle_id: "cycle-456",
+        employee_id: "emp-789",
+        manager_id: "mgr-111",
+        status: "submitted",
+      };
+
+      const mockExistingResponse = {
+        response_id: "response-existing",
+        request_id: "req-123",
+      };
+
+      mockDb.execute
+        .mockResolvedValueOnce([[mockRequest], []]) // getRequestById
+        .mockResolvedValueOnce([[mockExistingResponse], []]) // existing response found
+        .mockResolvedValueOnce([{ affectedRows: 1 }, []]) // UPDATE response
+        .mockResolvedValueOnce([{ affectedRows: 1 }, []]); // UPDATE request status
+
+      const result = await service.submitFeedback(feedbackData, "mgr-111");
+
+      expect(result).toBeDefined();
+      expect(result.response_id).toBe("response-existing");
+      expect(mockDb.execute).toHaveBeenCalledWith(
+        expect.stringContaining("UPDATE performance_feedback_response"),
+        expect.any(Array)
+      );
+    });
+  });
+});

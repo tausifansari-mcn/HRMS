@@ -170,11 +170,19 @@ export interface ReviewerInfo {
 
 export interface SubmitFeedbackDto {
   request_id: string;
-  ratings: RatingsJson;
-  overall_rating: number;
-  strengths?: string;
-  areas_for_improvement?: string;
-  comments?: string;
+  ratings_json: RatingsJson;
+  overall_strengths?: string;
+  development_areas?: string;
+}
+
+export interface FormTemplateDto {
+  employee: {
+    emp_id: string;
+    full_name: string;
+    designation: string;
+  };
+  competencies: CompetencyMaster[];
+  kpis: any[];
 }
 
 export interface GenerateReportDto {
