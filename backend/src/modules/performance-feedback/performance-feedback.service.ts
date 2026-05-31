@@ -245,4 +245,111 @@ export class PerformanceFeedbackService {
       [requestId]
     );
   }
+
+  /**
+   * Get competencies with optional filters
+   */
+  async getCompetencies(filters: {
+    is_active?: boolean;
+    category?: string;
+  }): Promise<CompetencyMaster[]> {
+    let query = "SELECT * FROM competency_master WHERE 1=1";
+    const params: any[] = [];
+
+    if (filters.is_active !== undefined) {
+      query += " AND is_active = ?";
+      params.push(filters.is_active ? 1 : 0);
+    }
+
+    if (filters.category) {
+      query += " AND category = ?";
+      params.push(filters.category);
+    }
+
+    query += " ORDER BY display_order ASC, competency_name ASC";
+
+    const [rows] = await db.execute<RowDataPacket[]>(query, params);
+    return rows as CompetencyMaster[];
+  }
+
+  /**
+   * Create new competency
+   */
+  async createCompetency(data: {
+    competency_name: string;
+    description?: string;
+    category?: string;
+    display_order?: number;
+  }): Promise<CompetencyMaster> {
+    const query = `
+      INSERT INTO competency_master
+      (competency_name, description, category, display_order, is_active)
+      VALUES (?, ?, ?, ?, 1)
+    `;
+
+    const [result] = await db.execute<ResultSetHeader>(query, [
+      data.competency_name,
+      data.description || null,
+      data.category || null,
+      data.display_order || 999,
+    ]);
+
+    const [rows] = await db.execute<RowDataPacket[]>(
+      "SELECT * FROM competency_master WHERE competency_id = ?",
+      [result.insertId]
+    );
+
+    return rows[0] as CompetencyMaster;
+  }
+
+  /**
+   * Update competency
+   */
+  async updateCompetency(
+    competencyId: string,
+    updates: {
+      competency_name?: string;
+      description?: string;
+      category?: string;
+      display_order?: number;
+    }
+  ): Promise<void> {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.competency_name !== undefined) {
+      fields.push("competency_name = ?");
+      values.push(updates.competency_name);
+    }
+    if (updates.description !== undefined) {
+      fields.push("description = ?");
+      values.push(updates.description);
+    }
+    if (updates.category !== undefined) {
+      fields.push("category = ?");
+      values.push(updates.category);
+    }
+    if (updates.display_order !== undefined) {
+      fields.push("display_order = ?");
+      values.push(updates.display_order);
+    }
+
+    if (fields.length === 0) return;
+
+    values.push(competencyId);
+    await db.execute(
+      `UPDATE competency_master SET ${fields.join(", ")} WHERE competency_id = ?`,
+      values
+    );
+  }
+
+  /**
+   * Deactivate competency (soft delete)
+   */
+  async deactivateCompetency(competencyId: string): Promise<void> {
+    await db.execute(
+      "UPDATE competency_master SET is_active = 0 WHERE competency_id = ?",
+      [competencyId]
+    );
+  }
 }
