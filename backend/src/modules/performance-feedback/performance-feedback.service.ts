@@ -592,4 +592,153 @@ export class PerformanceFeedbackService {
 
     return { report_id: reportId, training_need_ids: trainingNeedIds };
   }
+
+  /**
+   * Create development plan with goals in transaction
+   */
+  async createDevelopmentPlan(data: CreateDevelopmentPlanDto, createdBy: string): Promise<DevelopmentPlan> {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Insert plan
+      const [planResult] = await connection.execute<ResultSetHeader>(
+        `INSERT INTO development_plan
+         (employee_id, created_by, target_date, status)
+         VALUES (?, ?, ?, 'draft')`,
+        [data.employee_id, createdBy, data.target_date || null]
+      );
+
+      const planId = planResult.insertId;
+
+      // Insert goals if provided
+      if (data.goals && data.goals.length > 0) {
+        for (const goal of data.goals) {
+          await connection.execute(
+            `INSERT INTO development_plan_goal
+             (plan_id, description, target_date, status)
+             VALUES (?, ?, ?, 'pending')`,
+            [planId, goal.description, goal.target_date || null]
+          );
+        }
+      }
+
+      await connection.commit();
+
+      // Fetch created plan
+      const [planRows] = await db.execute<RowDataPacket[]>(
+        "SELECT * FROM development_plan WHERE plan_id = ?",
+        [planId]
+      );
+
+      return planRows[0] as DevelopmentPlan;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  /**
+   * Get development plans with filters
+   */
+  async getDevelopmentPlans(filters: {
+    employee_id?: string;
+    status?: string;
+  }): Promise<DevelopmentPlan[]> {
+    let query = "SELECT * FROM development_plan WHERE 1=1";
+    const params: any[] = [];
+
+    if (filters.employee_id) {
+      query += " AND employee_id = ?";
+      params.push(filters.employee_id);
+    }
+
+    if (filters.status) {
+      query += " AND status = ?";
+      params.push(filters.status);
+    }
+
+    query += " ORDER BY created_at DESC";
+
+    const [rows] = await db.execute<RowDataPacket[]>(query, params);
+    return rows as DevelopmentPlan[];
+  }
+
+  /**
+   * Update development plan fields
+   */
+  async updateDevelopmentPlan(
+    planId: string,
+    updates: {
+      target_date?: string;
+      status?: string;
+    }
+  ): Promise<void> {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.target_date !== undefined) {
+      fields.push("target_date = ?");
+      values.push(updates.target_date);
+    }
+
+    if (updates.status !== undefined) {
+      fields.push("status = ?");
+      values.push(updates.status);
+    }
+
+    if (fields.length === 0) return;
+
+    values.push(planId);
+    await db.execute(
+      `UPDATE development_plan SET ${fields.join(", ")} WHERE plan_id = ?`,
+      values
+    );
+  }
+
+  /**
+   * Update development plan goal
+   */
+  async updateGoal(
+    goalId: string,
+    updates: {
+      description?: string;
+      target_date?: string;
+      status?: string;
+      actual_date?: string;
+    }
+  ): Promise<void> {
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.description !== undefined) {
+      fields.push("description = ?");
+      values.push(updates.description);
+    }
+
+    if (updates.target_date !== undefined) {
+      fields.push("target_date = ?");
+      values.push(updates.target_date);
+    }
+
+    if (updates.status !== undefined) {
+      fields.push("status = ?");
+      values.push(updates.status);
+    }
+
+    if (updates.actual_date !== undefined) {
+      fields.push("actual_date = ?");
+      values.push(updates.actual_date);
+    }
+
+    if (fields.length === 0) return;
+
+    values.push(goalId);
+    await db.execute(
+      `UPDATE development_plan_goal SET ${fields.join(", ")} WHERE goal_id = ?`,
+      values
+    );
+  }
 }
