@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
 
 export interface Department {
   id: string;
@@ -16,33 +16,17 @@ export function useDepartments() {
   return useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
-      const { data: departments, error } = await supabase
-        .from("departments")
-        .select(`
-          *,
-          manager:employees!departments_manager_id_fkey(id, first_name, last_name)
-        `)
-        .order("name", { ascending: true });
-
-      if (error) throw error;
-
-      // Get employee counts per department
-      const { data: employees } = await supabase
-        .from("employees")
-        .select("department_id")
-        .not("department_id", "is", null);
-
-      const countMap = new Map<string, number>();
-      employees?.forEach((emp) => {
-        if (emp.department_id) {
-          countMap.set(emp.department_id, (countMap.get(emp.department_id) || 0) + 1);
-        }
-      });
-
-      return (departments || []).map((dept) => ({
-        ...dept,
-        manager_name: dept.manager ? `${dept.manager.first_name} ${dept.manager.last_name}` : null,
-        employee_count: countMap.get(dept.id) || 0,
+      const res = await hrmsApi.get<{ data: Array<{ id: string; dept_name: string; dept_code: string; description?: string | null; manager_id?: string | null; manager_name?: string | null; created_at?: string; updated_at?: string; employee_count?: number }> }>("/api/org/departments");
+      return (res.data ?? []).map((d) => ({
+        id: d.id,
+        name: d.dept_name,
+        code: d.dept_code,
+        description: d.description ?? null,
+        manager_id: d.manager_id ?? null,
+        manager_name: d.manager_name ?? null,
+        created_at: d.created_at ?? "",
+        updated_at: d.updated_at ?? "",
+        employee_count: d.employee_count ?? 0,
       })) as Department[];
     },
   });
@@ -53,14 +37,7 @@ export function useCreateDepartment() {
 
   return useMutation({
     mutationFn: async (department: { name: string; description?: string; manager_id?: string | null }) => {
-      const { data, error } = await supabase
-        .from("departments")
-        .insert(department)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      return hrmsApi.post("/api/org/departments", department);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments"] });
@@ -73,15 +50,7 @@ export function useUpdateDepartment() {
 
   return useMutation({
     mutationFn: async ({ id, ...department }: { id: string; name: string; description?: string; manager_id?: string | null }) => {
-      const { data, error } = await supabase
-        .from("departments")
-        .update(department)
-        .eq("id", id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      return hrmsApi.put(`/api/org/departments/${id}`, department);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments"] });
@@ -94,12 +63,7 @@ export function useDeleteDepartment() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("departments")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
+      return hrmsApi.delete(`/api/org/departments/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments"] });

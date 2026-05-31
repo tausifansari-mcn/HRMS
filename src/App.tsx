@@ -46,7 +46,7 @@ const Changelog                     = lazy(() => import("./pages/Changelog"));
 const ModuleLauncher                = lazy(() => import("./pages/ModuleLauncher"));
 
 // ATS
-const NativeATSDashboard            = lazy(() => import("./pages/NativeATSDashboard"));
+const NativeATSDashboardReplica     = lazy(() => import("./pages/NativeATSDashboardReplica"));
 const NativeATSCandidateRegistration = lazy(() => import("./pages/NativeATSCandidateRegistration"));
 const NativeATSRecruiterDashboard   = lazy(() => import("./pages/NativeATSRecruiterDashboard"));
 const NativeATSOnboardingBridge     = lazy(() => import("./pages/NativeATSOnboardingBridge"));
@@ -104,6 +104,9 @@ const NativeStatutoryConfig         = lazy(() => import("./pages/NativeStatutory
 // System
 const NativeMigrationConsole        = lazy(() => import("./pages/NativeMigrationConsole"));
 const NativeExitManagement          = lazy(() => import("./pages/NativeExitManagement"));
+const NativeKPIConfiguration        = lazy(() => import("./pages/NativeKPIConfiguration"));
+const NativeProcessConfig           = lazy(() => import("./pages/NativeProcessConfig"));
+const NativeLeaveTypeConfig         = lazy(() => import("./pages/NativeLeaveTypeConfig"));
 
 // Portal
 const PortalLogin                   = lazy(() => import("./pages/portal/PortalLogin"));
@@ -170,7 +173,7 @@ const App = () => (
               <Route path="/modules" element={<ProtectedRoute><ModuleLauncher /></ProtectedRoute>} />
 
               {/* ATS */}
-              <Route path="/ats/dashboard" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativeATSDashboard /></Gate></ProtectedRoute>} />
+              <Route path="/ats/dashboard" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativeATSDashboardReplica /></Gate></ProtectedRoute>} />
               <Route path="/ats/candidate-registration" element={<ProtectedRoute><NativeATSCandidateRegistration /></ProtectedRoute>} />
               <Route path="/ats/recruiter/my-candidates" element={<ProtectedRoute><Gate pageCode="ATS_RECRUITER_QUEUE"><NativeATSRecruiterDashboard /></Gate></ProtectedRoute>} />
               <Route path="/ats/onboarding-bridge" element={<ProtectedRoute><Gate pageCode="ATS_ONBOARDING_BRIDGE"><NativeATSOnboardingBridge /></Gate></ProtectedRoute>} />
@@ -220,7 +223,7 @@ const App = () => (
               <Route path="/pip-management" element={<ProtectedRoute><Gate pageCode="PIP_MANAGEMENT"><NativePIPManagement /></Gate></ProtectedRoute>} />
               <Route path="/erp" element={<ProtectedRoute><Gate pageCode="ERP"><NativeERP /></Gate></ProtectedRoute>} />
               <Route path="/goals" element={<ProtectedRoute><Gate pageCode="GOALS"><NativeGoalsAppraisal /></Gate></ProtectedRoute>} />
-              <Route path="/work-inbox" element={<ProtectedRoute><NativeWorkInbox /></ProtectedRoute>} />
+              <Route path="/work-inbox" element={<ProtectedRoute><Gate pageCode="WORK_INBOX"><NativeWorkInbox /></Gate></ProtectedRoute>} />
               <Route path="/mobility" element={<ProtectedRoute><Gate pageCode="MOBILITY"><NativeMobilityManagement /></Gate></ProtectedRoute>} />
               <Route path="/jobs" element={<ProtectedRoute><Gate pageCode="JOBS_PORTAL"><NativeJobsPortal /></Gate></ProtectedRoute>} />
               <Route path="/advanced-reports" element={<ProtectedRoute><Gate pageCode="ADVANCED_REPORTS"><NativeAdvancedReports /></Gate></ProtectedRoute>} />
@@ -239,6 +242,9 @@ const App = () => (
               {/* System */}
               <Route path="/migration-console" element={<ProtectedRoute><NativeMigrationConsole /></ProtectedRoute>} />
               <Route path="/exit-management" element={<ProtectedRoute><NativeExitManagement /></ProtectedRoute>} />
+              <Route path="/kpi-config" element={<ProtectedRoute><Gate pageCode="KPI_CONFIG"><NativeKPIConfiguration /></Gate></ProtectedRoute>} />
+              <Route path="/process-config" element={<ProtectedRoute><Gate pageCode="PROCESS_CONFIG"><NativeProcessConfig /></Gate></ProtectedRoute>} />
+              <Route path="/leave-types" element={<ProtectedRoute><Gate pageCode="LEAVE_TYPES"><NativeLeaveTypeConfig /></Gate></ProtectedRoute>} />
               <Route path="/changelog" element={<ProtectedRoute><Changelog /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>

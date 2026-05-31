@@ -37,6 +37,7 @@ SOURCE sql/029_labour_law.sql;
 SOURCE sql/030_dpdp_privacy.sql;
 SOURCE sql/031_breach_log.sql;
 SOURCE sql/032_consent_text_versions.sql;
+SOURCE sql/033_kpi_process_config.sql;
 
 SELECT 'mas_hrms schema complete' AS status;
 SHOW TABLES;

@@ -46,7 +46,7 @@ import {
   useOfficeLocation,
 } from "@/components/settings/OfficeLocationSettings";
 import { getExpectedHours, getShiftEndTime } from "@/lib/shiftUtils";
-import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { usePagination } from "@/hooks/usePagination";
 import { useSorting } from "@/hooks/useSorting";
 
@@ -260,17 +260,9 @@ const Attendance = () => {
   const { data: currentEmployee } = useQuery<EmployeeSchedule | null>({
     queryKey: ["current-employee-schedule", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employees")
-        .select(
-          "id, first_name, last_name, working_hours_start, working_hours_end, working_days"
-        )
-        .eq("user_id", user?.id)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      return data as EmployeeSchedule | null;
+      const empData = await hrmsApi.get<{ data: { id: string; first_name?: string | null; last_name?: string | null; working_hours_start?: string | null; working_hours_end?: string | null; working_days?: number[] | null } }>(`/api/employees/by-user/${user?.id}`);
+      if (!empData.data) return null;
+      return empData.data as EmployeeSchedule;
     },
     enabled: !!user?.id,
   });

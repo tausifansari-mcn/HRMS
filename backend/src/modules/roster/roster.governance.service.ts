@@ -372,12 +372,12 @@ export const rosterGovernanceService = {
       throw Object.assign(new Error("Roster is not published for acknowledgement"), { statusCode: 409 });
     }
     const now = new Date().toISOString().slice(0, 19).replace("T", " ");
-    const [result] = await db.execute(
+    const [result] = (await db.execute(
       `UPDATE roster_daily_assignment
           SET acknowledgement_status = 'acknowledged', acknowledged_at = ?
         WHERE cycle_id = ? AND employee_id = ? AND acknowledgement_status = 'pending'`,
       [now, cycleId, employeeId]
-    ) as [{ affectedRows: number }, unknown];
+    ) as unknown) as [{ affectedRows: number }, unknown];
     await logSensitiveAction({ actor_user_id: userId, action_type: "ROSTER_ACKNOWLEDGED", module_key: "roster_gov", entity_type: "weekly_roster_cycle", entity_id: cycleId, change_summary: { employee_id: employeeId, acknowledged: result.affectedRows }, req });
     return { acknowledged: result.affectedRows };
   },

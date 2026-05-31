@@ -223,6 +223,82 @@ router.get("/pt-slabs", h(async (req: AuthenticatedRequest, res: Response) => {
   return res.json({ success: true, data: rows });
 }));
 
+// POST /api/payroll/pt-slabs — create slab (admin/finance)
+router.post(
+  "/pt-slabs",
+  requireRole("admin", "finance"),
+  h(async (req: AuthenticatedRequest, res: Response) => {
+    const { state_code, state_name, income_from, income_to, pt_amount, frequency, effective_from } =
+      req.body as {
+        state_code: string;
+        state_name: string;
+        income_from: number;
+        income_to?: number | null;
+        pt_amount: number;
+        frequency: string;
+        effective_from: string;
+      };
+
+    if (!state_code || !state_name || income_from === undefined || pt_amount === undefined || !frequency || !effective_from) {
+      return res.status(400).json({ success: false, message: "state_code, state_name, income_from, pt_amount, frequency, effective_from are required" });
+    }
+
+    const id = (await import("crypto")).randomUUID();
+    await db.execute(
+      `INSERT INTO pt_slab_master (id, state_code, state_name, income_from, income_to, pt_amount, frequency, effective_from, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      [id, state_code, state_name, income_from, income_to ?? null, pt_amount, frequency, effective_from]
+    );
+    const [rows] = await db.execute<RowDataPacket[]>(
+      "SELECT * FROM pt_slab_master WHERE id = ? LIMIT 1",
+      [id]
+    );
+    return res.status(201).json({ success: true, data: (rows as RowDataPacket[])[0] });
+  })
+);
+
+// PATCH /api/payroll/pt-slabs/:id — update slab (admin/finance)
+router.patch(
+  "/pt-slabs/:id",
+  requireRole("admin", "finance"),
+  h(async (req: AuthenticatedRequest, res: Response) => {
+    const { id } = req.params;
+    const { pt_amount, income_to, is_active } = req.body as {
+      pt_amount?: number;
+      income_to?: number | null;
+      is_active?: number;
+    };
+
+    const sets: string[] = [];
+    const params: unknown[] = [];
+
+    if (pt_amount !== undefined) { sets.push("pt_amount = ?");  params.push(pt_amount); }
+    if (income_to !== undefined) { sets.push("income_to = ?");  params.push(income_to ?? null); }
+    if (is_active !== undefined) { sets.push("is_active = ?");  params.push(is_active); }
+
+    if (sets.length === 0) {
+      return res.status(400).json({ success: false, message: "No fields to update" });
+    }
+
+    params.push(id);
+    const patchResult = await db.execute(
+      `UPDATE pt_slab_master SET ${sets.join(", ")} WHERE id = ?`,
+      params
+    );
+    const result = (patchResult as unknown as [{ affectedRows: number }, unknown])[0];
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: "PT slab not found" });
+    }
+
+    const [rows] = await db.execute<RowDataPacket[]>(
+      "SELECT * FROM pt_slab_master WHERE id = ? LIMIT 1",
+      [id]
+    );
+    return res.json({ success: true, data: (rows as RowDataPacket[])[0] });
+  })
+);
+
 // ─── Minimum Wages ────────────────────────────────────────────────────────────
 
 // GET /api/payroll/minimum-wages — list minimum wages; optional ?state_code=

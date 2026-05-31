@@ -1,5 +1,10 @@
 import { Router } from "express";
+import type { Response } from "express";
 import { requireAuth } from "../../middleware/authMiddleware.js";
+import { requireRole } from "../../middleware/requireRole.js";
+import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
+import { db } from "../../db/mysql.js";
+import type { RowDataPacket } from "mysql2";
 import { kpiController as c } from "./kpi.controller.js";
 
 const router = Router();
@@ -29,5 +34,66 @@ router.post("/scores", h(c.recordScore));
 // Summary + Leaderboard
 router.get("/summary/:employeeId/:templateId/:period", h(c.getEmployeeSummary));
 router.get("/leaderboard", h(c.getLeaderboard));
+
+// Per-process KPI config
+router.get("/process-config/:processId", requireRole("admin", "hr", "manager"), h(async (req: AuthenticatedRequest, res: Response) => {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT kpc.*, km.metric_name, km.metric_code, km.category AS metric_type, km.unit,
+            ktm.target_value AS template_default
+     FROM kpi_process_config kpc
+     JOIN kpi_metric_master km ON km.id = kpc.metric_id
+     LEFT JOIN kpi_template_metric ktm ON ktm.metric_id = kpc.metric_id
+     WHERE kpc.process_id = ?
+     ORDER BY km.metric_name`,
+    [req.params.processId]
+  );
+  res.json({ success: true, data: rows });
+}));
+
+router.post("/process-config/:processId", requireRole("admin", "hr"), h(async (req: AuthenticatedRequest, res: Response) => {
+  const { metric_id, target_value, min_threshold, max_achievement, weightage } = req.body;
+  if (!metric_id || target_value === undefined) return res.status(400).json({ error: "metric_id and target_value required" });
+  await db.execute(
+    `INSERT INTO kpi_process_config (id, process_id, metric_id, target_value, min_threshold, max_achievement, weightage, created_by)
+     VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE target_value=VALUES(target_value), min_threshold=VALUES(min_threshold), max_achievement=VALUES(max_achievement), weightage=VALUES(weightage), updated_at=NOW()`,
+    [req.params.processId, metric_id, target_value, min_threshold ?? null, max_achievement ?? 120, weightage ?? 100, req.authUser!.id]
+  );
+  res.json({ success: true });
+}));
+
+router.delete("/process-config/:processId/:metricId", requireRole("admin", "hr"), h(async (req: AuthenticatedRequest, res: Response) => {
+  await db.execute("DELETE FROM kpi_process_config WHERE process_id=? AND metric_id=?", [req.params.processId, req.params.metricId]);
+  res.json({ success: true });
+}));
+
+router.get("/rating-config", h(async (req: AuthenticatedRequest, res: Response) => {
+  const processId = req.query.process_id as string | undefined;
+  let rows: RowDataPacket[];
+  if (processId) {
+    const [r] = await db.execute<RowDataPacket[]>(
+      "SELECT * FROM kpi_rating_config WHERE process_id=? OR process_id IS NULL ORDER BY process_id DESC, min_score_pct DESC",
+      [processId]
+    );
+    rows = r as RowDataPacket[];
+  } else {
+    const [r] = await db.execute<RowDataPacket[]>("SELECT * FROM kpi_rating_config ORDER BY process_id IS NULL DESC, min_score_pct DESC");
+    rows = r as RowDataPacket[];
+  }
+  res.json({ success: true, data: rows });
+}));
+
+router.put("/rating-config/:processId", requireRole("admin", "hr"), h(async (req: AuthenticatedRequest, res: Response) => {
+  const { ratings } = req.body as { ratings: { rating_label: string; min_score_pct: number; max_score_pct: number; color_code?: string }[] };
+  if (!Array.isArray(ratings)) return res.status(400).json({ error: "ratings array required" });
+  await db.execute("DELETE FROM kpi_rating_config WHERE process_id=?", [req.params.processId]);
+  for (const r of ratings) {
+    await db.execute(
+      "INSERT INTO kpi_rating_config (id, process_id, rating_label, min_score_pct, max_score_pct, color_code) VALUES (UUID(),?,?,?,?,?)",
+      [req.params.processId, r.rating_label, r.min_score_pct, r.max_score_pct, r.color_code ?? null]
+    );
+  }
+  res.json({ success: true });
+}));
 
 export { router as kpiRouter };
