@@ -462,4 +462,134 @@ export class PerformanceFeedbackService {
 
     return { response_id: responseId };
   }
+
+  /**
+   * Generate performance feedback report
+   * Aggregates scores, creates training needs for low scores (< 3.0)
+   */
+  async generateReport(requestId: string): Promise<{ report_id: string; training_need_ids: string[] }> {
+    // Get request
+    const request = await this.getRequestById(requestId);
+    if (!request) {
+      throw new Error("Request not found");
+    }
+
+    // Get response
+    const [responseRows] = await db.execute<RowDataPacket[]>(
+      "SELECT * FROM performance_feedback_response WHERE request_id = ?",
+      [requestId]
+    );
+
+    if (responseRows.length === 0) {
+      throw new Error("Response not found");
+    }
+
+    const response = responseRows[0];
+    const ratingsJson = JSON.parse(response.ratings_json);
+
+    // Calculate aggregated scores
+    const competencyScores = ratingsJson.competencies.map((c: any) => ({
+      competency_id: c.competency_id,
+      competency_name: c.competency_name,
+      score: c.rating,
+    }));
+
+    const kpiScores = ratingsJson.kpis.map((k: any) => ({
+      kpi_id: k.kpi_id,
+      kpi_name: k.kpi_name,
+      score: k.rating,
+    }));
+
+    // Calculate overall score
+    const allRatings = [
+      ...ratingsJson.competencies.map((c: any) => c.rating),
+      ...ratingsJson.kpis.map((k: any) => k.rating),
+    ];
+    const overallScore = allRatings.length > 0
+      ? allRatings.reduce((sum: number, r: number) => sum + r, 0) / allRatings.length
+      : 0;
+
+    // Identify development areas (scores < 3.0)
+    const developmentAreas = competencyScores
+      .filter((c: any) => c.score < 3.0)
+      .map((c: any) => `${c.competency_name} (${c.score}/5)`)
+      .join(", ");
+
+    // Identify strengths (scores >= 4.0)
+    const strengths = competencyScores
+      .filter((c: any) => c.score >= 4.0)
+      .map((c: any) => `${c.competency_name} (${c.score}/5)`)
+      .join(", ");
+
+    // Check if report already exists for this cycle and employee
+    const [existingReport] = await db.execute<RowDataPacket[]>(
+      "SELECT report_id FROM performance_feedback_report WHERE cycle_id = ? AND employee_id = ?",
+      [request.cycle_id, request.employee_id]
+    );
+
+    let reportId: string;
+
+    if (existingReport.length > 0) {
+      // Update existing report
+      reportId = existingReport[0].report_id;
+      await db.execute(
+        `UPDATE performance_feedback_report
+         SET overall_score = ?, strengths = ?, development_areas = ?,
+             manager_feedback = ?, report_generated_at = NOW()
+         WHERE report_id = ?`,
+        [
+          parseFloat(overallScore.toFixed(2)),
+          strengths || null,
+          developmentAreas || null,
+          response.development_areas || null,
+          reportId,
+        ]
+      );
+    } else {
+      // Create new report
+      const [result] = await db.execute<ResultSetHeader>(
+        `INSERT INTO performance_feedback_report
+         (cycle_id, employee_id, overall_score, strengths, development_areas, manager_feedback, total_reviewers)
+         VALUES (?, ?, ?, ?, ?, ?, 1)`,
+        [
+          request.cycle_id,
+          request.employee_id,
+          parseFloat(overallScore.toFixed(2)),
+          strengths || null,
+          developmentAreas || null,
+          response.development_areas || null,
+        ]
+      );
+
+      reportId = result.insertId.toString();
+    }
+
+    // Auto-create training needs for low scores (< 3.0)
+    const trainingNeedIds: string[] = [];
+
+    for (const compScore of competencyScores) {
+      if (compScore.score < 3.0) {
+        // Get competency details for better description
+        const [compRows] = await db.execute<RowDataPacket[]>(
+          "SELECT competency_name, category FROM competency_master WHERE competency_id = ?",
+          [compScore.competency_id]
+        );
+
+        const competencyName = compRows.length > 0 ? compRows[0].competency_name : compScore.competency_name;
+        const description = response.development_areas || `Low score on ${competencyName} (${compScore.score}/5) from performance feedback`;
+
+        // Insert training need
+        const [trainingResult] = await db.execute<ResultSetHeader>(
+          `INSERT INTO training_need
+           (employee_id, need_type, title, description, identified_date)
+           VALUES (?, 'performance_feedback', ?, ?, CURDATE())`,
+          [request.employee_id, competencyName, description]
+        );
+
+        trainingNeedIds.push(trainingResult.insertId.toString());
+      }
+    }
+
+    return { report_id: reportId, training_need_ids: trainingNeedIds };
+  }
 }

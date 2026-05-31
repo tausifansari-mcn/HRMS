@@ -795,3 +795,254 @@ describe("PerformanceFeedbackService - Feedback Form & Submission", () => {
     });
   });
 });
+
+describe("PerformanceFeedbackService - Report Generation", () => {
+  let service: PerformanceFeedbackService;
+
+  beforeEach(() => {
+    service = new PerformanceFeedbackService();
+    vi.clearAllMocks();
+  });
+
+  describe("generateReport", () => {
+    it("should generate report with aggregated scores and create training needs for low scores", async () => {
+      const mockRequest = {
+        request_id: "req-123",
+        cycle_id: "cycle-456",
+        employee_id: "emp-789",
+        manager_id: "mgr-111",
+        status: "submitted",
+      };
+
+      const mockResponse = {
+        response_id: "response-123",
+        request_id: "req-123",
+        ratings_json: JSON.stringify({
+          competencies: [
+            { competency_id: "1", competency_name: "Communication", rating: 4.5, comment: "Excellent" },
+            { competency_id: "2", competency_name: "Teamwork", rating: 2.5, comment: "Needs work" },
+            { competency_id: "3", competency_name: "Problem Solving", rating: 3.5, comment: "Good" },
+          ],
+          kpis: [
+            { kpi_id: "kpi-1", kpi_name: "Sales Target", rating: 4.0, comment: "Met target" },
+          ],
+        }),
+        overall_strengths: "Communication, Sales",
+        development_areas: "Teamwork needs improvement",
+        submitted_at: "2026-05-31T00:00:00Z",
+      };
+
+      const mockCompetency = {
+        competency_id: "2",
+        competency_name: "Teamwork",
+        category: "core",
+      };
+
+      const aggregatedData = {
+        competency_scores: [
+          { competency_id: "1", competency_name: "Communication", score: 4.5 },
+          { competency_id: "2", competency_name: "Teamwork", score: 2.5 },
+          { competency_id: "3", competency_name: "Problem Solving", score: 3.5 },
+        ],
+        kpi_scores: [
+          { kpi_id: "kpi-1", kpi_name: "Sales Target", score: 4.0 },
+        ],
+        overall_score: 3.63, // (4.5 + 2.5 + 3.5 + 4.0) / 4
+      };
+
+      mockDb.execute
+        .mockResolvedValueOnce([[mockRequest], []]) // getRequestById
+        .mockResolvedValueOnce([[mockResponse], []]) // get response
+        .mockResolvedValueOnce([[], []]) // check existing report (none)
+        .mockResolvedValueOnce([{ insertId: "report-123" }, []]) // INSERT report
+        .mockResolvedValueOnce([[mockCompetency], []]) // get competency for training need
+        .mockResolvedValueOnce([{ insertId: "training-need-1" }, []]); // INSERT training need
+
+      const result = await service.generateReport("req-123");
+
+      expect(result).toBeDefined();
+      expect(result.report_id).toBe("report-123");
+      expect(result.training_need_ids).toEqual(["training-need-1"]);
+
+      // Verify report INSERT was called with cycle_id, employee_id, overall_score
+      expect(mockDb.execute).toHaveBeenCalledWith(
+        expect.stringContaining("INSERT INTO performance_feedback_report"),
+        expect.arrayContaining([
+          "cycle-456", // cycle_id
+          "emp-789", // employee_id
+          expect.any(Number), // overall_score
+        ])
+      );
+
+      // Verify training need INSERT was called for low score (2.5 < 3.0)
+      const trainingNeedCalls = (mockDb.execute as any).mock.calls.filter(
+        (call: any) => call[0]?.includes("INSERT INTO training_need")
+      );
+      expect(trainingNeedCalls.length).toBe(1);
+      expect(trainingNeedCalls[0][1]).toEqual([
+        "emp-789",
+        "Teamwork",
+        "Teamwork needs improvement",
+      ]);
+    });
+
+    it("should update existing report if already generated", async () => {
+      const mockRequest = {
+        request_id: "req-123",
+        cycle_id: "cycle-456",
+        employee_id: "emp-789",
+        manager_id: "mgr-111",
+        status: "submitted",
+      };
+
+      const mockResponse = {
+        response_id: "response-123",
+        request_id: "req-123",
+        ratings_json: JSON.stringify({
+          competencies: [
+            { competency_id: "1", competency_name: "Communication", rating: 5.0, comment: "Perfect" },
+          ],
+          kpis: [],
+        }),
+        overall_strengths: "All areas strong",
+        development_areas: "",
+        submitted_at: "2026-05-31T00:00:00Z",
+      };
+
+      const mockExistingReport = {
+        report_id: "report-existing",
+        request_id: "req-123",
+      };
+
+      mockDb.execute
+        .mockResolvedValueOnce([[mockRequest], []]) // getRequestById
+        .mockResolvedValueOnce([[mockResponse], []]) // get response
+        .mockResolvedValueOnce([[mockExistingReport], []]) // existing report found
+        .mockResolvedValueOnce([{ affectedRows: 1 }, []]); // UPDATE report
+
+      const result = await service.generateReport("req-123");
+
+      expect(result.report_id).toBe("report-existing");
+      expect(result.training_need_ids).toEqual([]); // no low scores
+
+      // Verify UPDATE was called
+      expect(mockDb.execute).toHaveBeenCalledWith(
+        expect.stringContaining("UPDATE performance_feedback_report"),
+        expect.any(Array)
+      );
+    });
+
+    it("should throw error if request not found", async () => {
+      mockDb.execute.mockResolvedValueOnce([[], []]); // getRequestById returns empty
+
+      await expect(service.generateReport("non-existent")).rejects.toThrow(
+        "Request not found"
+      );
+    });
+
+    it("should throw error if response not submitted", async () => {
+      const mockRequest = {
+        request_id: "req-123",
+        cycle_id: "cycle-456",
+        employee_id: "emp-789",
+        manager_id: "mgr-111",
+        status: "submitted",
+      };
+
+      mockDb.execute
+        .mockResolvedValueOnce([[mockRequest], []])
+        .mockResolvedValueOnce([[], []]); // no response found
+
+      await expect(service.generateReport("req-123")).rejects.toThrow(
+        "Response not found"
+      );
+    });
+
+    it("should create multiple training needs for multiple low scores", async () => {
+      const mockRequest = {
+        request_id: "req-123",
+        cycle_id: "cycle-456",
+        employee_id: "emp-789",
+        manager_id: "mgr-111",
+        status: "submitted",
+      };
+
+      const mockResponse = {
+        response_id: "response-123",
+        request_id: "req-123",
+        ratings_json: JSON.stringify({
+          competencies: [
+            { competency_id: "1", competency_name: "Communication", rating: 2.0, comment: "Poor" },
+            { competency_id: "2", competency_name: "Teamwork", rating: 2.8, comment: "Below avg" },
+            { competency_id: "3", competency_name: "Leadership", rating: 4.5, comment: "Great" },
+          ],
+          kpis: [],
+        }),
+        overall_strengths: "Leadership",
+        development_areas: "Communication and Teamwork need significant improvement",
+        submitted_at: "2026-05-31T00:00:00Z",
+      };
+
+      const mockCompetency1 = { competency_id: "1", competency_name: "Communication", category: "core" };
+      const mockCompetency2 = { competency_id: "2", competency_name: "Teamwork", category: "core" };
+
+      mockDb.execute
+        .mockResolvedValueOnce([[mockRequest], []]) // getRequestById
+        .mockResolvedValueOnce([[mockResponse], []]) // get response
+        .mockResolvedValueOnce([[], []]) // check existing report (none)
+        .mockResolvedValueOnce([{ insertId: "report-123" }, []]) // INSERT report
+        .mockResolvedValueOnce([[mockCompetency1], []]) // get competency 1
+        .mockResolvedValueOnce([{ insertId: "training-need-1" }, []]) // INSERT training need 1
+        .mockResolvedValueOnce([[mockCompetency2], []]) // get competency 2
+        .mockResolvedValueOnce([{ insertId: "training-need-2" }, []]); // INSERT training need 2
+
+      const result = await service.generateReport("req-123");
+
+      expect(result.training_need_ids).toHaveLength(2);
+      expect(result.training_need_ids).toEqual(["training-need-1", "training-need-2"]);
+    });
+
+    it("should not create training needs if all scores >= 3.0", async () => {
+      const mockRequest = {
+        request_id: "req-123",
+        cycle_id: "cycle-456",
+        employee_id: "emp-789",
+        manager_id: "mgr-111",
+        status: "submitted",
+      };
+
+      const mockResponse = {
+        response_id: "response-123",
+        request_id: "req-123",
+        ratings_json: JSON.stringify({
+          competencies: [
+            { competency_id: "1", competency_name: "Communication", rating: 4.0, comment: "Good" },
+            { competency_id: "2", competency_name: "Teamwork", rating: 3.5, comment: "Solid" },
+          ],
+          kpis: [
+            { kpi_id: "kpi-1", kpi_name: "Sales", rating: 4.5, comment: "Excellent" },
+          ],
+        }),
+        overall_strengths: "All strong",
+        development_areas: "",
+        submitted_at: "2026-05-31T00:00:00Z",
+      };
+
+      mockDb.execute
+        .mockResolvedValueOnce([[mockRequest], []])
+        .mockResolvedValueOnce([[mockResponse], []])
+        .mockResolvedValueOnce([[], []])
+        .mockResolvedValueOnce([{ insertId: "report-123" }, []]);
+
+      const result = await service.generateReport("req-123");
+
+      expect(result.training_need_ids).toEqual([]);
+
+      // Verify training_need INSERT was NOT called
+      const insertTrainingCalls = (mockDb.execute as any).mock.calls.filter(
+        (call: any) => call[0]?.includes("INSERT INTO training_need")
+      );
+      expect(insertTrainingCalls.length).toBe(0);
+    });
+  });
+});
