@@ -3,6 +3,7 @@ import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
 import { payrollService } from "./payroll.service.js";
 import type { SalaryPrepRun } from "./payroll.types.js";
+import { maternityService } from "../compliance/maternity.service.js";
 
 interface TaxDeclarationRow {
   declared_hra: number;
@@ -239,6 +240,10 @@ export async function calculatePayrollRun(runId: string, userId: string): Promis
   let totalDed = 0;
   let totalNet = 0;
 
+  // Fetch employees on approved/active maternity leave covering this pay month.
+  // Per MBA 1961 s.5(1) these employees receive full pay — no LWP deduction.
+  const maternityExemptIds = await maternityService.getActiveEmployeeIdsForMonth(run.run_month);
+
   for (const emp of employees) {
     // 5. Fetch attendance summary for this employee for run_month
     const monthStart = `${run.run_month}-01`;
@@ -287,10 +292,13 @@ export async function calculatePayrollRun(runId: string, userId: string): Promis
     const tdsResult = calculateTds(taxableIncome, statConfig);
     const tdsMonthly = tdsResult.tds_monthly;
 
-    // 5c. LWP deduction
+    // 5c. LWP deduction — skip for employees on maternity leave (MBA 1961 s.5(1))
     const workingDays = att.working_days || defaultWorkingDays;
     const lwpDays = att.lwp_days || 0;
-    const lwpDeduction = lwpDays > 0 ? Math.round((grossMonthly / workingDays) * lwpDays * 100) / 100 : 0;
+    const isOnMaternityLeave = maternityExemptIds.has(emp.employee_id);
+    const lwpDeduction = (!isOnMaternityLeave && lwpDays > 0)
+      ? Math.round((grossMonthly / workingDays) * lwpDays * 100) / 100
+      : 0;
     const grossAfterLwp = Math.max(0, grossMonthly - lwpDeduction);
 
     // 5d. Salary advance monthly recovery
