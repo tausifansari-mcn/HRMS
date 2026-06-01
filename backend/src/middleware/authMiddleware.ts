@@ -43,15 +43,23 @@ export async function requireAuth(
 
     const token = authHeader.replace("Bearer ", "").trim();
 
-    // Demo bypass — accept mock tokens without Supabase call
+    // Demo bypass — only when INTERNAL_DEMO_BYPASS=true AND not in production
     if (token.startsWith("mock-token")) {
-      const demo = DEMO_TOKEN_MAP[token];
-      if (demo) {
-        req.authUser = { id: demo.id, email: demo.email, isDemo: true };
-        return next();
+      const demoBypssEnabled =
+        process.env.INTERNAL_DEMO_BYPASS === "true" &&
+        process.env.NODE_ENV !== "production";
+
+      if (!demoBypssEnabled) {
+        return res.status(401).json({ success: false, message: "Invalid or expired token" });
       }
-      // Unknown mock token — still allow with a generic demo user
-      req.authUser = { id: "demo-user-id", email: "demo@mascallnet.com", isDemo: true };
+
+      // Only accept exact known tokens — reject anything not in the map
+      const demo = DEMO_TOKEN_MAP[token];
+      if (!demo) {
+        return res.status(401).json({ success: false, message: "Invalid or expired token" });
+      }
+
+      req.authUser = { id: demo.id, email: demo.email, isDemo: true };
       return next();
     }
 

@@ -195,7 +195,7 @@ export default function NativeClientMaster() {
     setTogglingId(process.id);
     setMessage("");
     try {
-      await hrmsApi.post(`/api/processes/${process.id}/status`, {
+      await hrmsApi.patch(`/api/processes/${process.id}/status`, {
         is_active: !process.is_active,
       });
       setMessage(

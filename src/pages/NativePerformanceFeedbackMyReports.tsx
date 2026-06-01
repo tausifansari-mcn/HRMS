@@ -203,7 +203,7 @@ export default function NativePerformanceFeedbackMyReports() {
               )}
 
               <Button
-                onClick={() => navigate(`/api/performance-feedback/reports/${report.id}`)}
+                onClick={() => navigate(`/performance-feedback/reports/${report.id}`)}
                 variant="outline"
                 className="w-full"
               >

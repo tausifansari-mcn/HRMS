@@ -6,6 +6,7 @@ import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 import {
   getRbacReconciliation, assignRole, revokeRole,
   getUserRoles, listRoleCatalog, querySensitiveActionLog,
+  getAccessMe,
 } from "./access.service.js";
 
 const router = Router();
@@ -13,6 +14,16 @@ const router = Router();
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
 router.use(requireAuth);
+
+/**
+ * GET /api/access/me
+ * Returns the authenticated user's identity, MySQL roles, assignment scopes, and page permissions.
+ * Used by useUserRole hook as the single source of truth for frontend RBAC.
+ */
+router.get("/me", h(async (req: AuthenticatedRequest, res: Response) => {
+  const data = await getAccessMe(req.authUser!.id);
+  res.json({ success: true, data });
+}));
 
 /**
  * GET /api/access/rbac-reconciliation

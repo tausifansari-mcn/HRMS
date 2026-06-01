@@ -296,7 +296,7 @@ export default function NativeOperationsKPI() {
 
   const loadProcesses = useCallback(async () => {
     try {
-      const res = await hrmsApi.get<{ success: boolean; data: Process[] }>("/api/org/processes");
+      const res = await hrmsApi.get<{ success: boolean; data: Process[] }>("/api/processes");
       setProcesses(res.data ?? []);
       if ((res.data ?? []).length > 0 && !selectedProcess) {
         setSelectedProcess((res.data ?? [])[0].id);

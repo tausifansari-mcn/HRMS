@@ -1047,7 +1047,7 @@ function OffersTab() {
     setUpdatingId(id);
     setStatusDropdown(null);
     try {
-      await hrmsApi.post(`/api/ats-ext/offers/${id}/status`, { status, remarks: null });
+      await hrmsApi.patch(`/api/ats-ext/offers/${id}/status`, { status, remarks: null });
       setMessage(`Offer status updated to ${status}.`);
       await load();
     } catch (err: unknown) {

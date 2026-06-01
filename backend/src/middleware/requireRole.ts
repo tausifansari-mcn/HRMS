@@ -3,6 +3,24 @@ import type { NextFunction, Response } from "express";
 import { db } from "../db/mysql.js";
 import type { AuthenticatedRequest } from "./authMiddleware.js";
 
+// Role aliases: canonical ↔ legacy (both directions)
+// Allows routes using either 'manager' or 'process_manager' to work transparently.
+const ROLE_ALIASES: Record<string, string[]> = {
+  "process_manager": ["manager"],
+  "manager":         ["process_manager"],
+  "team_leader":     ["tl"],
+  "tl":              ["team_leader"],
+};
+
+/** Expand a list of roles to include their known aliases */
+function expandRoles(roles: string[]): string[] {
+  const expanded = new Set(roles);
+  for (const r of roles) {
+    (ROLE_ALIASES[r] ?? []).forEach(a => expanded.add(a));
+  }
+  return Array.from(expanded);
+}
+
 export function requireRole(...allowedRoles: string[]) {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
@@ -18,7 +36,10 @@ export function requireRole(...allowedRoles: string[]) {
       );
 
       const userRoles = (rows as { role_key: string }[]).map((r) => r.role_key);
-      const allowed = allowedRoles.some((role) => userRoles.includes(role));
+      // Expand both sides with aliases so manager↔process_manager are interchangeable
+      const expandedUserRoles = expandRoles(userRoles);
+      const expandedAllowed   = expandRoles(allowedRoles);
+      const allowed = expandedAllowed.some((role) => expandedUserRoles.includes(role));
 
       if (!allowed) {
         return res.status(403).json({ success: false, message: "Forbidden" });

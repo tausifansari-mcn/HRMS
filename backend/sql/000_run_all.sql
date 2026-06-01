@@ -1,6 +1,10 @@
 -- 000_run_all.sql
 -- Run this to execute all schema files in order.
 -- Usage: mysql -u root -p < sql/000_run_all.sql
+--
+-- NOTE: 043_demo_data.sql is a development/demo seed — do NOT include in production runs.
+-- NOTE: For duplicate variants (020/020b, 021/021b, 022/022b), only the 'b' variants
+--       are sourced here as they contain the governance/extended schemas.
 
 SOURCE sql/001_core_org.sql;
 SOURCE sql/002_employees.sql;
@@ -12,10 +16,10 @@ SOURCE sql/007_payroll.sql;
 SOURCE sql/008_integration_hub.sql;
 SOURCE sql/009_dialer_ispark.sql;
 SOURCE sql/010_kpi.sql;
-SOURCE sql/010a_kpi_migration.sql;
+SOURCE sql/010_kpi_migration.sql;
 SOURCE sql/011_exit_management.sql;
 SOURCE sql/012_client_portal.sql;
-SOURCE sql/013_roster_shift_times.sql;
+SOURCE sql/012_roster_shift_times.sql;
 SOURCE sql/015_platform_foundation.sql;
 SOURCE sql/016_employee_lifecycle.sql;
 SOURCE sql/017_ats_wfm_completion.sql;
@@ -41,6 +45,15 @@ SOURCE sql/033_kpi_process_config.sql;
 SOURCE sql/034_kpi_families.sql;
 SOURCE sql/035_portal_published_data.sql;
 SOURCE sql/036_erp_billing.sql;
+SOURCE sql/037_performance_feedback.sql;
+SOURCE sql/037_performance_feedback_fix.sql;
+SOURCE sql/038_engagement_gamification.sql;
+SOURCE sql/039_engagement_activity_badges.sql;
+SOURCE sql/040_communication.sql;
+SOURCE sql/041_schema_gap_fill.sql;
+SOURCE sql/042_maternity_schema_patch.sql;
+SOURCE sql/044_attendance_engine.sql;
+-- NOTE: SOURCE sql/043_demo_data.sql; -- development seed only, do not run in production
 
 SELECT 'mas_hrms schema complete' AS status;
 SHOW TABLES;

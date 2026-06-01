@@ -8,6 +8,7 @@ import { payslipService } from "./payslip.service.js";
 import { taxDeclarationService } from "./taxDeclaration.service.js";
 import { logSensitiveAction } from "../../shared/auditLog.js";
 import { db } from "../../db/mysql.js";
+import { env } from "../../config/env.js";
 import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 import type { Response } from "express";
 import type { RowDataPacket } from "mysql2";
@@ -549,13 +550,13 @@ router.get("/runs/:id/neft-export", requireRole("admin", "finance", "payroll"), 
     `SELECT spl.employee_id, spl.net_salary, spl.gross_salary, spl.total_deductions,
             e.employee_code, e.full_name, e.email,
             ebd.bank_name, ebd.ifsc_code,
-            AES_DECRYPT(ebd.account_number, 'hrms-bank-key') AS account_number
+            AES_DECRYPT(ebd.account_number, ?) AS account_number
      FROM salary_prep_line spl
      JOIN employees e ON e.id = spl.employee_id
      LEFT JOIN employee_bank_detail ebd ON ebd.employee_id = spl.employee_id
      WHERE spl.run_id = ? AND spl.net_salary > 0
      ORDER BY e.employee_code`,
-    [runId]
+    [env.PAYROLL_BANK_KEY, runId]
   );
 
   // Standard Indian bank NEFT format

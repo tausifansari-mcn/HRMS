@@ -148,3 +148,86 @@ export async function querySensitiveActionLog(filters: {
   );
   return rows as RowDataPacket[];
 }
+
+// ── /api/access/me — single source of truth for frontend RBAC ────────────────
+
+export interface AccessMeResponse {
+  userId: string;
+  email: string | undefined;
+  employeeId: string | null;
+  employeeCode: string | null;
+  employeeName: string | null;
+  roles: string[];
+  scopes: Array<{
+    id: string; role_key: string; scope_type: string;
+    branch_id: string | null; process_id: string | null;
+    lob_id: string | null; department_id: string | null;
+    manager_employee_id: string | null;
+  }>;
+  pages: Array<{
+    page_code: string; can_view: boolean; can_create: boolean;
+    can_edit: boolean; can_delete: boolean; can_export: boolean;
+  }>;
+}
+
+export async function getAccessMe(userId: string): Promise<AccessMeResponse> {
+  // 1. Roles from MySQL user_roles
+  const [roleRows] = await db.execute<RowDataPacket[]>(
+    "SELECT role_key FROM user_roles WHERE user_id = ? AND active_status = 1",
+    [userId]
+  );
+  const roles = (roleRows as RowDataPacket[]).map((r: any) => r.role_key as string);
+
+  // 2. Employee record linked to this user
+  const [empRows] = await db.execute<RowDataPacket[]>(
+    "SELECT id, employee_code, full_name FROM employees WHERE user_id = ? AND active_status = 1 LIMIT 1",
+    [userId]
+  );
+  const emp = (empRows as RowDataPacket[])[0] as any ?? null;
+
+  // 3. Assignment scopes
+  const [scopeRows] = await db.execute<RowDataPacket[]>(
+    `SELECT id, role_key, scope_type, branch_id, process_id, lob_id, department_id, manager_employee_id
+     FROM user_assignment_scope WHERE user_id = ? AND active_status = 1`,
+    [userId]
+  );
+  const scopes = scopeRows as any[];
+
+  // 4. Page permissions — union of all role grants (most permissive wins)
+  const allRoleKeys = [...new Set([...roles, ...scopes.map((s: any) => s.role_key)])];
+  let pages: AccessMeResponse["pages"] = [];
+  if (allRoleKeys.length > 0) {
+    const placeholders = allRoleKeys.map(() => "?").join(",");
+    const [pageRows] = await db.execute<RowDataPacket[]>(
+      `SELECT page_code,
+              MAX(can_view)   AS can_view,
+              MAX(can_create) AS can_create,
+              MAX(can_edit)   AS can_edit,
+              MAX(can_delete) AS can_delete,
+              MAX(can_export) AS can_export
+       FROM role_page_access
+       WHERE role_key IN (${placeholders}) AND active_status = 1
+       GROUP BY page_code`,
+      allRoleKeys
+    );
+    pages = (pageRows as RowDataPacket[]).map((r: any) => ({
+      page_code:  r.page_code as string,
+      can_view:   Boolean(r.can_view),
+      can_create: Boolean(r.can_create),
+      can_edit:   Boolean(r.can_edit),
+      can_delete: Boolean(r.can_delete),
+      can_export: Boolean(r.can_export),
+    }));
+  }
+
+  return {
+    userId,
+    email: undefined, // email not stored in MySQL — caller knows it from auth
+    employeeId:   emp?.id ?? null,
+    employeeCode: emp?.employee_code ?? null,
+    employeeName: emp?.full_name ?? null,
+    roles,
+    scopes,
+    pages,
+  };
+}
