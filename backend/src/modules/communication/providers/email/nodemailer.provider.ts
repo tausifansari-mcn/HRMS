@@ -24,6 +24,7 @@ export class NodemailerProvider implements CommunicationProvider {
   }
 
   async getDeliveryStatus(_messageId: string): Promise<DeliveryStatus> {
+    // Nodemailer has no delivery tracking API; status is assumed sent
     return { status: 'sent' };
   }
 
