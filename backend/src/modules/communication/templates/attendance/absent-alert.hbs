@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+  <p>Hi {{employee.name}},</p>
+
+  <p>You were marked <strong style="color: red;">ABSENT</strong> for {{formatDate attendance.date "DD MMM YYYY"}}.</p>
+
+  <p>If this is an error, please contact your manager {{manager.name}} or submit a regularization request.</p>
+
+  <p>Regards,<br>{{company.name}} HR Team</p>
+</body>
+</html>
