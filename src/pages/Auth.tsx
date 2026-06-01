@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import {
   ArrowRight,
+  ChevronDown,
+  ChevronUp,
   Eye,
   EyeOff,
   Loader2,
@@ -11,6 +13,7 @@ import {
   ShieldCheck,
   UserRound,
 } from "lucide-react";
+import { DEMO_CREDENTIALS } from "@/lib/demoCreds";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,6 +61,7 @@ const Auth = () => {
   const [loginPassword, setLoginPassword] = useState("");
 
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showDemoPanel, setShowDemoPanel] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
 
   const [signupName, setSignupName] = useState("");
@@ -417,14 +421,11 @@ const Auth = () => {
                     </div>
                   </div>
 
+                  {/* Demo Role Quick-Login Panel */}
                   <div className="mt-6">
                     <button
                       type="button"
-                      onClick={async () => {
-                        setIsLoading(true);
-                        await signIn("demo@mascallnet.com", "demo123");
-                        setIsLoading(false);
-                      }}
+                      onClick={() => setShowDemoPanel(p => !p)}
                       className="group relative flex w-full items-center justify-between overflow-hidden rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 via-indigo-50/50 to-purple-50 p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:border-sky-400 hover:shadow-lg hover:shadow-sky-100/50"
                     >
                       <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-sky-200/20 blur-xl transition group-hover:scale-150" />
@@ -433,12 +434,40 @@ const Auth = () => {
                           <ShieldCheck className="h-5 w-5" />
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-900 tracking-tight">Explore Demo Portal</p>
-                          <p className="text-[11px] font-medium text-slate-500">Access Admin/HR Command Center instantly</p>
+                          <p className="text-sm font-bold text-slate-900 tracking-tight">Test Credentials by Role</p>
+                          <p className="text-[11px] font-medium text-slate-500">Click any role below to auto-fill &amp; sign in</p>
                         </div>
                       </div>
-                      <ArrowRight className="h-5 w-5 text-sky-600 transition-transform duration-300 group-hover:translate-x-1" />
+                      {showDemoPanel
+                        ? <ChevronUp className="h-4 w-4 text-sky-600" />
+                        : <ChevronDown className="h-4 w-4 text-sky-600" />}
                     </button>
+
+                    {showDemoPanel && (
+                      <div className="mt-2 rounded-2xl border border-slate-100 bg-slate-50 p-3 space-y-1.5">
+                        {DEMO_CREDENTIALS.filter(c => c.email !== "demo@mascallnet.com").map(cred => (
+                          <button
+                            key={cred.email}
+                            type="button"
+                            disabled={isLoading}
+                            onClick={async () => {
+                              setLoginEmail(cred.email);
+                              setLoginPassword(cred.password);
+                              setIsLoading(true);
+                              await signIn(cred.email, cred.password);
+                              setIsLoading(false);
+                            }}
+                            className="flex w-full items-center justify-between rounded-xl border border-transparent bg-white px-3 py-2 text-left text-xs shadow-sm transition hover:border-sky-200 hover:shadow-md disabled:opacity-60"
+                          >
+                            <div>
+                              <span className="font-semibold text-slate-800">{cred.label}</span>
+                              <span className="ml-2 text-slate-400">{cred.email}</span>
+                            </div>
+                            <span className="font-mono text-slate-500">{cred.password}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {showForgotPassword && (

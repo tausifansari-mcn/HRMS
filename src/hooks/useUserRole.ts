@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Database } from "@/integrations/supabase/types";
+import { DEMO_CREDENTIALS } from "@/lib/demoCreds";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -55,32 +56,18 @@ export const useUserRole = () => {
     queryFn: async (): Promise<UserRoleData | null> => {
       if (!user?.id) return null;
 
-      // Local demo mode bypass
-      if (user.id === "demo-user-id") {
-        const allPageCodes = [
-          "ATS_DASHBOARD",
-          "ATS_RECRUITER_QUEUE",
-          "LMS_MY_LEARNING",
-          "LMS_COORDINATOR",
-          "LMS_ADMIN",
-          "LMS_MANAGEMENT_DASHBOARD",
-          "WFM_ROSTER",
-          "WFM_LIVE_TRACKER",
-          "QUALITY_DASHBOARD",
-          "OPERATIONS_DASHBOARD",
-          "WORKFORCE_COMMAND_CENTER",
-          "ACCESS_CONTROL"
-        ];
-        
+      // Local demo mode bypass — per-role
+      const demoCred = DEMO_CREDENTIALS.find(c => c.userId === user.id);
+      if (demoCred) {
         return {
-          roles: ["admin", "hr"],
-          roleKeys: ["admin", "hr", "manager", "employee"],
-          primaryRole: "admin",
-          employeeId: "demo-employee-id",
-          employeeCode: "EMP-DEMO-001",
-          employeeName: "Demo Admin",
+          roles: [demoCred.role as AppRole],
+          roleKeys: [demoCred.role, "employee"],
+          primaryRole: demoCred.role as AppRole,
+          employeeId: demoCred.employeeId,
+          employeeCode: demoCred.employeeCode,
+          employeeName: demoCred.fullName,
           scopes: [],
-          pages: allPageCodes.map(code => ({
+          pages: demoCred.pages.map(code => ({
             page_code: code,
             can_view: true,
             can_create: true,
