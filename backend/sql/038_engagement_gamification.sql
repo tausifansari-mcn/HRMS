@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS gamification_badge_master (
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_badge_name (badge_name),
     INDEX idx_category (badge_category),
     INDEX idx_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -33,8 +34,9 @@ CREATE TABLE IF NOT EXISTS employee_badge_earned (
     reason TEXT COMMENT 'Why badge was awarded',
     awarded_by VARCHAR(36) COMMENT 'Admin/system that awarded',
     metadata_json JSON COMMENT 'Additional context',
-    FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
     FOREIGN KEY (badge_id) REFERENCES gamification_badge_master(badge_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_employee_badge (employee_id, badge_id),
     INDEX idx_employee (employee_id),
     INDEX idx_badge (badge_id),
     INDEX idx_earned_at (earned_at)
@@ -52,7 +54,7 @@ CREATE TABLE IF NOT EXISTS gamification_points_ledger (
     description VARCHAR(255),
     balance_after INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
     INDEX idx_employee (employee_id),
     INDEX idx_type (transaction_type),
     INDEX idx_created (created_at)
@@ -88,7 +90,7 @@ CREATE TABLE IF NOT EXISTS employee_tier_status (
     points_to_next_tier INT,
     tier_achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
     FOREIGN KEY (current_tier_id) REFERENCES gamification_tier_master(tier_id) ON DELETE RESTRICT,
     INDEX idx_employee (employee_id),
     INDEX idx_tier (current_tier_id),
@@ -108,6 +110,7 @@ CREATE TABLE IF NOT EXISTS kudos_master (
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_kudos_title (kudos_title),
     INDEX idx_category (kudos_category),
     INDEX idx_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -124,8 +127,8 @@ CREATE TABLE IF NOT EXISTS kudos_transaction (
     points_awarded INT NOT NULL DEFAULT 10,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_anonymous BOOLEAN DEFAULT FALSE,
-    FOREIGN KEY (sender_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
-    FOREIGN KEY (receiver_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (receiver_id) REFERENCES employees(id) ON DELETE CASCADE,
     FOREIGN KEY (kudos_template_id) REFERENCES kudos_master(kudos_template_id) ON DELETE SET NULL,
     INDEX idx_sender (sender_id),
     INDEX idx_receiver (receiver_id),
@@ -149,6 +152,7 @@ CREATE TABLE IF NOT EXISTS survey_master (
     created_by VARCHAR(36),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_survey_title (survey_title),
     INDEX idx_type (survey_type),
     INDEX idx_active (is_active),
     INDEX idx_dates (start_date, end_date)
@@ -169,6 +173,7 @@ CREATE TABLE IF NOT EXISTS survey_question (
     scale_max INT COMMENT 'For scale questions',
     scale_labels_json JSON COMMENT 'Labels for scale endpoints',
     FOREIGN KEY (survey_id) REFERENCES survey_master(survey_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_survey_question_order (survey_id, question_order),
     INDEX idx_survey (survey_id),
     INDEX idx_order (survey_id, question_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -187,7 +192,8 @@ CREATE TABLE IF NOT EXISTS survey_response (
     submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (survey_id) REFERENCES survey_master(survey_id) ON DELETE CASCADE,
     FOREIGN KEY (question_id) REFERENCES survey_question(question_id) ON DELETE CASCADE,
-    FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE SET NULL,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE SET NULL,
+    UNIQUE KEY uq_survey_employee_question (survey_id, question_id, employee_id),
     INDEX idx_survey (survey_id),
     INDEX idx_question (question_id),
     INDEX idx_employee (employee_id),
@@ -207,7 +213,7 @@ CREATE TABLE IF NOT EXISTS pulse_check (
     feedback_text TEXT,
     submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     week_start_date DATE NOT NULL,
-    FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
     INDEX idx_employee (employee_id),
     INDEX idx_submitted (submitted_at),
     INDEX idx_week (week_start_date),
@@ -220,28 +226,28 @@ CREATE TABLE IF NOT EXISTS pulse_check (
 -- =====================================================
 
 -- Performance Badges
-INSERT INTO gamification_badge_master (badge_id, badge_name, badge_description, badge_icon, badge_category, points_value, criteria_json) VALUES
+INSERT IGNORE INTO gamification_badge_master (badge_id, badge_name, badge_description, badge_icon, badge_category, points_value, criteria_json) VALUES
 (UUID(), 'Top Performer', 'Exceeded KPI targets for 3 consecutive months', '🏆', 'performance', 100, '{"type": "kpi", "threshold": "3_months", "criteria": "exceed_target"}'),
 (UUID(), 'Revenue Champion', 'Generated highest revenue in quarter', '💰', 'performance', 150, '{"type": "revenue", "threshold": "quarterly_top", "criteria": "highest_revenue"}'),
 (UUID(), 'Quality Star', 'Maintained 95%+ quality score for 2 months', '⭐', 'performance', 75, '{"type": "quality", "threshold": "95_percent", "duration": "2_months"}'),
 (UUID(), 'Customer Hero', 'Received 5+ positive customer feedbacks', '🦸', 'performance', 80, '{"type": "feedback", "threshold": "5_positive", "criteria": "customer_satisfaction"}');
 
 -- Activity Badges
-INSERT INTO gamification_badge_master (badge_id, badge_name, badge_description, badge_icon, badge_category, points_value, criteria_json) VALUES
+INSERT IGNORE INTO gamification_badge_master (badge_id, badge_name, badge_description, badge_icon, badge_category, points_value, criteria_json) VALUES
 (UUID(), 'Early Bird', 'Logged in before 9 AM for 20 consecutive days', '🌅', 'activity', 50, '{"type": "attendance", "threshold": "20_days", "criteria": "before_9am"}'),
 (UUID(), 'Perfect Attendance', 'No absences for 3 months', '📅', 'activity', 100, '{"type": "attendance", "threshold": "3_months", "criteria": "zero_absence"}'),
 (UUID(), 'Team Player', 'Sent 20+ kudos to colleagues', '🤝', 'activity', 60, '{"type": "kudos", "threshold": "20_sent", "criteria": "peer_recognition"}'),
 (UUID(), 'Survey Champion', 'Completed 10+ surveys/pulse checks', '📊', 'activity', 40, '{"type": "survey", "threshold": "10_completed", "criteria": "participation"}');
 
 -- Tenure Badges
-INSERT INTO gamification_badge_master (badge_id, badge_name, badge_description, badge_icon, badge_category, points_value, criteria_json) VALUES
+INSERT IGNORE INTO gamification_badge_master (badge_id, badge_name, badge_description, badge_icon, badge_category, points_value, criteria_json) VALUES
 (UUID(), '6 Month Milestone', 'Completed 6 months with the company', '🎯', 'tenure', 50, '{"type": "tenure", "threshold": "6_months", "criteria": "continuous_service"}'),
 (UUID(), '1 Year Anniversary', 'Completed 1 year with the company', '🎂', 'tenure', 100, '{"type": "tenure", "threshold": "12_months", "criteria": "continuous_service"}'),
 (UUID(), '2 Year Veteran', 'Completed 2 years with the company', '🏅', 'tenure', 200, '{"type": "tenure", "threshold": "24_months", "criteria": "continuous_service"}'),
 (UUID(), '5 Year Legend', 'Completed 5 years with the company', '👑', 'tenure', 500, '{"type": "tenure", "threshold": "60_months", "criteria": "continuous_service"}');
 
 -- Social Badges
-INSERT INTO gamification_badge_master (badge_id, badge_name, badge_description, badge_icon, badge_category, points_value, criteria_json) VALUES
+INSERT IGNORE INTO gamification_badge_master (badge_id, badge_name, badge_description, badge_icon, badge_category, points_value, criteria_json) VALUES
 (UUID(), 'Kudos Magnet', 'Received 30+ kudos from peers', '🌟', 'social', 90, '{"type": "kudos", "threshold": "30_received", "criteria": "peer_appreciated"}'),
 (UUID(), 'Mentor', 'Helped onboard 3+ new employees', '🎓', 'social', 120, '{"type": "mentorship", "threshold": "3_mentees", "criteria": "onboarding_support"}'),
 (UUID(), 'Feedback Guru', 'Provided 20+ constructive peer feedbacks', '💬', 'social', 70, '{"type": "feedback", "threshold": "20_given", "criteria": "peer_feedback"}');
@@ -250,7 +256,7 @@ INSERT INTO gamification_badge_master (badge_id, badge_name, badge_description, 
 -- SEED DATA: TIERS
 -- =====================================================
 
-INSERT INTO gamification_tier_master (tier_id, tier_name, tier_level, min_points, max_points, tier_color, tier_icon, benefits_json) VALUES
+INSERT IGNORE INTO gamification_tier_master (tier_id, tier_name, tier_level, min_points, max_points, tier_color, tier_icon, benefits_json) VALUES
 (UUID(), 'Bronze', 1, 0, 499, '#CD7F32', '🥉', '{"perks": ["Basic profile badge", "Access to standard surveys"]}'),
 (UUID(), 'Silver', 2, 500, 1499, '#C0C0C0', '🥈', '{"perks": ["Silver profile badge", "Priority survey feedback", "Monthly recognition"]}'),
 (UUID(), 'Gold', 3, 1500, 2999, '#FFD700', '🥇', '{"perks": ["Gold profile badge", "Quarterly bonus eligibility", "Featured in newsletter"]}'),
@@ -261,7 +267,7 @@ INSERT INTO gamification_tier_master (tier_id, tier_name, tier_level, min_points
 -- SEED DATA: KUDOS TEMPLATES
 -- =====================================================
 
-INSERT INTO kudos_master (kudos_template_id, kudos_title, kudos_message_template, kudos_icon, kudos_category, points_value) VALUES
+INSERT IGNORE INTO kudos_master (kudos_template_id, kudos_title, kudos_message_template, kudos_icon, kudos_category, points_value) VALUES
 (UUID(), 'Great Job!', 'Amazing work on {task}! Your effort really shows.', '👏', 'general', 10),
 (UUID(), 'Team Player', 'Thanks for being such a great team player! Your collaboration makes all the difference.', '🤝', 'teamwork', 15),
 (UUID(), 'Problem Solver', 'Your innovative solution to {problem} was brilliant!', '💡', 'innovation', 20),
@@ -276,12 +282,15 @@ INSERT INTO kudos_master (kudos_template_id, kudos_title, kudos_message_template
 -- =====================================================
 
 -- Survey 1: Monthly Engagement Survey
-SET @survey1_id = UUID();
-INSERT INTO survey_master (survey_id, survey_title, survey_description, survey_type, start_date, end_date, is_anonymous, is_active, points_reward, target_audience_json) VALUES
+SET @survey1_id = COALESCE(
+  (SELECT survey_id FROM survey_master WHERE survey_title = 'Monthly Engagement Survey' LIMIT 1),
+  '00000000-0000-0000-0000-000000000381'
+);
+INSERT IGNORE INTO survey_master (survey_id, survey_title, survey_description, survey_type, start_date, end_date, is_anonymous, is_active, points_reward, target_audience_json) VALUES
 (@survey1_id, 'Monthly Engagement Survey', 'Help us understand your work experience and engagement levels', 'engagement', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), TRUE, TRUE, 25, '{"all_employees": true}');
 
 -- Survey 1 Questions
-INSERT INTO survey_question (question_id, survey_id, question_text, question_type, question_order, is_required, options_json, scale_min, scale_max, scale_labels_json) VALUES
+INSERT IGNORE INTO survey_question (question_id, survey_id, question_text, question_type, question_order, is_required, options_json, scale_min, scale_max, scale_labels_json) VALUES
 (UUID(), @survey1_id, 'How satisfied are you with your current role?', 'scale', 1, TRUE, NULL, 1, 5, '{"1": "Very Dissatisfied", "5": "Very Satisfied"}'),
 (UUID(), @survey1_id, 'Do you feel valued as a team member?', 'rating', 2, TRUE, NULL, 1, 5, '{"1": "Not at all", "5": "Absolutely"}'),
 (UUID(), @survey1_id, 'What do you enjoy most about working here?', 'text', 3, FALSE, NULL, NULL, NULL, NULL),
@@ -289,12 +298,15 @@ INSERT INTO survey_question (question_id, survey_id, question_text, question_typ
 (UUID(), @survey1_id, 'Would you recommend this company to a friend?', 'yes_no', 5, TRUE, '["Yes", "No"]', NULL, NULL, NULL);
 
 -- Survey 2: Team Feedback Survey
-SET @survey2_id = UUID();
-INSERT INTO survey_master (survey_id, survey_title, survey_description, survey_type, start_date, end_date, is_anonymous, is_active, points_reward, target_audience_json) VALUES
+SET @survey2_id = COALESCE(
+  (SELECT survey_id FROM survey_master WHERE survey_title = 'Team Feedback Survey' LIMIT 1),
+  '00000000-0000-0000-0000-000000000382'
+);
+INSERT IGNORE INTO survey_master (survey_id, survey_title, survey_description, survey_type, start_date, end_date, is_anonymous, is_active, points_reward, target_audience_json) VALUES
 (@survey2_id, 'Team Feedback Survey', 'Share your thoughts on team collaboration and communication', 'feedback', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 14 DAY), TRUE, TRUE, 20, '{"all_employees": true}');
 
 -- Survey 2 Questions
-INSERT INTO survey_question (question_id, survey_id, question_text, question_type, question_order, is_required, options_json, scale_min, scale_max, scale_labels_json) VALUES
+INSERT IGNORE INTO survey_question (question_id, survey_id, question_text, question_type, question_order, is_required, options_json, scale_min, scale_max, scale_labels_json) VALUES
 (UUID(), @survey2_id, 'How effective is communication within your team?', 'scale', 1, TRUE, NULL, 1, 5, '{"1": "Very Poor", "5": "Excellent"}'),
 (UUID(), @survey2_id, 'What communication tools do you use most?', 'multiple_choice', 2, TRUE, '["Email", "Slack", "Teams", "Phone", "In-person", "Other"]', NULL, NULL, NULL),
 (UUID(), @survey2_id, 'Does your team hold regular meetings?', 'single_choice', 3, TRUE, '["Daily", "Weekly", "Bi-weekly", "Monthly", "Rarely", "Never"]', NULL, NULL, NULL),
