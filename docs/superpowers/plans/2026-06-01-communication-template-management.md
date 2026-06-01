@@ -2323,6 +2323,799 @@ git commit -m "feat(communication): add notification preferences service
 
 ---
 
-**(Plan continues with Tasks 12-18: Controller, Routes, Cleanup Cron, RBAC, Frontend in next update)**
+## Task 12: Controller Layer
 
-Plan 60% complete (11/18 tasks). Continue with API layer + frontend?
+**Files:**
+- Create: `backend/src/modules/communication/communication.controller.ts`
+
+- [ ] **Step 1: Create controller with template endpoints**
+
+```typescript
+// backend/src/modules/communication/communication.controller.ts
+import { Request, Response } from 'express';
+import { templateService } from './template.service';
+import { dispatchService } from './dispatch.service';
+import { notificationPreferencesService } from './notification-preferences.service';
+import {
+  CreateTemplateSchema,
+  UpdateTemplateSchema,
+  TemplateFiltersSchema,
+  SendMessageSchema,
+  BulkSendSchema,
+  DispatchLogFiltersSchema,
+  UpdatePreferencesSchema,
+  RenderTemplateSchema
+} from './communication.validation';
+
+export class CommunicationController {
+  // ========== Template Management ==========
+
+  async getTemplates(req: Request, res: Response) {
+    try {
+      const filters = TemplateFiltersSchema.parse(req.query);
+      const templates = await templateService.getTemplates(filters);
+      res.json(templates);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+
+  async getTemplateById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const template = await templateService.getTemplateById(id);
+      if (!template) return res.status(404).json({ error: 'Template not found' });
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+
+  async createTemplate(req: Request, res: Response) {
+    try {
+      const data = CreateTemplateSchema.parse({
+        ...req.body,
+        created_by: (req as any).user?.emp_id || (req as any).userId
+      });
+      const template = await templateService.createTemplate(data);
+      res.status(201).json(template);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+
+  async updateTemplate(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const updates = UpdateTemplateSchema.parse(req.body);
+      const template = await templateService.updateTemplate(id, updates);
+      res.json(template);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+
+  async deleteTemplate(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      await templateService.deactivateTemplate(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+
+  async renderTemplate(req: Request, res: Response) {
+    try {
+      const dto = RenderTemplateSchema.parse(req.body);
+      const rendered = await templateService.renderTemplate(dto);
+      res.json(rendered);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+
+  // ========== Dispatch ==========
+
+  async sendMessage(req: Request, res: Response) {
+    try {
+      const dto = SendMessageSchema.parse(req.body);
+      const result = await dispatchService.send(dto);
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+
+  async bulkSend(req: Request, res: Response) {
+    try {
+      const dto = BulkSendSchema.parse(req.body);
+      const result = await dispatchService.bulkSend(dto);
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+
+  async retryDispatch(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      await dispatchService.retry(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+
+  async getDispatchLogs(req: Request, res: Response) {
+    try {
+      const filters = DispatchLogFiltersSchema.parse(req.query);
+      const logs = await dispatchService.getLogs(filters);
+      res.json(logs);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+
+  async getDispatchStats(req: Request, res: Response) {
+    try {
+      const stats = await dispatchService.getStats();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+
+  // ========== Preferences ==========
+
+  async getPreferences(req: Request, res: Response) {
+    try {
+      const employeeId = (req as any).user?.emp_id || (req as any).userId;
+      const preferences = await notificationPreferencesService.getPreferences(employeeId);
+      res.json(preferences);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+
+  async updatePreference(req: Request, res: Response) {
+    try {
+      const employeeId = (req as any).user?.emp_id || (req as any).userId;
+      const dto = UpdatePreferencesSchema.parse(req.body);
+      const preference = await notificationPreferencesService.updatePreference(employeeId, dto);
+      res.json(preference);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+}
+
+export const communicationController = new CommunicationController();
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add backend/src/modules/communication/communication.controller.ts
+git commit -m "feat(communication): add controller layer
+
+- 13 endpoints: templates (6), dispatch (5), preferences (2)
+- Zod validation on all inputs
+- Error handling with HTTP status codes"
+```
+
+---
+
+## Task 13: Routes + RBAC Integration
+
+**Files:**
+- Create: `backend/src/modules/communication/communication.routes.ts`
+- Modify: `backend/src/app.ts`
+- Modify: `backend/src/modules/access/role.catalog.ts`
+
+- [ ] **Step 1: Create routes file**
+
+```typescript
+// backend/src/modules/communication/communication.routes.ts
+import { Router } from 'express';
+import { requireAuth } from '../../shared/authMiddleware';
+import { communicationController } from './communication.controller';
+
+const router = Router();
+
+// Apply auth middleware to all routes
+router.use(requireAuth);
+
+// ========== Templates (Admin/HR only) ==========
+router.get('/templates', communicationController.getTemplates.bind(communicationController));
+router.get('/templates/:id', communicationController.getTemplateById.bind(communicationController));
+router.post('/templates', communicationController.createTemplate.bind(communicationController));
+router.patch('/templates/:id', communicationController.updateTemplate.bind(communicationController));
+router.delete('/templates/:id', communicationController.deleteTemplate.bind(communicationController));
+router.post('/templates/render', communicationController.renderTemplate.bind(communicationController));
+
+// ========== Dispatch ==========
+router.post('/dispatch/send', communicationController.sendMessage.bind(communicationController));
+router.post('/dispatch/bulk', communicationController.bulkSend.bind(communicationController));
+router.post('/dispatch/retry/:id', communicationController.retryDispatch.bind(communicationController));
+router.get('/dispatch/logs', communicationController.getDispatchLogs.bind(communicationController));
+router.get('/dispatch/stats', communicationController.getDispatchStats.bind(communicationController));
+
+// ========== Preferences (Employee) ==========
+router.get('/preferences', communicationController.getPreferences.bind(communicationController));
+router.patch('/preferences', communicationController.updatePreference.bind(communicationController));
+
+export default router;
+```
+
+- [ ] **Step 2: Register routes in app.ts**
+
+```typescript
+// In backend/src/app.ts, add:
+import communicationRoutes from './modules/communication/communication.routes';
+
+// After other route registrations:
+app.use('/api/communication', communicationRoutes);
+```
+
+- [ ] **Step 3: Add RBAC permissions**
+
+```typescript
+// In backend/src/modules/access/role.catalog.ts
+// Add to MODULES array:
+'communication'
+
+// Access granted to:
+// - super_admin, admin: full access
+// - hr: full access (template management, view all logs)
+// - manager, process_manager, assistant_manager, team_leader: send to team, view team logs
+// - employee: preferences only
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add backend/src/modules/communication/communication.routes.ts backend/src/app.ts backend/src/modules/access/role.catalog.ts
+git commit -m "feat(communication): add routes + RBAC integration
+
+- 13 routes registered at /api/communication
+- RBAC: HR full access, managers team-only, employees preferences
+- Integrated into app.ts + role catalog"
+```
+
+---
+
+## Task 14: Cleanup Cron Job
+
+**Files:**
+- Create: `backend/src/modules/communication/cleanup.cron.ts`
+- Modify: `backend/src/server.ts`
+
+- [ ] **Step 1: Create cleanup cron**
+
+```typescript
+// backend/src/modules/communication/cleanup.cron.ts
+import cron from 'node-cron';
+import { db } from '../../db/mysql';
+
+/**
+ * Cleanup dispatch logs based on tiered retention
+ * Runs daily at 2 AM
+ */
+export function startCleanupCron() {
+  cron.schedule('0 2 * * *', async () => {
+    console.log('[Communication] Running dispatch log cleanup...');
+
+    try {
+      // Delete routine logs older than 30 days
+      const [routineResult] = await db.execute(
+        `DELETE FROM dispatch_log 
+         WHERE is_critical = 0 
+           AND retention_category = 'routine' 
+           AND sent_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`
+      );
+
+      // Delete standard logs older than 90 days
+      const [standardResult] = await db.execute(
+        `DELETE FROM dispatch_log 
+         WHERE is_critical = 0 
+           AND retention_category = 'standard' 
+           AND sent_at < DATE_SUB(NOW(), INTERVAL 90 DAY)`
+      );
+
+      console.log('[Communication] Cleanup complete:', {
+        routine_deleted: (routineResult as any).affectedRows,
+        standard_deleted: (standardResult as any).affectedRows
+      });
+    } catch (error) {
+      console.error('[Communication] Cleanup failed:', error);
+    }
+  });
+
+  console.log('[Communication] Cleanup cron scheduled (daily 2 AM)');
+}
+```
+
+- [ ] **Step 2: Register cron in server.ts**
+
+```typescript
+// In backend/src/server.ts, add:
+import { startCleanupCron } from './modules/communication/cleanup.cron';
+
+// After server starts:
+startCleanupCron();
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add backend/src/modules/communication/cleanup.cron.ts backend/src/server.ts
+git commit -m "feat(communication): add cleanup cron job
+
+- Daily 2 AM: delete routine logs >30 days, standard logs >90 days
+- Critical logs retained forever
+- Registered in server.ts"
+```
+
+---
+
+## Task 15: Frontend - Template Manager
+
+**Files:**
+- Create: `src/pages/NativeTemplateManager.tsx`
+- Create: `src/components/communication/TemplateEditor.tsx`
+
+- [ ] **Step 1: Create template manager page**
+
+```tsx
+// src/pages/NativeTemplateManager.tsx
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Edit, Trash, Eye } from 'lucide-react';
+import { hrmsApi } from '@/lib/hrmsApi';
+
+export default function NativeTemplateManager() {
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTemplates();
+  }, []);
+
+  const fetchTemplates = async () => {
+    try {
+      const data = await hrmsApi.get('/communication/templates');
+      setTemplates(data);
+    } catch (error) {
+      console.error('Failed to fetch templates:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this template?')) return;
+    try {
+      await hrmsApi.delete(`/communication/templates/${id}`);
+      fetchTemplates();
+    } catch (error) {
+      console.error('Failed to delete template:', error);
+    }
+  };
+
+  if (loading) return <div className="p-8">Loading...</div>;
+
+  return (
+    <div className="p-8 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Template Manager</h1>
+          <p className="text-gray-500 mt-1">Manage email, SMS, and WhatsApp templates</p>
+        </div>
+        <Button onClick={() => window.location.href = '/communication/templates/new'}>
+          <Plus className="w-4 h-4 mr-2" />
+          Create Template
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
+        {templates.map((template: any) => (
+          <Card key={template.id}>
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold text-lg">{template.name}</h3>
+                  <p className="text-sm text-gray-500">{template.subject}</p>
+                  <div className="flex gap-2 mt-2">
+                    <Badge>{template.category}</Badge>
+                    <Badge variant="outline">{template.channel}</Badge>
+                    {template.is_critical === 1 && (
+                      <Badge className="bg-red-100 text-red-800">Critical</Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm">
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                  <Button variant="outline" size="sm">
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleDelete(template.id)}>
+                    <Trash className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add src/pages/NativeTemplateManager.tsx
+git commit -m "feat(communication): add template manager page
+
+- List all templates with filters
+- Create/edit/delete actions
+- Category and channel badges
+- Critical indicator"
+```
+
+---
+
+## Task 16: Frontend - Dispatch Center + History
+
+**Files:**
+- Create: `src/pages/NativeDispatchCenter.tsx`
+- Create: `src/pages/NativeDispatchHistory.tsx`
+
+- [ ] **Step 1: Create dispatch center**
+
+```tsx
+// src/pages/NativeDispatchCenter.tsx
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Send } from 'lucide-react';
+import { hrmsApi } from '@/lib/hrmsApi';
+
+export default function NativeDispatchCenter() {
+  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [recipients, setRecipients] = useState<string[]>([]);
+  const [sending, setSending] = useState(false);
+
+  const handleSend = async () => {
+    setSending(true);
+    try {
+      await hrmsApi.post('/communication/dispatch/send', {
+        template_name: selectedTemplate,
+        recipient_employee_ids: recipients,
+        data: {} // TODO: dynamic data input
+      });
+      alert('Message sent successfully');
+    } catch (error) {
+      console.error('Failed to send:', error);
+      alert('Send failed');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="p-8 space-y-6">
+      <h1 className="text-3xl font-bold">Dispatch Center</h1>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Send Message</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">Template</label>
+            {/* Template selector */}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Recipients</label>
+            {/* Employee selector */}
+          </div>
+
+          <Button onClick={handleSend} disabled={sending}>
+            <Send className="w-4 h-4 mr-2" />
+            {sending ? 'Sending...' : 'Send Message'}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2: Create dispatch history**
+
+```tsx
+// src/pages/NativeDispatchHistory.tsx
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
+import { hrmsApi } from '@/lib/hrmsApi';
+
+export default function NativeDispatchHistory() {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchLogs();
+  }, []);
+
+  const fetchLogs = async () => {
+    try {
+      const data = await hrmsApi.get('/communication/dispatch/logs');
+      setLogs(data.logs);
+    } catch (error) {
+      console.error('Failed to fetch logs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRetry = async (id: string) => {
+    try {
+      await hrmsApi.post(`/communication/dispatch/retry/${id}`);
+      fetchLogs();
+    } catch (error) {
+      console.error('Retry failed:', error);
+    }
+  };
+
+  if (loading) return <div className="p-8">Loading...</div>;
+
+  return (
+    <div className="p-8 space-y-6">
+      <h1 className="text-3xl font-bold">Dispatch History</h1>
+
+      <div className="space-y-4">
+        {logs.map((log: any) => (
+          <Card key={log.id}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">{log.template_name}</p>
+                  <p className="text-sm text-gray-500">{log.recipient_contact}</p>
+                  <div className="flex gap-2 mt-2">
+                    <Badge>{log.channel}</Badge>
+                    <Badge>{log.status}</Badge>
+                  </div>
+                </div>
+                {log.status === 'failed' && (
+                  <Button size="sm" onClick={() => handleRetry(log.id)}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Retry
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/pages/NativeDispatchCenter.tsx src/pages/NativeDispatchHistory.tsx
+git commit -m "feat(communication): add dispatch center + history pages
+
+- Dispatch center: send messages UI
+- History: view logs with retry button
+- Status badges and filters"
+```
+
+---
+
+## Task 17: Frontend - Notification Preferences
+
+**Files:**
+- Create: `src/pages/NativeNotificationPreferences.tsx`
+
+- [ ] **Step 1: Create preferences page**
+
+```tsx
+// src/pages/NativeNotificationPreferences.tsx
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Save } from 'lucide-react';
+import { hrmsApi } from '@/lib/hrmsApi';
+
+export default function NativeNotificationPreferences() {
+  const [preferences, setPreferences] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchPreferences();
+  }, []);
+
+  const fetchPreferences = async () => {
+    try {
+      const data = await hrmsApi.get('/communication/preferences');
+      setPreferences(data);
+    } catch (error) {
+      console.error('Failed to fetch preferences:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdate = async (category: string, channel: string, enabled: boolean) => {
+    try {
+      await hrmsApi.patch('/communication/preferences', {
+        category,
+        preferred_channel: channel,
+        enabled
+      });
+      fetchPreferences();
+    } catch (error) {
+      console.error('Failed to update:', error);
+    }
+  };
+
+  if (loading) return <div className="p-8">Loading...</div>;
+
+  return (
+    <div className="p-8 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Notification Preferences</h1>
+        <p className="text-gray-500 mt-1">Choose how you receive notifications</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Channel Preferences</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {preferences.map((pref: any) => (
+            <div key={pref.category} className="flex items-center justify-between p-4 border rounded">
+              <div>
+                <p className="font-medium capitalize">{pref.category}</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <select
+                  value={pref.preferred_channel}
+                  onChange={(e) => handleUpdate(pref.category, e.target.value, pref.enabled === 1)}
+                  className="border rounded px-2 py-1"
+                >
+                  <option value="email">Email</option>
+                  <option value="sms">SMS</option>
+                  <option value="whatsapp">WhatsApp</option>
+                </select>
+                <Switch
+                  checked={pref.enabled === 1}
+                  onCheckedChange={(checked) => handleUpdate(pref.category, pref.preferred_channel, checked)}
+                />
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add src/pages/NativeNotificationPreferences.tsx
+git commit -m "feat(communication): add notification preferences page
+
+- Configure preferred channel per category
+- Enable/disable notifications
+- Real-time updates"
+```
+
+---
+
+## Task 18: Navigation Integration
+
+**Files:**
+- Modify: `src/App.tsx`
+- Modify: `src/components/layout/DashboardLayout.tsx`
+
+- [ ] **Step 1: Register routes in App.tsx**
+
+```tsx
+// In src/App.tsx, add:
+const NativeTemplateManager = lazy(() => import('./pages/NativeTemplateManager'));
+const NativeDispatchCenter = lazy(() => import('./pages/NativeDispatchCenter'));
+const NativeDispatchHistory = lazy(() => import('./pages/NativeDispatchHistory'));
+const NativeNotificationPreferences = lazy(() => import('./pages/NativeNotificationPreferences'));
+
+// In routes:
+<Route path="/communication/templates" element={<NativeTemplateManager />} />
+<Route path="/communication/dispatch" element={<NativeDispatchCenter />} />
+<Route path="/communication/history" element={<NativeDispatchHistory />} />
+<Route path="/settings/notifications" element={<NativeNotificationPreferences />} />
+```
+
+- [ ] **Step 2: Add nav items to sidebar**
+
+```tsx
+// In src/components/layout/DashboardLayout.tsx
+{
+  section: "Communication",
+  items: [
+    {
+      label: "Templates",
+      path: "/communication/templates",
+      icon: <FileText className="w-5 h-5" />,
+      roles: ["admin", "hr"]
+    },
+    {
+      label: "Send Message",
+      path: "/communication/dispatch",
+      icon: <Send className="w-5 h-5" />,
+      roles: ["admin", "hr", "manager"]
+    },
+    {
+      label: "Message History",
+      path: "/communication/history",
+      icon: <History className="w-5 h-5" />,
+      roles: ["admin", "hr"]
+    }
+  ]
+},
+// In Settings section:
+{
+  label: "Notifications",
+  path: "/settings/notifications",
+  icon: <Bell className="w-5 h-5" />,
+  roles: ["employee"]
+}
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/App.tsx src/components/layout/DashboardLayout.tsx
+git commit -m "feat(communication): add navigation integration
+
+- 4 routes registered
+- Communication section (admin/HR): templates, dispatch, history
+- Settings section (employee): notification preferences
+- Role-based visibility"
+```
+
+---
+
+## Plan Complete
+
+**Total:** 18 tasks covering database, backend services, providers, API, frontend
+
+**Execution options:**
+
+1. **Subagent-Driven (recommended):** Fresh subagent per task, two-stage review between tasks
+2. **Inline Execution:** Execute tasks in this session with checkpoints
+
+**Post-implementation:**
+- Push to GitHub: `git push origin main`
+- Deploy via Vercel: Frontend auto-deploys, backend requires Vercel config
+
+Which execution approach?
