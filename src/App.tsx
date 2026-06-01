@@ -107,6 +107,7 @@ const NativeAdvancedReports         = lazy(() => import("./pages/NativeAdvancedR
 const NativeStatutoryCompliance     = lazy(() => import("./pages/NativeStatutoryCompliance"));
 const NativeLabourCompliance        = lazy(() => import("./pages/NativeLabourCompliance"));
 const NativeDPDPCompliance          = lazy(() => import("./pages/NativeDPDPCompliance"));
+const NativeMaternityLeave          = lazy(() => import("./pages/NativeMaternityLeave"));
 const NativeIntegrationHub          = lazy(() => import("./pages/NativeIntegrationHub"));
 const NativeClientMaster            = lazy(() => import("./pages/NativeClientMaster"));
 const NativeLocationPolicyMasters   = lazy(() => import("./pages/NativeLocationPolicyMasters"));
@@ -254,6 +255,7 @@ const App = () => (
               <Route path="/assets-manager" element={<ProtectedRoute><Gate pageCode="ASSETS_MANAGER"><NativeAssetsManager /></Gate></ProtectedRoute>} />
               <Route path="/helpdesk" element={<ProtectedRoute><Gate pageCode="HELPDESK"><NativeHelpdesk /></Gate></ProtectedRoute>} />
               <Route path="/letters" element={<ProtectedRoute><Gate pageCode="LETTERS"><NativeLetters /></Gate></ProtectedRoute>} />
+              <Route path="/maternity-leave" element={<ProtectedRoute><NativeMaternityLeave /></ProtectedRoute>} />
               <Route path="/employee-lifecycle" element={<ProtectedRoute><Gate pageCode="EMPLOYEE_LIFECYCLE"><NativeLifecycle /></Gate></ProtectedRoute>} />
               <Route path="/employee-lifecycle-v2" element={<ProtectedRoute><Gate pageCode="EMPLOYEE_LIFECYCLE"><NativeEmployeeLifecycle /></Gate></ProtectedRoute>} />
               <Route path="/org-masters" element={<ProtectedRoute><Gate pageCode="ORG_MASTERS"><NativeOrgMasters /></Gate></ProtectedRoute>} />
