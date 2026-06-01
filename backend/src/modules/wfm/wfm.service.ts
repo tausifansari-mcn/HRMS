@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
 import { queueAutoAwards } from "../engagement/badge.service.js";
+import { getEffectiveConfig } from "../customization/customization-engine.js";
 import type {
   AttendanceRegularization,
   PaginatedResult,
@@ -20,7 +21,28 @@ import type {
   UpdateShiftInput,
 } from "./wfm.validation.js";
 
+// Default attendance policy
+const DEFAULT_ATTENDANCE_POLICY = {
+  grace_period_minutes: 0,
+  late_deduction_threshold: 0,
+  allow_self_regularization: false,
+  auto_approve_threshold_minutes: 0,
+  overtime_multiplier: 1.5,
+};
+
 export const wfmService = {
+  // ─── Attendance Policy ─────────────────────────────────────────────────────
+
+  async getAttendancePolicy(employeeId: string): Promise<typeof DEFAULT_ATTENDANCE_POLICY> {
+    try {
+      const result = await getEffectiveConfig(employeeId, 'attendance_policy', null, DEFAULT_ATTENDANCE_POLICY);
+      return result.config;
+    } catch (err) {
+      console.warn('Customization error for attendance policy:', err);
+      return DEFAULT_ATTENDANCE_POLICY;
+    }
+  },
+
   // ─── Shifts ────────────────────────────────────────────────────────────────
 
   async listShifts(filters?: ShiftListFilters): Promise<WfmShift[]> {

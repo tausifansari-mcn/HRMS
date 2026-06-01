@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireAuth } from "../../middleware/authMiddleware.js";
 import { wfmController } from "./wfm.controller.js";
+import { wfmService } from "./wfm.service.js";
 import { getLiveTracker } from "./liveTracker.service.js";
 
 export const wfmRouter = Router();
@@ -9,6 +10,16 @@ wfmRouter.use(requireAuth);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
+
+// Attendance policy (customizable)
+wfmRouter.get("/attendance-policy/:employeeId", async (req, res, next) => {
+  try {
+    const policy = await wfmService.getAttendancePolicy(req.params.employeeId);
+    res.json(policy);
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Shifts
 wfmRouter.get("/shifts",          h(wfmController.listShifts.bind(wfmController)));

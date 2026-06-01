@@ -272,15 +272,28 @@ export const customizationService = {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function parseRuleRow(row: any): CustomizationRule {
+  // Helper to parse JSON fields (handles string, Buffer, or already-parsed objects)
+  const parseJsonField = (field: any) => {
+    if (!field) return undefined;
+    if (typeof field === 'object' && !Buffer.isBuffer(field)) return field; // Already parsed
+    const str = Buffer.isBuffer(field) ? field.toString('utf8') : field;
+    try {
+      return JSON.parse(str);
+    } catch (err) {
+      console.warn('JSON parse error:', err, 'Field:', str);
+      return undefined;
+    }
+  };
+
   return {
     ...row,
-    branch_ids: row.branch_ids ? JSON.parse(row.branch_ids) : undefined,
-    process_ids: row.process_ids ? JSON.parse(row.process_ids) : undefined,
-    department_ids: row.department_ids ? JSON.parse(row.department_ids) : undefined,
-    designation_ids: row.designation_ids ? JSON.parse(row.designation_ids) : undefined,
-    role_ids: row.role_ids ? JSON.parse(row.role_ids) : undefined,
-    employee_ids: row.employee_ids ? JSON.parse(row.employee_ids) : undefined,
-    config_data: row.config_data ? JSON.parse(row.config_data) : {},
+    branch_ids: parseJsonField(row.branch_ids),
+    process_ids: parseJsonField(row.process_ids),
+    department_ids: parseJsonField(row.department_ids),
+    designation_ids: parseJsonField(row.designation_ids),
+    role_ids: parseJsonField(row.role_ids),
+    employee_ids: parseJsonField(row.employee_ids),
+    config_data: parseJsonField(row.config_data) || {},
   };
 }
 

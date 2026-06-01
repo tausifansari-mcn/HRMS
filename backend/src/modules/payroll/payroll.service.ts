@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
+import { getEffectiveConfig } from "../customization/customization-engine.js";
 import type {
   BulkAssignInput,
   BulkAssignResult,
@@ -102,11 +103,27 @@ export const payrollService = {
 
   // ─── Components ────────────────────────────────────────────────────────────
 
-  async listComponents(): Promise<SalaryComponent[]> {
+  async listComponents(employeeId?: string): Promise<SalaryComponent[]> {
     const [rows] = await db.execute<RowDataPacket[]>(
       "SELECT * FROM salary_component_master WHERE active_status = 1 ORDER BY component_name ASC"
     );
-    return rows as SalaryComponent[];
+    let components = rows as SalaryComponent[];
+
+    // Apply customizations if employeeId provided
+    if (employeeId) {
+      try {
+        const result = await getEffectiveConfig(employeeId, 'salary_component', null, { components });
+        if (result.config.additional_components) {
+          components = [...components, ...result.config.additional_components];
+        } else if (result.config.components) {
+          components = result.config.components;
+        }
+      } catch (err) {
+        console.warn('Customization error for salary components:', err);
+      }
+    }
+
+    return components;
   },
 
   async createComponent(input: CreateComponentInput, _userId: string): Promise<SalaryComponent> {

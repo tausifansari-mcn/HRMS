@@ -211,15 +211,23 @@ export async function getEffectiveConfig(
  * Get employee context for customization
  */
 async function getEmployeeContext(employeeId: string): Promise<CustomizationContext> {
-  const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT branch_id, process_id, department_id, designation_id, role_id
+  // Get employee data
+  const [empRows] = await db.execute<RowDataPacket[]>(
+    `SELECT branch_id, process_id, designation_id, department_id
      FROM employees
      WHERE id = ? LIMIT 1`,
     [employeeId]
   );
 
-  const emp = (rows as any[])[0];
+  const emp = (empRows as any[])[0];
   if (!emp) throw new Error('Employee not found');
+
+  // Get role from user_roles (many-to-many, take first active role)
+  const [roleRows] = await db.execute<RowDataPacket[]>(
+    `SELECT role_key FROM user_roles WHERE user_id = ? AND active_status = 1 LIMIT 1`,
+    [employeeId]
+  );
+  const role = (roleRows as any[])[0];
 
   return {
     employeeId,
@@ -227,7 +235,7 @@ async function getEmployeeContext(employeeId: string): Promise<CustomizationCont
     processId: emp.process_id,
     departmentId: emp.department_id,
     designationId: emp.designation_id,
-    roleId: emp.role_id,
+    roleId: role?.role_key, // May be undefined if no role
   };
 }
 

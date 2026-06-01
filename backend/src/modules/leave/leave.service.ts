@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
+import { getEffectiveConfig } from "../customization/customization-engine.js";
 import type {
   LeaveBalanceLedger,
   LeaveHoliday,
@@ -17,11 +18,26 @@ import type {
 } from "./leave.validation.js";
 
 export const leaveService = {
-  async listLeaveTypes(): Promise<LeaveType[]> {
+  async listLeaveTypes(employeeId?: string): Promise<LeaveType[]> {
     const [rows] = await db.execute<RowDataPacket[]>(
       "SELECT * FROM leave_type_master WHERE active_status = 1 ORDER BY leave_name ASC"
     );
-    return rows as LeaveType[];
+    const types = rows as LeaveType[];
+
+    // Apply customizations if employeeId provided
+    if (employeeId) {
+      for (const type of types) {
+        try {
+          const result = await getEffectiveConfig(employeeId, 'leave_type', type.id, type);
+          Object.assign(type, result.config);
+        } catch (err) {
+          // Skip customization on error
+          console.warn(`Customization error for leave type ${type.id}:`, err);
+        }
+      }
+    }
+
+    return types;
   },
 
   async createLeaveType(input: CreateLeaveTypeInput): Promise<LeaveType> {
