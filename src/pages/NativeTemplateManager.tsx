@@ -110,7 +110,22 @@ export default function NativeTemplateManager() {
   };
 
   useEffect(() => {
-    void loadTemplates();
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await hrmsApi.get<{ success: boolean; data: Template[] }>("/api/communication/templates");
+        if (!cancelled) setTemplates(res.data ?? []);
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setMessage(err instanceof Error ? err.message : "Failed to load templates");
+          setMessageType("error");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // ── Actions ──────────────────────────────────────────────────────────────────

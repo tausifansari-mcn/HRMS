@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,
+  CheckCircle2,
   History,
   Loader,
   RefreshCcw,
@@ -75,7 +76,22 @@ export default function NativeDispatchHistory() {
   };
 
   useEffect(() => {
-    void loadLogs();
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await hrmsApi.get<{ success: boolean; data: DispatchLog[] }>("/api/communication/dispatch/logs");
+        if (!cancelled) setLogs(res.data ?? []);
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setMessage(err instanceof Error ? err.message : "Failed to load dispatch logs");
+          setMessageType("error");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // ── Actions ──────────────────────────────────────────────────────────────────
@@ -127,7 +143,9 @@ export default function NativeDispatchHistory() {
             messageType === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" :
                                         "border-blue-200 bg-blue-50 text-blue-800"
           }`}>
-            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            {messageType === "success"
+              ? <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+              : <AlertTriangle className="h-4 w-4 flex-shrink-0" />}
             {message}
           </div>
         )}

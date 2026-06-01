@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,
+  CheckCircle2,
   Loader,
   RefreshCcw,
   Send,
@@ -95,8 +96,30 @@ export default function NativeDispatchCenter() {
   };
 
   useEffect(() => {
-    void loadTemplates();
-    void loadStats();
+    let cancelled = false;
+    (async () => {
+      setTemplatesLoading(true);
+      try {
+        const res = await hrmsApi.get<{ success: boolean; data: Template[] }>("/api/communication/templates");
+        if (!cancelled) setTemplates((res.data ?? []).filter((t) => t.is_active));
+      } catch {
+        // silently ignore — page still usable
+      } finally {
+        if (!cancelled) setTemplatesLoading(false);
+      }
+    })();
+    (async () => {
+      setStatsLoading(true);
+      try {
+        const res = await hrmsApi.get<{ success: boolean; data: DispatchStats }>("/api/communication/dispatch/stats");
+        if (!cancelled) setStats(res.data);
+      } catch {
+        // stats are optional — don't block on failure
+      } finally {
+        if (!cancelled) setStatsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   // ── Actions ──────────────────────────────────────────────────────────────────
@@ -190,7 +213,9 @@ export default function NativeDispatchCenter() {
             messageType === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" :
                                         "border-blue-200 bg-blue-50 text-blue-800"
           }`}>
-            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            {messageType === "success"
+              ? <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+              : <AlertTriangle className="h-4 w-4 flex-shrink-0" />}
             {message}
           </div>
         )}
