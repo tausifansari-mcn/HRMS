@@ -1,14 +1,30 @@
 import { randomUUID } from "crypto";
 import type { RowDataPacket, ResultSetHeader } from "mysql2";
 import { db } from "../../db/mysql.js";
+import { getEffectiveConfig } from "../customization/customization-engine.js";
 
 // ── Generic list/get helpers ──────────────────────────────────────────────────
 
-async function listActive(table: string, orderCol = "created_at"): Promise<RowDataPacket[]> {
+async function listActive(table: string, orderCol = "created_at", entityType?: string, employeeId?: string): Promise<RowDataPacket[]> {
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT * FROM ${table} WHERE active_status = 1 ORDER BY ${orderCol}`
   );
-  return rows as RowDataPacket[];
+  let items = rows as RowDataPacket[];
+
+  // Apply customization if entityType + employeeId provided
+  if (entityType && employeeId) {
+    for (const item of items) {
+      try {
+        const result = await getEffectiveConfig(employeeId, entityType, item.id, item);
+        Object.assign(item, result.config);
+      } catch (err) {
+        // Skip customization on error
+        console.warn(`Customization error for ${entityType} ${item.id}:`, err);
+      }
+    }
+  }
+
+  return items;
 }
 
 async function getById(table: string, id: string): Promise<RowDataPacket | null> {
@@ -26,7 +42,7 @@ async function softDelete(table: string, id: string): Promise<void> {
 // ── Branch ────────────────────────────────────────────────────────────────────
 
 export const branchService = {
-  list: () => listActive("branch_master", "branch_name"),
+  list: (employeeId?: string) => listActive("branch_master", "branch_name", "branch", employeeId),
   getById: (id: string) => getById("branch_master", id),
   async create(data: { branch_code: string; branch_name: string; city?: string; state?: string }) {
     const id = randomUUID();
@@ -49,7 +65,7 @@ export const branchService = {
 // ── Department ────────────────────────────────────────────────────────────────
 
 export const departmentService = {
-  list: () => listActive("department_master", "dept_name"),
+  list: (employeeId?: string) => listActive("department_master", "dept_name", "department", employeeId),
   getById: (id: string) => getById("department_master", id),
   async create(data: { dept_code: string; dept_name: string; branch_id?: string }) {
     const id = randomUUID();
@@ -72,7 +88,7 @@ export const departmentService = {
 // ── LOB ───────────────────────────────────────────────────────────────────────
 
 export const lobService = {
-  list: () => listActive("lob_master", "lob_name"),
+  list: (employeeId?: string) => listActive("lob_master", "lob_name", "lob", employeeId),
   getById: (id: string) => getById("lob_master", id),
   async create(data: { lob_code: string; lob_name: string }) {
     const id = randomUUID();
@@ -95,7 +111,7 @@ export const lobService = {
 // ── Designation ───────────────────────────────────────────────────────────────
 
 export const designationService = {
-  list: () => listActive("designation_master", "designation_name"),
+  list: (employeeId?: string) => listActive("designation_master", "designation_name", "designation", employeeId, "designation_name"),
   getById: (id: string) => getById("designation_master", id),
   async create(data: { designation_code: string; designation_name: string; grade?: string; grade_id?: string }) {
     const id = randomUUID();
@@ -118,7 +134,7 @@ export const designationService = {
 // ── Campaign ─────────────────────────────────────────────────────────────────
 
 export const campaignService = {
-  list: () => listActive("campaign_master", "campaign_name"),
+  list: (employeeId?: string) => listActive("campaign_master", "campaign_name", "campaign", employeeId, "campaign_name"),
   getById: (id: string) => getById("campaign_master", id),
   async create(data: { campaign_code: string; campaign_name: string; process_id?: string; lob_id?: string }) {
     const id = randomUUID();
@@ -141,7 +157,7 @@ export const campaignService = {
 // ── Cost Centre ───────────────────────────────────────────────────────────────
 
 export const costCentreService = {
-  list: () => listActive("cost_centre_master", "cost_centre_name"),
+  list: (employeeId?: string) => listActive("cost_centre_master", "cost_centre_code", "cost_centre", employeeId, "cost_centre_name"),
   getById: (id: string) => getById("cost_centre_master", id),
   async create(data: { cost_centre_code: string; cost_centre_name: string; branch_id?: string; department_id?: string }) {
     const id = randomUUID();
@@ -164,7 +180,7 @@ export const costCentreService = {
 // ── Grade / Band ──────────────────────────────────────────────────────────────
 
 export const gradeBandService = {
-  list: () => listActive("grade_band_master", "grade_code"),
+  list: (employeeId?: string) => listActive("grade_band_master", "grade_band_name", "grade_band", employeeId, "grade_code"),
   getById: (id: string) => getById("grade_band_master", id),
   async create(data: { grade_code: string; grade_name: string; band?: string; min_ctc?: number; max_ctc?: number }) {
     const id = randomUUID();
@@ -187,7 +203,7 @@ export const gradeBandService = {
 // ── Location ──────────────────────────────────────────────────────────────────
 
 export const locationService = {
-  list: () => listActive("location_master", "location_name"),
+  list: (employeeId?: string) => listActive("location_master", "location_name", "location", employeeId, "location_name"),
   getById: (id: string) => getById("location_master", id),
   async create(data: Record<string, unknown>) {
     const id = randomUUID();
@@ -210,7 +226,7 @@ export const locationService = {
 // ── Policy ────────────────────────────────────────────────────────────────────
 
 export const policyService = {
-  list: () => listActive("policy_master", "policy_name"),
+  list: (employeeId?: string) => listActive("policy_master", "policy_name", "policy", employeeId, "policy_name"),
   getById: (id: string) => getById("policy_master", id),
   async create(data: Record<string, unknown>) {
     const id = randomUUID();
