@@ -117,6 +117,11 @@ const NativeTaxDeclaration          = lazy(() => import("./pages/NativeTaxDeclar
 const NativeFullFinal               = lazy(() => import("./pages/NativeFullFinal"));
 const NativeStatutoryConfig         = lazy(() => import("./pages/NativeStatutoryConfig"));
 
+// Communication
+const NativeTemplateManager         = lazy(() => import("./pages/NativeTemplateManager"));
+const NativeDispatchCenter          = lazy(() => import("./pages/NativeDispatchCenter"));
+const NativeDispatchHistory         = lazy(() => import("./pages/NativeDispatchHistory"));
+
 // System
 const NativeMigrationConsole        = lazy(() => import("./pages/NativeMigrationConsole"));
 const NativeExitManagement          = lazy(() => import("./pages/NativeExitManagement"));
@@ -275,6 +280,11 @@ const App = () => (
               <Route path="/payroll/tax-declaration" element={<ProtectedRoute><Gate pageCode="TAX_DECLARATION"><NativeTaxDeclaration /></Gate></ProtectedRoute>} />
               <Route path="/payroll/full-final" element={<ProtectedRoute><Gate pageCode="FULL_FINAL"><NativeFullFinal /></Gate></ProtectedRoute>} />
               <Route path="/payroll/statutory-config" element={<ProtectedRoute><Gate pageCode="STATUTORY_CONFIG"><NativeStatutoryConfig /></Gate></ProtectedRoute>} />
+
+              {/* Communication */}
+              <Route path="/communication/templates" element={<ProtectedRoute><NativeTemplateManager /></ProtectedRoute>} />
+              <Route path="/communication/dispatch"  element={<ProtectedRoute><NativeDispatchCenter /></ProtectedRoute>} />
+              <Route path="/communication/history"   element={<ProtectedRoute><NativeDispatchHistory /></ProtectedRoute>} />
 
               {/* System */}
               <Route path="/migration-console" element={<ProtectedRoute><NativeMigrationConsole /></ProtectedRoute>} />

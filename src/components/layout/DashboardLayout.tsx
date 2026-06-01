@@ -24,6 +24,7 @@ import {
   Landmark,
   LogOut,
   Menu,
+  MessageSquare,
   Network,
   Package,
   ShieldCheck,
@@ -175,6 +176,14 @@ const navGroups: NavGroup[] = [
       { label: "Performance Command Center", href: "/performance/command-center", icon: <BarChart3 className="h-4 w-4" />, pageCode: "WORKFORCE_COMMAND_CENTER", description: "Unified workforce intelligence" },
       { label: "Access Control", href: "/settings/access-control", icon: <Settings className="h-4 w-4" />, pageCode: "ACCESS_CONTROL", adminOnly: true, description: "Role and page access management" },
       { label: "KPI Configuration", href: "/kpi-config", icon: <Target className="h-4 w-4" />, pageCode: "KPI_CONFIG", adminOnly: true, description: "Per-process KPI targets and rating thresholds" },
+    ],
+  },
+  {
+    title: "Communication",
+    items: [
+      { label: "Templates",         href: "/communication/templates", icon: <MessageSquare className="h-4 w-4" />, adminOnly: true,  description: "Manage email, SMS and WhatsApp templates" },
+      { label: "Dispatch Center",   href: "/communication/dispatch",  icon: <MessageSquare className="h-4 w-4" />,                   description: "Send messages to employees" },
+      { label: "Dispatch History",  href: "/communication/history",   icon: <MessageSquare className="h-4 w-4" />, adminOnly: true,  description: "View and retry dispatch logs" },
     ],
   },
   {
