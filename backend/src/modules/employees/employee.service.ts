@@ -84,9 +84,11 @@ export const employeeService = {
     if (search)    { conds.push("(full_name LIKE ? OR employee_code LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
 
     const where = `WHERE ${conds.join(" AND ")}`;
+
+    // Use string interpolation for LIMIT/OFFSET to avoid parameter binding issues
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT * FROM employees ${where} ORDER BY employee_code ASC LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+      `SELECT * FROM employees ${where} ORDER BY employee_code ASC LIMIT ${limit} OFFSET ${offset}`,
+      params
     );
     const [countRows] = await db.execute<RowDataPacket[]>(
       `SELECT COUNT(*) AS total FROM employees ${where}`, params
