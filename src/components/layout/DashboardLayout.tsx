@@ -199,6 +199,7 @@ const navGroups: NavGroup[] = [
       { label: "Statutory Config", href: "/payroll/statutory-config", icon: <Landmark className="h-4 w-4" />, adminOnly: true, description: "PF, ESIC, PT and gratuity configuration" },
       { label: "Process Configuration", href: "/process-config", icon: <Network className="h-4 w-4" />, adminOnly: true, description: "Per-process KPI targets, payroll rules, roster settings" },
       { label: "Leave Types", href: "/leave-types", icon: <CalendarDays className="h-4 w-4" />, adminOnly: true, description: "Leave type master — PL, SL, CL, LWP rules" },
+      { label: "Attendance Rules", href: "/attendance-rules-master", icon: <Clock className="h-4 w-4" />, adminOnly: true, description: "Configure attendance thresholds by designation, process or branch" },
       { label: "Notifications", href: "/notification-preferences", icon: <Bell className="h-4 w-4" />, description: "Notification preferences" },
       { label: "Statutory Compliance", href: "/compliance/statutory", icon: <Landmark className="h-4 w-4" />, adminOnly: true, description: "PF/UAN, ECR, ESIC challan, PT slabs, min wages" },
       { label: "Labour Compliance", href: "/compliance/labour", icon: <ShieldCheck className="h-4 w-4" />, adminOnly: true, description: "Bonus Act, POSH register, Maternity benefits" },

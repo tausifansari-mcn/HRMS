@@ -134,6 +134,7 @@ const NativeLeaveTypeConfig         = lazy(() => import("./pages/NativeLeaveType
 const NativeMyRoster                = lazy(() => import("./pages/NativeMyRoster"));
 const NativeRTABoard                = lazy(() => import("./pages/NativeRTABoard"));
 const NativeWalkinQueue             = lazy(() => import("./pages/NativeWalkinQueue"));
+const NativeAttendanceRulesMaster   = lazy(() => import("./pages/NativeAttendanceRulesMaster"));
 
 // Portal
 const PortalLogin                   = lazy(() => import("./pages/portal/PortalLogin"));
@@ -299,6 +300,7 @@ const App = () => (
               <Route path="/my-roster" element={<ProtectedRoute><NativeMyRoster /></ProtectedRoute>} />
               <Route path="/rta-board" element={<ProtectedRoute><Gate pageCode="RTA_BOARD"><NativeRTABoard /></Gate></ProtectedRoute>} />
               <Route path="/ats/walkin-queue" element={<ProtectedRoute><Gate pageCode="ATS_WAITING_QUEUE"><NativeWalkinQueue /></Gate></ProtectedRoute>} />
+              <Route path="/attendance-rules-master" element={<ProtectedRoute><NativeAttendanceRulesMaster /></ProtectedRoute>} />
               <Route path="/changelog" element={<ProtectedRoute><Changelog /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
