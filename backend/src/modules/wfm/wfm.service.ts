@@ -45,13 +45,27 @@ export const wfmService = {
 
   // ─── Shifts ────────────────────────────────────────────────────────────────
 
-  async listShifts(filters?: ShiftListFilters): Promise<WfmShift[]> {
+  async listShifts(filters?: ShiftListFilters, employeeId?: string): Promise<WfmShift[]> {
     let sql = "SELECT * FROM wfm_shift_master";
     if (filters?.activeStatus === "active")   sql += " WHERE active_status = 1";
     if (filters?.activeStatus === "inactive") sql += " WHERE active_status = 0";
     sql += " ORDER BY shift_name ASC";
     const [rows] = await db.execute<RowDataPacket[]>(sql);
-    return rows as WfmShift[];
+    let shifts = rows as WfmShift[];
+
+    // Apply customization if employeeId provided
+    if (employeeId) {
+      for (const shift of shifts) {
+        try {
+          const result = await getEffectiveConfig(employeeId, 'shift', shift.id, shift);
+          Object.assign(shift, result.config);
+        } catch (err) {
+          console.warn(`Customization error for shift ${shift.id}:`, err);
+        }
+      }
+    }
+
+    return shifts;
   },
 
   async getShift(id: string): Promise<WfmShift> {
