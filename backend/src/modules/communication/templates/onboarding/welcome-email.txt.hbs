@@ -2,13 +2,10 @@ Welcome to {{company.name}}!
 
 Hi {{employee.name}},
 
-Congratulations on joining {{company.name}} as {{employee.designation}}! We're excited to have you on the team.
-
-Your joining date is {{formatDate employee.date_of_joining "DD MMM YYYY"}}.
-
-Your manager {{manager.name}} ({{manager.email}}) will guide you through the onboarding process.
-
-Please complete your pending documents by {{formatDate documents.deadline "DD MMM YYYY"}}.
+Congratulations on joining {{company.name}} as {{employee.designation}}!
+Your joining date is {{employee.date_of_joining}}.
+Your manager: {{manager.name}} ({{manager.email}})
+{{#if documents.pending_count}}Pending documents: {{documents.pending_count}} — deadline: {{documents.deadline}}{{/if}}
 
 Welcome aboard!
 {{company.name}} HR Team

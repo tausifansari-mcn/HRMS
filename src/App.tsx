@@ -107,6 +107,7 @@ const NativeAdvancedReports         = lazy(() => import("./pages/NativeAdvancedR
 const NativeStatutoryCompliance     = lazy(() => import("./pages/NativeStatutoryCompliance"));
 const NativeLabourCompliance        = lazy(() => import("./pages/NativeLabourCompliance"));
 const NativeDPDPCompliance          = lazy(() => import("./pages/NativeDPDPCompliance"));
+const NativeMaternityLeave          = lazy(() => import("./pages/NativeMaternityLeave"));
 const NativeIntegrationHub          = lazy(() => import("./pages/NativeIntegrationHub"));
 const NativeClientMaster            = lazy(() => import("./pages/NativeClientMaster"));
 const NativeLocationPolicyMasters   = lazy(() => import("./pages/NativeLocationPolicyMasters"));
@@ -116,6 +117,11 @@ const NativePayslipCenter           = lazy(() => import("./pages/NativePayslipCe
 const NativeTaxDeclaration          = lazy(() => import("./pages/NativeTaxDeclaration"));
 const NativeFullFinal               = lazy(() => import("./pages/NativeFullFinal"));
 const NativeStatutoryConfig         = lazy(() => import("./pages/NativeStatutoryConfig"));
+
+// Communication
+const NativeTemplateManager         = lazy(() => import("./pages/NativeTemplateManager"));
+const NativeDispatchCenter          = lazy(() => import("./pages/NativeDispatchCenter"));
+const NativeDispatchHistory         = lazy(() => import("./pages/NativeDispatchHistory"));
 
 // System
 const NativeMigrationConsole        = lazy(() => import("./pages/NativeMigrationConsole"));
@@ -128,6 +134,7 @@ const NativeLeaveTypeConfig         = lazy(() => import("./pages/NativeLeaveType
 const NativeMyRoster                = lazy(() => import("./pages/NativeMyRoster"));
 const NativeRTABoard                = lazy(() => import("./pages/NativeRTABoard"));
 const NativeWalkinQueue             = lazy(() => import("./pages/NativeWalkinQueue"));
+const NativeAttendanceRulesMaster   = lazy(() => import("./pages/NativeAttendanceRulesMaster"));
 
 // Portal
 const PortalLogin                   = lazy(() => import("./pages/portal/PortalLogin"));
@@ -249,6 +256,7 @@ const App = () => (
               <Route path="/assets-manager" element={<ProtectedRoute><Gate pageCode="ASSETS_MANAGER"><NativeAssetsManager /></Gate></ProtectedRoute>} />
               <Route path="/helpdesk" element={<ProtectedRoute><Gate pageCode="HELPDESK"><NativeHelpdesk /></Gate></ProtectedRoute>} />
               <Route path="/letters" element={<ProtectedRoute><Gate pageCode="LETTERS"><NativeLetters /></Gate></ProtectedRoute>} />
+              <Route path="/maternity-leave" element={<ProtectedRoute><NativeMaternityLeave /></ProtectedRoute>} />
               <Route path="/employee-lifecycle" element={<ProtectedRoute><Gate pageCode="EMPLOYEE_LIFECYCLE"><NativeLifecycle /></Gate></ProtectedRoute>} />
               <Route path="/employee-lifecycle-v2" element={<ProtectedRoute><Gate pageCode="EMPLOYEE_LIFECYCLE"><NativeEmployeeLifecycle /></Gate></ProtectedRoute>} />
               <Route path="/org-masters" element={<ProtectedRoute><Gate pageCode="ORG_MASTERS"><NativeOrgMasters /></Gate></ProtectedRoute>} />
@@ -276,6 +284,11 @@ const App = () => (
               <Route path="/payroll/full-final" element={<ProtectedRoute><Gate pageCode="FULL_FINAL"><NativeFullFinal /></Gate></ProtectedRoute>} />
               <Route path="/payroll/statutory-config" element={<ProtectedRoute><Gate pageCode="STATUTORY_CONFIG"><NativeStatutoryConfig /></Gate></ProtectedRoute>} />
 
+              {/* Communication */}
+              <Route path="/communication/templates" element={<ProtectedRoute><NativeTemplateManager /></ProtectedRoute>} />
+              <Route path="/communication/dispatch"  element={<ProtectedRoute><NativeDispatchCenter /></ProtectedRoute>} />
+              <Route path="/communication/history"   element={<ProtectedRoute><NativeDispatchHistory /></ProtectedRoute>} />
+
               {/* System */}
               <Route path="/migration-console" element={<ProtectedRoute><NativeMigrationConsole /></ProtectedRoute>} />
               <Route path="/exit-management" element={<ProtectedRoute><NativeExitManagement /></ProtectedRoute>} />
@@ -287,6 +300,7 @@ const App = () => (
               <Route path="/my-roster" element={<ProtectedRoute><NativeMyRoster /></ProtectedRoute>} />
               <Route path="/rta-board" element={<ProtectedRoute><Gate pageCode="RTA_BOARD"><NativeRTABoard /></Gate></ProtectedRoute>} />
               <Route path="/ats/walkin-queue" element={<ProtectedRoute><Gate pageCode="ATS_WAITING_QUEUE"><NativeWalkinQueue /></Gate></ProtectedRoute>} />
+              <Route path="/attendance-rules-master" element={<ProtectedRoute><NativeAttendanceRulesMaster /></ProtectedRoute>} />
               <Route path="/changelog" element={<ProtectedRoute><Changelog /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>

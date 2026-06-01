@@ -24,6 +24,10 @@ const envSchema = z.object({
   PORTAL_JWT_SECRET: z.string().min(32).default("change-me-in-production-portal-secret-32ch"),
   // Must be explicitly "true" to enable demo bypass. Production default is disabled.
   PORTAL_DEMO_BYPASS: z.string().optional().default("false"),
+  // Required secret for payroll bank account AES encryption. Must be set in production.
+  PAYROLL_BANK_KEY: z.string().min(16).default("hrms-bank-key-dev"),
+  // Enables mock-token demo bypass. Must NOT be "true" in production.
+  INTERNAL_DEMO_BYPASS: z.string().optional().default("false"),
   SMTP_HOST:   z.string().default("smtp.gmail.com"),
   SMTP_PORT:   z.coerce.number().default(587),
   SMTP_USER:   z.string().default(""),
@@ -37,6 +41,29 @@ if (!parsed.success) {
   console.error("Invalid backend environment variables:");
   console.error(parsed.error.flatten().fieldErrors);
   process.exit(1);
+}
+
+const KNOWN_INSECURE_DEFAULTS = [
+  "change-me-in-production-portal-secret-32ch",
+];
+
+if (parsed.data.NODE_ENV === "production") {
+  if (KNOWN_INSECURE_DEFAULTS.includes(parsed.data.PORTAL_JWT_SECRET)) {
+    console.error("[FATAL] PORTAL_JWT_SECRET must be changed from the default value in production.");
+    process.exit(1);
+  }
+  if (parsed.data.PAYROLL_BANK_KEY === "hrms-bank-key-dev") {
+    console.error("[FATAL] PAYROLL_BANK_KEY must be set to a secure value in production.");
+    process.exit(1);
+  }
+  if (parsed.data.INTERNAL_DEMO_BYPASS === "true") {
+    console.error("[FATAL] INTERNAL_DEMO_BYPASS must not be 'true' in production.");
+    process.exit(1);
+  }
+  if (parsed.data.PORTAL_DEMO_BYPASS === "true") {
+    console.error("[FATAL] PORTAL_DEMO_BYPASS must not be 'true' in production.");
+    process.exit(1);
+  }
 }
 
 export const env = parsed.data;

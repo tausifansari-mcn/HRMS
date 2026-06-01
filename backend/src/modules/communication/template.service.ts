@@ -1,233 +1,146 @@
-// backend/src/modules/communication/template.service.ts
 import { randomUUID } from 'crypto';
 import Handlebars from 'handlebars';
 import fs from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { db } from '../../db/mysql.js';
-import { RowDataPacket } from 'mysql2';
-import {
+import type { RowDataPacket } from 'mysql2';
+import type {
   CommunicationTemplate,
   CreateTemplateDTO,
   UpdateTemplateDTO,
   TemplateFilters,
-  RenderTemplateDTO
+  RenderTemplateDTO,
 } from './communication.types.js';
 
-// Register Handlebars helpers
-Handlebars.registerHelper('formatDate', (date: string, format: string) => {
-  const d = new Date(date);
-  return d.toLocaleDateString('en-IN');
-});
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const TMPL_DIR = path.join(__dirname, 'templates');
 
+// Register helpers once at module load
+Handlebars.registerHelper('formatDate', (date: string) => {
+  if (!date) return '';
+  return new Date(date).toLocaleDateString('en-IN');
+});
 Handlebars.registerHelper('currency', (amount: number) => {
-  return `₹${amount.toLocaleString('en-IN')}`;
+  return `₹${Number(amount ?? 0).toLocaleString('en-IN')}`;
 });
 
-export class TemplateService {
-  private templatesDir = path.join(__dirname, 'templates');
-  private variableSchemas: any;
+let _schemas: Record<string, any> | null = null;
+async function getVariableSchemas(): Promise<Record<string, any>> {
+  if (_schemas) return _schemas;
+  const raw = await fs.readFile(path.join(TMPL_DIR, 'variable-schemas.json'), 'utf-8');
+  _schemas = JSON.parse(raw);
+  return _schemas!;
+}
 
-  constructor() {
-    this.loadVariableSchemas();
-  }
+async function readFileTemplate(name: string): Promise<{ html: string; text?: string; category: string }> {
+  const htmlPath = path.join(TMPL_DIR, `${name}.hbs`);
+  const txtPath  = path.join(TMPL_DIR, `${name}.txt.hbs`);
+  const html = await fs.readFile(htmlPath, 'utf-8');
+  let text: string | undefined;
+  try { text = await fs.readFile(txtPath, 'utf-8'); } catch { /* optional */ }
+  const category = name.split('/')[0]!;
+  return { html, text, category };
+}
 
-  private async loadVariableSchemas() {
-    const schemasPath = path.join(this.templatesDir, 'variable-schemas.json');
-    const content = await fs.readFile(schemasPath, 'utf-8');
-    this.variableSchemas = JSON.parse(content);
-  }
-
+class TemplateService {
   async getTemplates(filters: TemplateFilters): Promise<CommunicationTemplate[]> {
-    let query = 'SELECT * FROM communication_template WHERE 1=1';
-    const params: any[] = [];
-
-    if (filters.category) {
-      query += ' AND category = ?';
-      params.push(filters.category);
-    }
-
-    if (filters.channel) {
-      query += ' AND channel = ?';
-      params.push(filters.channel);
-    }
-
-    if (filters.is_active !== undefined) {
-      query += ' AND is_active = ?';
-      params.push(filters.is_active ? 1 : 0);
-    }
-
-    if (filters.search) {
-      query += ' AND (name LIKE ? OR subject LIKE ?)';
-      params.push(`%${filters.search}%`, `%${filters.search}%`);
-    }
-
-    query += ' ORDER BY created_at DESC';
-
-    const [rows] = await db.execute<RowDataPacket[]>(query, params);
+    let q = 'SELECT * FROM communication_template WHERE 1=1';
+    const p: unknown[] = [];
+    if (filters.category)              { q += ' AND category = ?';                   p.push(filters.category); }
+    if (filters.channel)               { q += ' AND channel = ?';                    p.push(filters.channel); }
+    if (filters.is_active !== undefined) { q += ' AND is_active = ?';                p.push(filters.is_active ? 1 : 0); }
+    if (filters.search)                { q += ' AND (name LIKE ? OR subject LIKE ?)'; p.push(`%${filters.search}%`, `%${filters.search}%`); }
+    q += ' ORDER BY created_at DESC';
+    const [rows] = await db.execute<RowDataPacket[]>(q, p);
     return rows as CommunicationTemplate[];
   }
 
   async getTemplateById(id: string): Promise<CommunicationTemplate | null> {
     const [rows] = await db.execute<RowDataPacket[]>(
-      'SELECT * FROM communication_template WHERE id = ?',
-      [id]
+      'SELECT * FROM communication_template WHERE id = ?', [id]
     );
-
-    if (rows.length === 0) return null;
-    return rows[0] as CommunicationTemplate;
+    return rows[0] as CommunicationTemplate ?? null;
   }
 
   async getTemplateByName(name: string): Promise<{ html: string; text?: string; category: string } | null> {
-    const filePath = path.join(this.templatesDir, `${name}.hbs`);
-    const textFilePath = path.join(this.templatesDir, `${name}.txt.hbs`);
-
     try {
-      const htmlTemplate = await fs.readFile(filePath, 'utf-8');
-      let textTemplate: string | undefined;
-
-      try {
-        textTemplate = await fs.readFile(textFilePath, 'utf-8');
-      } catch {
-        // Text version optional
-      }
-
-      const category = name.split('/')[0];
-      return { html: htmlTemplate, text: textTemplate, category };
+      return await readFileTemplate(name);
     } catch {
       const [rows] = await db.execute<RowDataPacket[]>(
         'SELECT body_html, body_text, category FROM communication_template WHERE name = ? AND is_active = 1',
         [name]
       );
-
-      if (rows.length === 0) return null;
-
-      return {
-        html: rows[0].body_html,
-        text: rows[0].body_text,
-        category: rows[0].category
-      };
+      if (!rows[0]) return null;
+      const r = rows[0] as any;
+      return { html: r.body_html, text: r.body_text ?? undefined, category: r.category };
     }
   }
 
   async createTemplate(data: CreateTemplateDTO): Promise<CommunicationTemplate> {
-    const id = randomUUID();
-
     try {
       Handlebars.compile(data.body_html);
-      if (data.body_text) {
-        Handlebars.compile(data.body_text);
-      }
-    } catch (error) {
-      throw new Error(`Invalid Handlebars syntax: ${error instanceof Error ? error.message : 'Unknown'}`);
+      if (data.body_text) Handlebars.compile(data.body_text);
+    } catch (e) {
+      throw new Error(`Invalid Handlebars syntax: ${e instanceof Error ? e.message : String(e)}`);
     }
-
+    const id = randomUUID();
     await db.execute(
       `INSERT INTO communication_template
-      (id, name, subject, body_html, body_text, category, channel, variables_schema, is_critical, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        data.name,
-        data.subject || null,
-        data.body_html,
-        data.body_text || null,
-        data.category,
-        data.channel,
-        data.variables_schema ? JSON.stringify(data.variables_schema) : null,
-        data.is_critical ? 1 : 0,
-        data.created_by
-      ]
+       (id, name, subject, body_html, body_text, category, channel, variables_schema, is_critical, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, data.name, data.subject ?? null, data.body_html, data.body_text ?? null,
+       data.category, data.channel,
+       data.variables_schema ? JSON.stringify(data.variables_schema) : null,
+       data.is_critical ? 1 : 0, data.created_by]
     );
-
-    return this.getTemplateById(id) as Promise<CommunicationTemplate>;
+    return (await this.getTemplateById(id))!;
   }
 
   async updateTemplate(id: string, updates: UpdateTemplateDTO): Promise<CommunicationTemplate> {
     const fields: string[] = [];
-    const params: any[] = [];
-
-    if (updates.name !== undefined) {
-      fields.push('name = ?');
-      params.push(updates.name);
-    }
-
-    if (updates.subject !== undefined) {
-      fields.push('subject = ?');
-      params.push(updates.subject);
-    }
-
+    const params: unknown[] = [];
+    if (updates.name      !== undefined) { fields.push('name = ?');      params.push(updates.name); }
+    if (updates.subject   !== undefined) { fields.push('subject = ?');   params.push(updates.subject); }
     if (updates.body_html !== undefined) {
       Handlebars.compile(updates.body_html);
-      fields.push('body_html = ?');
-      params.push(updates.body_html);
+      fields.push('body_html = ?'); params.push(updates.body_html);
     }
-
     if (updates.body_text !== undefined) {
-      if (updates.body_text) {
-        Handlebars.compile(updates.body_text);
-      }
-      fields.push('body_text = ?');
-      params.push(updates.body_text);
+      if (updates.body_text) Handlebars.compile(updates.body_text);
+      fields.push('body_text = ?'); params.push(updates.body_text);
     }
-
-    if (updates.is_active !== undefined) {
-      fields.push('is_active = ?');
-      params.push(updates.is_active ? 1 : 0);
-    }
-
-    if (fields.length === 0) {
-      throw new Error('No fields to update');
-    }
-
+    if (updates.is_active !== undefined) { fields.push('is_active = ?'); params.push(updates.is_active ? 1 : 0); }
+    if (!fields.length) throw new Error('No fields to update');
     params.push(id);
-
-    await db.execute(
-      `UPDATE communication_template SET ${fields.join(', ')} WHERE id = ?`,
-      params
-    );
-
-    return this.getTemplateById(id) as Promise<CommunicationTemplate>;
+    await db.execute(`UPDATE communication_template SET ${fields.join(', ')} WHERE id = ?`, params);
+    return (await this.getTemplateById(id))!;
   }
 
   async deactivateTemplate(id: string): Promise<void> {
-    await db.execute(
-      'UPDATE communication_template SET is_active = 0 WHERE id = ?',
-      [id]
-    );
+    await db.execute('UPDATE communication_template SET is_active = 0 WHERE id = ?', [id]);
   }
 
   async renderTemplate(dto: RenderTemplateDTO): Promise<{ html: string; text?: string }> {
-    let templateSource: { html: string; text?: string; category: string } | null = null;
-
+    let source: { html: string; text?: string } | null = null;
     if (dto.template_id) {
-      const template = await this.getTemplateById(dto.template_id);
-      if (!template) throw new Error('Template not found');
-      templateSource = {
-        html: template.body_html,
-        text: template.body_text || undefined,
-        category: template.category
-      };
+      const t = await this.getTemplateById(dto.template_id);
+      if (!t) throw new Error('Template not found');
+      source = { html: t.body_html, text: t.body_text ?? undefined };
     } else if (dto.template_name) {
-      templateSource = await this.getTemplateByName(dto.template_name);
-      if (!templateSource) throw new Error('Template not found');
+      source = await this.getTemplateByName(dto.template_name);
+      if (!source) throw new Error('Template not found');
     } else {
-      throw new Error('Either template_id or template_name required');
+      throw new Error('template_id or template_name required');
     }
-
-    const htmlTemplate = Handlebars.compile(templateSource.html);
-    const html = htmlTemplate(dto.data);
-
-    let text: string | undefined;
-    if (templateSource.text) {
-      const textTemplate = Handlebars.compile(templateSource.text);
-      text = textTemplate(dto.data);
-    }
-
+    const html = Handlebars.compile(source.html)(dto.data);
+    const text = source.text ? Handlebars.compile(source.text)(dto.data) : undefined;
     return { html, text };
   }
 
-  getVariableSchema(category: string): any {
-    return this.variableSchemas[category] || {};
+  async getVariableSchema(category: string): Promise<unknown> {
+    const schemas = await getVariableSchemas();
+    return schemas[category] ?? {};
   }
 }
 

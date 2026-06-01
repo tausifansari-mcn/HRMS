@@ -4,6 +4,8 @@ import { requireAuth } from "../../middleware/authMiddleware.js";
 import { requireRole } from "../../middleware/requireRole.js";
 import { complianceService } from "./compliance.service.js";
 import { getEmployeeForUser, hasRole } from "../../shared/accessGuard.js";
+import { maternityService } from './maternity.service.js';
+import { createMaternitySchema, updateMaternitySchema, maternityListFiltersSchema } from './maternity.validation.js';
 import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 
 export const complianceRouter = Router();
@@ -149,85 +151,82 @@ complianceRouter.get(
 
 // ─── Maternity Benefit Act ────────────────────────────────────────────────────
 
-// GET /maternity — admin/hr sees all; employee sees own
+// GET /maternity — admin/hr sees all (with filters); employee sees own
 complianceRouter.get(
-  "/maternity",
+  '/maternity',
   h(async (req, res) => {
     const userId = req.authUser!.id;
-    const privileged = await hasRole(userId, "admin", "hr");
+    const privileged = await hasRole(userId, 'admin', 'hr');
+    const filters = maternityListFiltersSchema.parse(req.query);
 
     if (privileged) {
-      const data = await complianceService.listMaternity();
+      const data = await maternityService.list(undefined, filters);
       return res.json({ success: true, data });
     }
 
     const emp = await getEmployeeForUser(userId);
-    if (!emp) {
-      return res.status(403).json({ success: false, error: "No employee record linked to account" });
-    }
-    const data = await complianceService.listMaternity(emp.id);
+    if (!emp) return res.status(403).json({ success: false, error: 'No employee record linked to account' });
+    const data = await maternityService.list(emp.id, filters);
     return res.json({ success: true, data });
   })
 );
 
-// POST /maternity — create record (admin/hr)
+// POST /maternity — employee can self-apply; HR/admin can apply on behalf
 complianceRouter.post(
-  "/maternity",
-  requireRole("admin", "hr"),
+  '/maternity',
   h(async (req, res) => {
-    const {
-      employee_id,
-      expected_delivery_date,
-      leave_start_date,
-      paid_weeks,
-      complications,
-    } = req.body as {
-      employee_id: string;
-      expected_delivery_date?: string;
-      leave_start_date: string;
-      paid_weeks?: number;
-      complications?: boolean;
-    };
+    const userId = req.authUser!.id;
+    const privileged = await hasRole(userId, 'admin', 'hr');
+    const body = createMaternitySchema.parse(req.body);
 
-    if (!employee_id?.trim()) {
-      return res.status(400).json({ success: false, error: "employee_id is required" });
-    }
-    if (!leave_start_date) {
-      return res.status(400).json({ success: false, error: "leave_start_date is required" });
+    if (!privileged) {
+      const emp = await getEmployeeForUser(userId);
+      if (!emp) return res.status(403).json({ success: false, error: 'No employee record linked' });
+      if (body.employee_id !== emp.id) {
+        return res.status(403).json({ success: false, error: 'You can only apply maternity leave for yourself' });
+      }
     }
 
-    const data = await complianceService.createMaternity({
-      employee_id: employee_id.trim(),
-      expected_delivery_date,
-      leave_start_date,
-      paid_weeks,
-      complications,
-    });
+    const data = await maternityService.create(body);
     return res.status(201).json({ success: true, data });
   })
 );
 
-// PATCH /maternity/:id — update status/dates (admin/hr)
-complianceRouter.patch(
-  "/maternity/:id",
-  requireRole("admin", "hr"),
+// POST /maternity/:id/approve — HR/admin approves and auto-creates leave request
+complianceRouter.post(
+  '/maternity/:id/approve',
+  requireRole('admin', 'hr'),
   h(async (req, res) => {
-    const { status, actual_delivery_date, leave_end_date } = req.body as {
-      status?: "applied" | "approved" | "active" | "completed" | "rejected";
-      actual_delivery_date?: string;
-      leave_end_date?: string;
-    };
-
-    const validStatuses = ["applied", "approved", "active", "completed", "rejected"];
-    if (status && !validStatuses.includes(status)) {
-      return res.status(400).json({ success: false, error: `status must be one of: ${validStatuses.join(", ")}` });
-    }
-
-    const data = await complianceService.updateMaternity(req.params.id, req.authUser!.id, {
-      status,
-      actual_delivery_date,
-      leave_end_date,
-    });
+    const data = await maternityService.approve(req.params.id, req.authUser!.id);
     return res.json({ success: true, data });
+  })
+);
+
+// PATCH /maternity/:id — update actual dates, nursing break, WFH option
+complianceRouter.patch(
+  '/maternity/:id',
+  requireRole('admin', 'hr'),
+  h(async (req, res) => {
+    const body = updateMaternitySchema.parse(req.body);
+    const data = await maternityService.update(req.params.id, body);
+    return res.json({ success: true, data });
+  })
+);
+
+// GET /maternity/:id — get single record (employee sees own; admin/hr sees all)
+complianceRouter.get(
+  '/maternity/:id',
+  h(async (req, res) => {
+    const userId = req.authUser!.id;
+    const privileged = await hasRole(userId, 'admin', 'hr');
+    const record = await maternityService.getById(req.params.id);
+    if (!record) return res.status(404).json({ success: false, error: 'Record not found' });
+    if (!privileged) {
+      const emp = await getEmployeeForUser(userId);
+      if (!emp || emp.id !== record.employee_id) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+      }
+    }
+    return res.json({ success: true, data: record });
   })
 );

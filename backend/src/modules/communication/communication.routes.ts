@@ -1,23 +1,30 @@
-// backend/src/modules/communication/communication.routes.ts
 import { Router } from 'express';
-import { communicationController } from './communication.controller.js';
+import { requireAuth } from '../../middleware/authMiddleware.js';
+import { requireRole } from '../../middleware/requireRole.js';
+import { communicationController as c } from './communication.controller.js';
 
-export const communicationRoutes = Router();
+const router = Router();
+const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
-// Templates
-communicationRoutes.get('/templates', communicationController.getTemplates);
-communicationRoutes.get('/templates/:id', communicationController.getTemplateById);
-communicationRoutes.post('/templates', communicationController.createTemplate);
-communicationRoutes.patch('/templates/:id', communicationController.updateTemplate);
-communicationRoutes.delete('/templates/:id', communicationController.deactivateTemplate);
+router.use(requireAuth);
+
+// Templates — HR/Admin only for write, all authenticated for read
+router.get('/templates',           h(c.listTemplates));
+router.post('/templates/render',   h(c.renderTemplate));
+router.get('/templates/:id',       h(c.getTemplate));
+router.post('/templates',          requireRole('admin', 'hr'), h(c.createTemplate));
+router.patch('/templates/:id',     requireRole('admin', 'hr'), h(c.updateTemplate));
+router.delete('/templates/:id',    requireRole('admin', 'hr'), h(c.deleteTemplate));
 
 // Dispatch
-communicationRoutes.post('/dispatch/send', communicationController.sendMessage);
-communicationRoutes.post('/dispatch/bulk', communicationController.bulkSend);
-communicationRoutes.post('/dispatch/:id/retry', communicationController.retryDispatch);
-communicationRoutes.get('/dispatch/logs', communicationController.getDispatchLogs);
-communicationRoutes.get('/dispatch/stats', communicationController.getDispatchStats);
+router.post('/dispatch/send',      requireRole('admin', 'hr', 'process_manager', 'assistant_manager', 'team_leader'), h(c.send));
+router.post('/dispatch/bulk',      requireRole('admin', 'hr'), h(c.bulkSend));
+router.post('/dispatch/retry/:id', requireRole('admin', 'hr'), h(c.retryDispatch));
+router.get('/dispatch/logs',       requireRole('admin', 'hr'), h(c.getLogs));
+router.get('/dispatch/stats',      requireRole('admin', 'hr'), h(c.getStats));
 
-// Preferences
-communicationRoutes.get('/preferences/:employeeId', communicationController.getPreferences);
-communicationRoutes.put('/preferences/:employeeId', communicationController.updatePreferences);
+// Preferences — any authenticated user
+router.get('/preferences',         h(c.getPreferences));
+router.patch('/preferences',       h(c.updatePreference));
+
+export { router as communicationRouter };

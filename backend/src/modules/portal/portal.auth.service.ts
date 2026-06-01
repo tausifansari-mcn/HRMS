@@ -30,7 +30,11 @@ export const portalAuthService = {
 
   async requestOtp(email: string): Promise<void> {
     await portalAuthService.purgeExpiredOtps();
-    if (email === "demo@mascallnet.com") return;
+    // Demo bypass only when explicitly enabled in non-production
+    if (email === "demo@mascallnet.com" && portalAuthService.isDemoBypassEnabled()) return;
+    if (email === "demo@mascallnet.com" && !portalAuthService.isDemoBypassEnabled()) {
+      throw new Error("Demo bypass not available in this environment");
+    }
     const [users] = await db.execute<RowDataPacket[]>(
       "SELECT id FROM client_user WHERE email = ? AND is_active = 1 LIMIT 1",
       [email]
@@ -70,7 +74,11 @@ export const portalAuthService = {
 
   async verifyOtp(email: string, otp: string): Promise<string> {
     await portalAuthService.purgeExpiredOtps();
+    // Demo bypass gated by isDemoBypassEnabled — never allowed in production
     if (email === "demo@mascallnet.com") {
+      if (!portalAuthService.isDemoBypassEnabled()) {
+        throw new Error("Invalid or expired OTP");
+      }
       return portalAuthService.issueToken({
         clientUserId: "u-demo-1",
         clientId: "c-demo-1",

@@ -1,133 +1,117 @@
-// backend/src/modules/communication/communication.controller.ts
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response } from 'express';
 import { templateService } from './template.service.js';
 import { dispatchService } from './dispatch.service.js';
 import { notificationPreferencesService } from './notification-preferences.service.js';
 import {
   CreateTemplateSchema,
   UpdateTemplateSchema,
+  TemplateFiltersSchema,
   SendMessageSchema,
   BulkSendSchema,
-  UpdatePreferencesSchema
+  DispatchLogFiltersSchema,
+  UpdatePreferencesSchema,
+  RenderTemplateSchema,
 } from './communication.validation.js';
+
+function userId(req: Request): string {
+  return (req as any).authUser?.id ?? 'system';
+}
 
 export const communicationController = {
   // Templates
-  async getTemplates(req: Request, res: Response, next: NextFunction) {
+  async listTemplates(req: Request, res: Response) {
     try {
-      const templates = await templateService.getTemplates(req.query as any);
-      res.json(templates);
-    } catch (error) {
-      next(error);
-    }
+      const filters = TemplateFiltersSchema.parse(req.query);
+      res.json(await templateService.getTemplates(filters));
+    } catch (e) { res.status(400).json({ error: String(e) }); }
   },
 
-  async getTemplateById(req: Request, res: Response, next: NextFunction) {
+  async getTemplate(req: Request, res: Response) {
     try {
-      const template = await templateService.getTemplateById(req.params.id);
-      if (!template) {
-        return res.status(404).json({ error: 'Template not found' });
-      }
-      res.json(template);
-    } catch (error) {
-      next(error);
-    }
+      const t = await templateService.getTemplateById(req.params.id!);
+      if (!t) return res.status(404).json({ error: 'Not found' });
+      res.json(t);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
   },
 
-  async createTemplate(req: Request, res: Response, next: NextFunction) {
+  async createTemplate(req: Request, res: Response) {
     try {
-      const validated = CreateTemplateSchema.parse(req.body);
-      const template = await templateService.createTemplate(validated);
-      res.status(201).json(template);
-    } catch (error) {
-      next(error);
-    }
+      const data = CreateTemplateSchema.parse({ ...req.body, created_by: userId(req) });
+      res.status(201).json(await templateService.createTemplate(data));
+    } catch (e) { res.status(400).json({ error: String(e) }); }
   },
 
-  async updateTemplate(req: Request, res: Response, next: NextFunction) {
+  async updateTemplate(req: Request, res: Response) {
     try {
-      const validated = UpdateTemplateSchema.parse(req.body);
-      const template = await templateService.updateTemplate(req.params.id, validated);
-      res.json(template);
-    } catch (error) {
-      next(error);
-    }
+      const updates = UpdateTemplateSchema.parse(req.body);
+      res.json(await templateService.updateTemplate(req.params.id!, updates));
+    } catch (e) { res.status(400).json({ error: String(e) }); }
   },
 
-  async deactivateTemplate(req: Request, res: Response, next: NextFunction) {
+  async deleteTemplate(req: Request, res: Response) {
     try {
-      await templateService.deactivateTemplate(req.params.id);
-      res.json({ success: true });
-    } catch (error) {
-      next(error);
-    }
+      await templateService.deactivateTemplate(req.params.id!);
+      res.status(204).send();
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  },
+
+  async renderTemplate(req: Request, res: Response) {
+    try {
+      const dto = RenderTemplateSchema.parse(req.body);
+      res.json(await templateService.renderTemplate(dto));
+    } catch (e) { res.status(400).json({ error: String(e) }); }
   },
 
   // Dispatch
-  async sendMessage(req: Request, res: Response, next: NextFunction) {
+  async send(req: Request, res: Response) {
     try {
-      const validated = SendMessageSchema.parse(req.body);
-      const result = await dispatchService.send(validated);
-      res.json(result);
-    } catch (error) {
-      next(error);
-    }
+      const dto = SendMessageSchema.parse(req.body);
+      res.json(await dispatchService.send(dto));
+    } catch (e) { res.status(400).json({ error: String(e) }); }
   },
 
-  async bulkSend(req: Request, res: Response, next: NextFunction) {
+  async bulkSend(req: Request, res: Response) {
     try {
-      const validated = BulkSendSchema.parse(req.body);
-      const result = await dispatchService.bulkSend(validated);
-      res.json(result);
-    } catch (error) {
-      next(error);
-    }
+      const dto = BulkSendSchema.parse(req.body);
+      res.json(await dispatchService.bulkSend(dto));
+    } catch (e) { res.status(400).json({ error: String(e) }); }
   },
 
-  async retryDispatch(req: Request, res: Response, next: NextFunction) {
+  async retryDispatch(req: Request, res: Response) {
     try {
-      await dispatchService.retry(req.params.id);
-      res.json({ success: true });
-    } catch (error) {
-      next(error);
-    }
+      await dispatchService.retry(req.params.id!);
+      res.status(204).send();
+    } catch (e) { res.status(500).json({ error: String(e) }); }
   },
 
-  async getDispatchLogs(req: Request, res: Response, next: NextFunction) {
+  async getLogs(req: Request, res: Response) {
     try {
-      const logs = await dispatchService.getLogs(req.query as any);
-      res.json(logs);
-    } catch (error) {
-      next(error);
-    }
+      const filters = DispatchLogFiltersSchema.parse(req.query);
+      res.json(await dispatchService.getLogs(filters));
+    } catch (e) { res.status(400).json({ error: String(e) }); }
   },
 
-  async getDispatchStats(req: Request, res: Response, next: NextFunction) {
+  async getStats(req: Request, res: Response) {
     try {
-      const stats = await dispatchService.getStats();
-      res.json(stats);
-    } catch (error) {
-      next(error);
-    }
+      res.json(await dispatchService.getStats());
+    } catch (e) { res.status(500).json({ error: String(e) }); }
   },
 
   // Preferences
-  async getPreferences(req: Request, res: Response, next: NextFunction) {
+  async getPreferences(req: Request, res: Response) {
     try {
-      const prefs = await notificationPreferencesService.getPreferences(req.params.employeeId);
-      res.json(prefs);
-    } catch (error) {
-      next(error);
-    }
+      const empId = (req as any).authUser?.id;
+      if (!empId) return res.status(401).json({ error: 'Unauthorized' });
+      res.json(await notificationPreferencesService.getPreferences(empId));
+    } catch (e) { res.status(500).json({ error: String(e) }); }
   },
 
-  async updatePreferences(req: Request, res: Response, next: NextFunction) {
+  async updatePreference(req: Request, res: Response) {
     try {
-      const updates = req.body.map((u: any) => UpdatePreferencesSchema.parse(u));
-      await notificationPreferencesService.updatePreferences(req.params.employeeId, updates);
-      res.json({ success: true });
-    } catch (error) {
-      next(error);
-    }
-  }
+      const empId = (req as any).authUser?.id;
+      if (!empId) return res.status(401).json({ error: 'Unauthorized' });
+      const dto = UpdatePreferencesSchema.parse(req.body);
+      res.json(await notificationPreferencesService.updatePreference(empId, dto));
+    } catch (e) { res.status(400).json({ error: String(e) }); }
+  },
 };

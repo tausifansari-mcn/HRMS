@@ -260,7 +260,7 @@ const Attendance = () => {
   const { data: currentEmployee } = useQuery<EmployeeSchedule | null>({
     queryKey: ["current-employee-schedule", user?.id],
     queryFn: async () => {
-      const empData = await hrmsApi.get<{ data: { id: string; first_name?: string | null; last_name?: string | null; working_hours_start?: string | null; working_hours_end?: string | null; working_days?: number[] | null } }>(`/api/employees/by-user/${user?.id}`);
+      const empData = await hrmsApi.get<{ data: { id: string; first_name?: string | null; last_name?: string | null; working_hours_start?: string | null; working_hours_end?: string | null; working_days?: number[] | null } }>(`/api/employees/me`);
       if (!empData.data) return null;
       return empData.data as EmployeeSchedule;
     },

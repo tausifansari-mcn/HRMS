@@ -9,24 +9,17 @@
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>Welcome to {{company.name}}!</h1>
-  </div>
+  <div class="header"><h1>Welcome to {{company.name}}!</h1></div>
   <div class="content">
     <p>Hi {{employee.name}},</p>
-
     <p>Congratulations on joining {{company.name}} as {{employee.designation}}! We're excited to have you on the team.</p>
-
-    <p>Your joining date is {{formatDate employee.date_of_joining "DD MMM YYYY"}}.</p>
-
+    <p>Your joining date is {{employee.date_of_joining}}.</p>
     <p>Your manager {{manager.name}} ({{manager.email}}) will guide you through the onboarding process.</p>
-
-    <p>Please complete your pending documents by {{formatDate documents.deadline "DD MMM YYYY"}}.</p>
-
+    {{#if documents.pending_count}}
+    <p>Please complete your {{documents.pending_count}} pending document(s) by {{documents.deadline}}.</p>
+    {{/if}}
     <p><a href="/onboarding" class="button">Start Onboarding</a></p>
-
-    <p>Welcome aboard!</p>
-    <p>{{company.name}} HR Team</p>
+    <p>Welcome aboard!<br>{{company.name}} HR Team</p>
   </div>
 </body>
 </html>

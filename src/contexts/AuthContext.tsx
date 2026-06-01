@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { getDemoCred, buildDemoSession } from "@/lib/demoCreds";
 
 interface AuthContextType {
   user: User | null;
@@ -71,37 +72,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    // Direct local demo sign-in bypass
-    if (email === "demo@mascallnet.com") {
-      const mockSession = {
-        access_token: "mock-token",
-        token_type: "bearer",
-        expires_in: 3600,
-        refresh_token: "mock-refresh-token",
-        user: {
-          id: "demo-user-id",
-          aud: "authenticated",
-          role: "authenticated",
-          email: "demo@mascallnet.com",
-          email_confirmed_at: new Date().toISOString(),
-          phone: "",
-          confirmed_at: new Date().toISOString(),
-          last_sign_in_at: new Date().toISOString(),
-          app_metadata: { provider: "email", providers: ["email"] },
-          user_metadata: { full_name: "Demo Admin" },
-          identities: [],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }
-      };
-      
+    // Role-based demo sign-in bypass (no Supabase call)
+    const demoCred = getDemoCred(email);
+    if (demoCred && password === demoCred.password) {
+      const mockSession = buildDemoSession(demoCred);
       localStorage.setItem("hrms_demo_session", JSON.stringify(mockSession));
       setSession(mockSession as any);
       setUser(mockSession.user as any);
-      
-      // Invalidate queries to reload all statistics in demo mode
       queryClient.invalidateQueries();
       return { error: null };
+    }
+    if (demoCred && password !== demoCred.password) {
+      return { error: new Error("Incorrect password for demo account") };
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({

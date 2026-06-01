@@ -100,7 +100,7 @@ export default function NativeWalkinQueue() {
 
   const loadProcesses = async () => {
     try {
-      const res = await hrmsApi.get<{ success: boolean; data: Process[] }>("/api/process");
+      const res = await hrmsApi.get<{ success: boolean; data: Process[] }>("/api/processes");
       setProcesses(res.data ?? []);
     } catch {
       // processes are optional for the form dropdown

@@ -1,97 +1,49 @@
-// backend/src/modules/communication/providers/provider.factory.ts
-import { CommunicationProvider } from './provider.interface';
-import { Channel } from '../communication.types';
+import type { CommunicationProvider } from './provider.interface.js';
+import type { Channel } from '../communication.types.js';
+import { NodemailerProvider } from './email/nodemailer.provider.js';
+import { LocalEmailProvider } from './email/local-email.provider.js';
+import { TwilioSMSProvider } from './sms/twilio-sms.provider.js';
+import { LocalSMSProvider } from './sms/local-sms.provider.js';
+import { TwilioWhatsAppProvider } from './whatsapp/twilio-whatsapp.provider.js';
+import { LocalWhatsAppProvider } from './whatsapp/local-whatsapp.provider.js';
 
-type ProviderType = 'nodemailer' | 'local-email-tool' | 'twilio' | 'local-sms-tool' | 'local-whatsapp-tool';
-
-interface ProviderConfig {
-  email: ProviderType;
-  sms: ProviderType;
-  whatsapp: ProviderType;
-}
+type EmailType = 'nodemailer' | 'local-email-tool';
+type SMSType = 'twilio' | 'local-sms-tool';
+type WAType = 'twilio' | 'local-whatsapp-tool';
 
 class ProviderFactory {
-  private config: ProviderConfig;
-  private providers: Map<string, CommunicationProvider> = new Map();
+  private cache = new Map<Channel, CommunicationProvider>();
 
-  constructor() {
-    this.config = {
-      email: (process.env.EMAIL_PROVIDER as ProviderType) || 'nodemailer',
-      sms: (process.env.SMS_PROVIDER as ProviderType) || 'twilio',
-      whatsapp: (process.env.WHATSAPP_PROVIDER as ProviderType) || 'twilio'
-    };
-  }
-
-  /**
-   * Get provider for channel
-   */
   getProvider(channel: Channel): CommunicationProvider {
-    const cacheKey = `${channel}-${this.config[channel]}`;
-
-    if (this.providers.has(cacheKey)) {
-      return this.providers.get(cacheKey)!;
+    if (!this.cache.has(channel)) {
+      this.cache.set(channel, this.build(channel));
     }
-
-    const provider = this.createProvider(channel);
-    this.providers.set(cacheKey, provider);
-    return provider;
+    return this.cache.get(channel)!;
   }
 
-  private createProvider(channel: Channel): CommunicationProvider {
-    const providerType = this.config[channel];
-
-    switch (channel) {
-      case 'email':
-        return this.createEmailProvider(providerType);
-      case 'sms':
-        return this.createSMSProvider(providerType);
-      case 'whatsapp':
-        return this.createWhatsAppProvider(providerType);
-      default:
-        throw new Error(`Unsupported channel: ${channel}`);
+  private build(channel: Channel): CommunicationProvider {
+    if (channel === 'email') {
+      const type = (process.env.EMAIL_PROVIDER ?? 'nodemailer') as EmailType;
+      if (type === 'nodemailer')       return new NodemailerProvider();
+      if (type === 'local-email-tool') return new LocalEmailProvider();
+      throw new Error(`Unknown email provider: ${type}`);
     }
-  }
-
-  private createEmailProvider(type: ProviderType): CommunicationProvider {
-    // Lazy imports to avoid loading unused providers
-    if (type === 'nodemailer') {
-      const { NodemailerProvider } = require('./email/nodemailer.provider');
-      return new NodemailerProvider();
-    } else if (type === 'local-email-tool') {
-      const { LocalEmailProvider } = require('./email/local-email.provider');
-      return new LocalEmailProvider();
+    if (channel === 'sms') {
+      const type = (process.env.SMS_PROVIDER ?? 'twilio') as SMSType;
+      if (type === 'twilio')          return new TwilioSMSProvider();
+      if (type === 'local-sms-tool')  return new LocalSMSProvider();
+      throw new Error(`Unknown SMS provider: ${type}`);
     }
-    throw new Error(`Unsupported email provider: ${type}`);
-  }
-
-  private createSMSProvider(type: ProviderType): CommunicationProvider {
-    if (type === 'twilio') {
-      const { TwilioSMSProvider } = require('./sms/twilio-sms.provider');
-      return new TwilioSMSProvider();
-    } else if (type === 'local-sms-tool') {
-      const { LocalSMSProvider } = require('./sms/local-sms.provider');
-      return new LocalSMSProvider();
+    if (channel === 'whatsapp') {
+      const type = (process.env.WHATSAPP_PROVIDER ?? 'twilio') as WAType;
+      if (type === 'twilio')              return new TwilioWhatsAppProvider();
+      if (type === 'local-whatsapp-tool') return new LocalWhatsAppProvider();
+      throw new Error(`Unknown WhatsApp provider: ${type}`);
     }
-    throw new Error(`Unsupported SMS provider: ${type}`);
+    throw new Error(`Unknown channel: ${channel}`);
   }
 
-  private createWhatsAppProvider(type: ProviderType): CommunicationProvider {
-    if (type === 'twilio') {
-      const { TwilioWhatsAppProvider } = require('./whatsapp/twilio-whatsapp.provider');
-      return new TwilioWhatsAppProvider();
-    } else if (type === 'local-whatsapp-tool') {
-      const { LocalWhatsAppProvider } = require('./whatsapp/local-whatsapp.provider');
-      return new LocalWhatsAppProvider();
-    }
-    throw new Error(`Unsupported WhatsApp provider: ${type}`);
-  }
-
-  /**
-   * Clear provider cache (for testing)
-   */
-  clearCache(): void {
-    this.providers.clear();
-  }
+  clearCache(): void { this.cache.clear(); }
 }
 
 export const providerFactory = new ProviderFactory();
