@@ -3,6 +3,7 @@ vi.mock("../src/db/mysql.js", () => ({
     db: { execute: vi.fn() },
     pingDb: vi.fn(),
 }));
+vi.mock("../src/modules/engagement/badge.service.js", () => ({ queueAutoAwards: vi.fn() }));
 vi.mock("../src/db/supabaseAdmin.js", () => ({
     supabaseAdmin: {},
     supabaseAuthClient: { auth: { getUser: vi.fn() } },

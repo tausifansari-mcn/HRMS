@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { PerformanceFeedbackService } from "./performance-feedback.service";
+import { PerformanceFeedbackService } from "./performance-feedback.service.js";
 import {
   createCycleSchema,
   updateCycleSchema,
@@ -12,7 +12,7 @@ import {
   updateGoalSchema,
   cycleFiltersSchema,
   feedbackFiltersSchema,
-} from "./performance-feedback.validation";
+} from "./performance-feedback.validation.js";
 
 const service = new PerformanceFeedbackService();
 

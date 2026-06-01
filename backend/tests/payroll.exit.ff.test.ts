@@ -14,6 +14,7 @@ vi.mock("../src/db/supabaseAdmin.js", () => ({
 vi.mock("../src/shared/auditLog.js", () => ({
   logSensitiveAction: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock("../src/modules/engagement/badge.service.js", () => ({ queueAutoAwards: vi.fn() }));
 
 import { db } from "../src/db/mysql.js";
 import { logSensitiveAction } from "../src/shared/auditLog.js";

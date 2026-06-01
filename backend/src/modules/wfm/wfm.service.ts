@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
+import { queueAutoAwards } from "../engagement/badge.service.js";
 import type {
   AttendanceRegularization,
   PaginatedResult,
@@ -105,7 +106,9 @@ export const wfmService = {
         WHERE id = ?`,
       [minutes, sessionId]
     );
-    return this.getSession(sessionId);
+    const updatedSession = await this.getSession(sessionId);
+    queueAutoAwards(session.employee_id, "attendance");
+    return updatedSession;
   },
 
   async getSession(id: string): Promise<WfmAttendanceSession> {

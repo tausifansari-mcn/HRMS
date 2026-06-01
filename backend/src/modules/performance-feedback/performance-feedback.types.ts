@@ -23,6 +23,7 @@ export interface PerformanceFeedbackRequest {
   employee_id: string;
   reviewer_id: string;
   reviewer_type: ReviewerType;
+  manager_id?: string;
   request_date: string;
   due_date: string;
   status: RequestStatus;
@@ -152,9 +153,7 @@ export interface CreateCycleDto {
 }
 
 export interface LaunchCycleDto {
-  cycle_id: string;
-  launch_date: string;
-  reviewer_assignments: ReviewerAssignment[];
+  employee_ids: string[];
 }
 
 export interface ReviewerAssignment {
@@ -192,16 +191,13 @@ export interface GenerateReportDto {
 
 export interface CreateDevelopmentPlanDto {
   employee_id: string;
-  cycle_id: string;
-  plan_title: string;
-  plan: PlanJson;
-  created_by: string;
+  target_date?: string;
   goals?: CreateGoalDto[];
 }
 
 export interface CreateGoalDto {
-  goal_description: string;
-  target_date: string;
+  description: string;
+  target_date?: string;
 }
 
 export interface UpdateGoalDto {

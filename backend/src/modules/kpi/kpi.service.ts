@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
+import { queueAutoAwards } from "../engagement/badge.service.js";
 import type {
   FamilySummary, KpiAssignment, KpiFamily, KpiMetric, KpiScore, KpiSummary,
   KpiTemplate, KpiTemplateMetric, LeaderboardEntry,
@@ -165,7 +166,9 @@ export const kpiService = {
       "SELECT * FROM kpi_score WHERE employee_id = ? AND metric_id = ? AND period = ? LIMIT 1",
       [input.employeeId, input.metricId, input.period]
     );
-    return (rows as KpiScore[])[0];
+    const score = (rows as KpiScore[])[0];
+    queueAutoAwards(input.employeeId, "kpi_score_recorded");
+    return score;
   },
 
   async bulkRecordScores(input: BulkScoreInput, _userId: string): Promise<{ recorded: number }> {
@@ -181,6 +184,9 @@ export const kpiService = {
        ON DUPLICATE KEY UPDATE actual_value = VALUES(actual_value), source = VALUES(source)`,
       params
     );
+    for (const employeeId of new Set(input.scores.map((score) => score.employeeId))) {
+      queueAutoAwards(employeeId, "kpi_score_recorded");
+    }
     return { recorded: (result as any).affectedRows ?? input.scores.length };
   },
 

@@ -3,6 +3,7 @@ import type { Request } from "express";
 import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
 import { logSensitiveAction } from "../../shared/auditLog.js";
+import { queueAutoAwards } from "../engagement/badge.service.js";
 
 export interface PayslipData {
   id: string;
@@ -142,6 +143,8 @@ export const payslipService = {
       [payslipId]
     );
 
-    return this.getPayslip(rec.employee_id, rec.run_id);
+    const payslip = await this.getPayslip(rec.employee_id, rec.run_id);
+    queueAutoAwards(rec.employee_id, "payslip_acknowledged");
+    return payslip;
   },
 };

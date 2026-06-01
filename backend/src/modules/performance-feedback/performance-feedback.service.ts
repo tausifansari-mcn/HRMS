@@ -1,4 +1,4 @@
-import { db } from "../../db/mysql";
+import { db } from "../../db/mysql.js";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
 import {
   PerformanceFeedbackCycle,
@@ -15,7 +15,7 @@ import {
   CompetencyScore,
   KpiScore,
   FormTemplateDto,
-} from "./performance-feedback.types";
+} from "./performance-feedback.types.js";
 
 export class PerformanceFeedbackService {
   /**

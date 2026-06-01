@@ -22,7 +22,7 @@ const _pool: Pool = mysql.createPool({
 type AnyParams = any;
 
 export const db = {
-  execute<T extends RowDataPacket[]>(sql: string, params?: unknown[]): Promise<[T, FieldPacket[]]> {
+  execute<T extends QueryResult = RowDataPacket[]>(sql: string, params?: unknown[]): Promise<[T, FieldPacket[]]> {
     return _pool.execute<T>(sql, params as AnyParams);
   },
   executeRun(sql: string, params?: unknown[]): Promise<[QueryResult, FieldPacket[]]> {
