@@ -44,8 +44,7 @@ ALTER TABLE ats_onboarding_bridge
   ADD COLUMN IF NOT EXISTS hr_approved_by              CHAR(36),
   ADD COLUMN IF NOT EXISTS hr_approved_at              DATETIME;
 
-ALTER TABLE ats_onboarding_bridge
-  ADD UNIQUE INDEX IF NOT EXISTS uq_onb_token (onboarding_token);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_onb_token ON ats_onboarding_bridge (onboarding_token);
 
 -- 4. NEW: ats_onboarding_request
 CREATE TABLE IF NOT EXISTS ats_onboarding_request (
@@ -154,30 +153,8 @@ INSERT INTO salary_band_master (band_code, band_name, min_ctc, max_ctc, basic_pc
   ('M', 'Band M — Management', 1200001, 99999999,  50.00, 50.00)
 ON DUPLICATE KEY UPDATE band_name = VALUES(band_name);
 
--- 9. Ensure employee_salary_snapshot exists (referenced by approval flow)
-CREATE TABLE IF NOT EXISTS employee_salary_snapshot (
-  id               CHAR(36)      NOT NULL DEFAULT (UUID()) PRIMARY KEY,
-  employee_id      CHAR(36)      NOT NULL,
-  effective_date   DATE          NOT NULL,
-  offered_ctc      DECIMAL(12,2),
-  basic            DECIMAL(12,2),
-  hra              DECIMAL(12,2),
-  conveyance       DECIMAL(12,2),
-  da               DECIMAL(12,2),
-  special_allowance DECIMAL(12,2),
-  other_allowance  DECIMAL(12,2),
-  bonus            DECIMAL(12,2),
-  gross            DECIMAL(12,2),
-  pf_employee      DECIMAL(12,2),
-  pf_employer      DECIMAL(12,2),
-  esic_employee    DECIMAL(12,2),
-  esic_employer    DECIMAL(12,2),
-  professional_tax DECIMAL(12,2),
-  gratuity         DECIMAL(12,2),
-  admin_charges    DECIMAL(12,2),
-  net_in_hand      DECIMAL(12,2),
-  created_by       CHAR(36),
-  created_at       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
-  INDEX idx_salary_snap_emp (employee_id)
-);
+-- 9. Ensure employee_salary_snapshot has columns used by approval flow
+--    (table created in 052; these are additive guards for the two columns the service inserts)
+ALTER TABLE employee_salary_snapshot
+  ADD COLUMN IF NOT EXISTS effective_date DATE          NULL,
+  ADD COLUMN IF NOT EXISTS offered_ctc    DECIMAL(12,2) NULL;
