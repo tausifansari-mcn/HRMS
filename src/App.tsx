@@ -133,6 +133,8 @@ const NativeOperationsKPI           = lazy(() => import("./pages/NativeOperation
 const NativePortalDataManager       = lazy(() => import("./pages/NativePortalDataManager"));
 const NativeLeaveTypeConfig         = lazy(() => import("./pages/NativeLeaveTypeConfig"));
 const NativeMyRoster                = lazy(() => import("./pages/NativeMyRoster"));
+const NativeRosterMasterBuilder     = lazy(() => import("./pages/NativeRosterMasterBuilder"));
+const NativeWeekOffPreferences      = lazy(() => import("./pages/NativeWeekOffPreferences"));
 const NativeRTABoard                = lazy(() => import("./pages/NativeRTABoard"));
 const NativeWalkinQueue             = lazy(() => import("./pages/NativeWalkinQueue"));
 const NativeAttendanceRulesMaster   = lazy(() => import("./pages/NativeAttendanceRulesMaster"));
@@ -305,6 +307,8 @@ const App = () => (
               <Route path="/process-config" element={<ProtectedRoute><Gate pageCode="PROCESS_CONFIG"><NativeProcessConfig /></Gate></ProtectedRoute>} />
               <Route path="/leave-types" element={<ProtectedRoute><Gate pageCode="LEAVE_TYPES"><NativeLeaveTypeConfig /></Gate></ProtectedRoute>} />
               <Route path="/my-roster" element={<ProtectedRoute><NativeMyRoster /></ProtectedRoute>} />
+              <Route path="/roster-master-builder" element={<ProtectedRoute><Gate pageCode="ROSTER_MASTER"><NativeRosterMasterBuilder /></Gate></ProtectedRoute>} />
+              <Route path="/week-off-preferences" element={<ProtectedRoute><NativeWeekOffPreferences /></ProtectedRoute>} />
               <Route path="/rta-board" element={<ProtectedRoute><Gate pageCode="RTA_BOARD"><NativeRTABoard /></Gate></ProtectedRoute>} />
               <Route path="/ats/walkin-queue" element={<ProtectedRoute><Gate pageCode="ATS_WAITING_QUEUE"><NativeWalkinQueue /></Gate></ProtectedRoute>} />
               <Route path="/attendance-rules-master" element={<ProtectedRoute><NativeAttendanceRulesMaster /></ProtectedRoute>} />
