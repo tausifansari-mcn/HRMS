@@ -80,12 +80,19 @@ const NativePerformanceFeedbackAssignments = lazy(() => import("./pages/NativePe
 const NativePerformanceFeedbackForm = lazy(() => import("./pages/NativePerformanceFeedbackForm"));
 const NativePerformanceFeedbackTeamReports = lazy(() => import("./pages/NativePerformanceFeedbackTeamReports"));
 
+// People
+const NativeEmployeeStatCard        = lazy(() => import("./pages/NativeEmployeeStatCard"));
+
 // Engagement
 const NativeEngagement                = lazy(() => import("./pages/NativeEngagement"));
 const NativeBadges                    = lazy(() => import("./pages/NativeBadges"));
 const NativeKudos                     = lazy(() => import("./pages/NativeKudos"));
 const NativeSurveys                   = lazy(() => import("./pages/NativeSurveys"));
 const NativeLeaderboard               = lazy(() => import("./pages/NativeLeaderboard"));
+
+// Offer Letters & Master Reports
+const NativeOfferLetterGeneration   = lazy(() => import("./pages/NativeOfferLetterGeneration"));
+const NativeMasterReports           = lazy(() => import("./pages/NativeMasterReports"));
 
 // HR Ops
 const NativeAssetsManager           = lazy(() => import("./pages/NativeAssetsManager"));
@@ -126,6 +133,10 @@ const NativeNotificationPreferences = lazy(() => import("./pages/NativeNotificat
 
 // Call Centre Config
 const NativeCallCentreConfig        = lazy(() => import("./pages/NativeCallCentreConfig"));
+
+// Document Verification & Roster Preferences
+const NativeDocumentVerification    = lazy(() => import("./pages/NativeDocumentVerification"));
+const NativeRosterPreference        = lazy(() => import("./pages/NativeRosterPreference"));
 
 // System
 const NativeMigrationConsole        = lazy(() => import("./pages/NativeMigrationConsole"));
@@ -232,6 +243,7 @@ const App = () => (
               <Route path="/wfm/roster" element={<ProtectedRoute><Gate pageCode="WFM_ROSTER"><NativeWFMRoster /></Gate></ProtectedRoute>} />
               <Route path="/wfm/live-tracker" element={<ProtectedRoute><Gate pageCode="WFM_LIVE_TRACKER"><NativePlaceholderPage title="WFM Live Tracker" module="WFM" /></Gate></ProtectedRoute>} />
               <Route path="/wfm/extensions" element={<ProtectedRoute><Gate pageCode="WFM_EXTENSIONS"><NativeWFMExtensions /></Gate></ProtectedRoute>} />
+              <Route path="/roster-preference" element={<ProtectedRoute><NativeRosterPreference /></ProtectedRoute>} />
 
               {/* Quality / Ops */}
               <Route path="/quality/dashboard" element={<ProtectedRoute><Gate pageCode="QUALITY_DASHBOARD"><NativePlaceholderPage title="Quality Dashboard" module="Quality" /></Gate></ProtectedRoute>} />
@@ -257,12 +269,21 @@ const App = () => (
               <Route path="/engagement/surveys" element={<ProtectedRoute><NativeSurveys /></ProtectedRoute>} />
               <Route path="/engagement/leaderboard" element={<ProtectedRoute><NativeLeaderboard /></ProtectedRoute>} />
 
+              {/* Employee Stat Card / Journey */}
+              <Route path="/employee-stat-card" element={<ProtectedRoute><NativeEmployeeStatCard /></ProtectedRoute>} />
+              <Route path="/employee-stat-card/:id" element={<ProtectedRoute><NativeEmployeeStatCard /></ProtectedRoute>} />
+
               {/* Client Portal */}
               <Route path="/portal/login" element={<PortalLogin />} />
               <Route path="/portal" element={<PortalRoute><PortalOverview /></PortalRoute>} />
               <Route path="/portal/processes/:id" element={<PortalRoute><PortalProcessDashboard /></PortalRoute>} />
 
+              {/* Offer Letters & Master Reports */}
+              <Route path="/offer-letter" element={<ProtectedRoute><NativeOfferLetterGeneration /></ProtectedRoute>} />
+              <Route path="/master-reports" element={<ProtectedRoute><NativeMasterReports /></ProtectedRoute>} />
+
               {/* HR Ops */}
+              <Route path="/document-verification" element={<ProtectedRoute><NativeDocumentVerification /></ProtectedRoute>} />
               <Route path="/assets-manager" element={<ProtectedRoute><Gate pageCode="ASSETS_MANAGER"><NativeAssetsManager /></Gate></ProtectedRoute>} />
               <Route path="/helpdesk" element={<ProtectedRoute><Gate pageCode="HELPDESK"><NativeHelpdesk /></Gate></ProtectedRoute>} />
               <Route path="/letters" element={<ProtectedRoute><Gate pageCode="LETTERS"><NativeLetters /></Gate></ProtectedRoute>} />

@@ -5,6 +5,8 @@ import { requireRole } from "../../middleware/requireRole.js";
 import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 import { selfOrAdminHr } from "../../shared/accessGuard.js";
 import { lifecycleService } from "./lifecycle.service.js";
+import { db } from "../../db/mysql.js";
+import type { RowDataPacket } from "mysql2";
 
 const router = Router();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,6 +54,31 @@ router.post("/documents/:id/verify", requireRole("admin", "hr"), h(async (req: A
 router.get("/documents/expiring", requireRole("admin", "hr"), h(async (req: AuthenticatedRequest, res: Response) => {
   const days = req.query.days ? parseInt(req.query.days as string, 10) : 30;
   res.json({ data: await lifecycleService.getExpiredOrExpiringDocuments(days) });
+}));
+
+router.get("/documents/unverified", requireRole("admin", "hr"), h(async (_req: AuthenticatedRequest, res: Response) => {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT ed.*, e.first_name, e.last_name, e.employee_code
+       FROM employee_documents ed
+       LEFT JOIN employees e ON e.id = ed.employee_id
+      WHERE ed.verified = 0
+      ORDER BY ed.created_at DESC
+      LIMIT 200`
+  );
+  res.json({ data: rows });
+}));
+
+router.get("/documents/:id/access-log", requireRole("admin", "hr"), h(async (req: AuthenticatedRequest, res: Response) => {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT dal.*, e.first_name, e.last_name
+       FROM employee_document_access_log dal
+       LEFT JOIN employees e ON e.id = dal.accessed_by
+      WHERE dal.document_id = ?
+      ORDER BY dal.accessed_at DESC
+      LIMIT 100`,
+    [req.params.id]
+  );
+  res.json({ data: rows });
 }));
 
 export { router as lifecycleRouter };

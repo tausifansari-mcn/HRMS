@@ -49,6 +49,7 @@ import { attendanceEngineRouter } from "./modules/wfm/attendance-engine.routes.j
 import customizationRouter from "./modules/customization/customization.routes.js";
 import { rosterMasterRouter } from "./modules/roster/roster-master.routes.js";
 import rosterCapacityRouter from "./modules/roster/roster-capacity.routes.js";
+import { reportingRouter } from "./modules/reporting/reporting.routes.js";
 
 export const app = express();
 
@@ -127,6 +128,7 @@ app.use('/api/wfm/attendance', attendanceEngineRouter);
 app.use("/api/customization", customizationRouter);
 app.use("/api/roster-master", rosterMasterRouter);
 app.use("/api/roster-capacity", rosterCapacityRouter);
+app.use('/api/reports', reportingRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

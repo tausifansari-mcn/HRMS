@@ -55,6 +55,9 @@ SOURCE sql/042_maternity_schema_patch.sql;
 SOURCE sql/044_attendance_engine.sql;
 SOURCE sql/045_role_compat.sql;
 SOURCE sql/046_call_centre_code.sql;
+SOURCE sql/047_roster_preference.sql;
+SOURCE sql/048_offerletter_cc.sql;
+SOURCE sql/049_report_master.sql;
 -- NOTE: SOURCE sql/043_demo_data.sql; -- development seed only, do not run in production
 
 SELECT 'mas_hrms schema complete' AS status;
