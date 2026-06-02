@@ -19,7 +19,9 @@ function getAuthHeader(): Record<string, string> {
     return { Authorization: `Bearer ${mysqlToken}` };
   }
 
-  throw new Error('No active session');
+  // No session — return empty headers so public endpoints (e.g. candidate registration)
+  // still reach the backend. Protected routes enforce auth server-side via requireAuth.
+  return {};
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
