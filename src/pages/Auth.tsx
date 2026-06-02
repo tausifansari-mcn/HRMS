@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import {
   ArrowRight,
@@ -78,6 +78,8 @@ const Auth = () => {
   const { signIn, signUp, forgotPassword, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const onboardingToken = searchParams.get('token');
 
   useEffect(() => {
     if (user) {
@@ -186,7 +188,7 @@ const Auth = () => {
 
     setIsLoading(true);
 
-    const { error } = await signUp(signupEmail, signupPassword, signupName);
+    const { error } = await signUp(signupEmail, signupPassword, signupName, onboardingToken ?? undefined);
 
     setIsLoading(false);
 

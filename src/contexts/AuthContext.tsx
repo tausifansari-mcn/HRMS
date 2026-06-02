@@ -12,7 +12,7 @@ interface AuthContextType {
   isLoading: boolean;
   isSigningOut: boolean;
   signIn: (identifier: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, onboardingToken?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   forgotPassword: (email: string) => Promise<{ error: Error | null }>;
 }
@@ -160,12 +160,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, _fullName: string): Promise<{ error: Error | null }> => {
+  const signUp = async (email: string, password: string, _fullName: string, onboardingToken?: string): Promise<{ error: Error | null }> => {
     try {
+      const body: Record<string, unknown> = { email, password };
+      if (onboardingToken) body.onboardingToken = onboardingToken;
       const res = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
       if (!res.ok) return { error: new Error(json.error || 'Registration failed') };

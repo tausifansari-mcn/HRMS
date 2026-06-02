@@ -45,6 +45,11 @@ const NotificationPreferences       = lazy(() => import("./pages/NotificationPre
 const Changelog                     = lazy(() => import("./pages/Changelog"));
 const ModuleLauncher                = lazy(() => import("./pages/ModuleLauncher"));
 
+// ATS Onboarding
+const CandidateOnboardingPage       = lazy(() => import("./pages/CandidateOnboardingPage"));
+const NativeHROnboardingRequests    = lazy(() => import("./pages/NativeHROnboardingRequests"));
+const NativeBranchHeadApproval      = lazy(() => import("./pages/NativeBranchHeadApproval"));
+
 // ATS
 const NativeATSDashboardReplica     = lazy(() => import("./pages/NativeATSDashboardReplica"));
 const NativeATSCandidateRegistration = lazy(() => import("./pages/NativeATSCandidateRegistration"));
@@ -194,6 +199,7 @@ const App = () => (
               <Route path="/security" element={<Security />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/onboard" element={<CandidateOnboardingPage />} />
 
               <Route path="/interview-registration" element={<NativeATSCandidateRegistration />} />
               <Route path="/candidate-registration" element={<Navigate to="/interview-registration" replace />} />
@@ -233,6 +239,8 @@ const App = () => (
               <Route path="/ats/sourcing-analysis" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativeATSSourcingAnalysis /></Gate></ProtectedRoute>} />
               <Route path="/ats/extensions" element={<ProtectedRoute><Gate pageCode="ATS_EXTENSIONS"><NativeATSExtensions /></Gate></ProtectedRoute>} />
               <Route path="/ats/form-config" element={<ProtectedRoute><NativeATSFormConfig /></ProtectedRoute>} />
+              <Route path="/ats/onboarding-requests" element={<ProtectedRoute><NativeHROnboardingRequests /></ProtectedRoute>} />
+              <Route path="/ats/offer-approvals" element={<ProtectedRoute><NativeBranchHeadApproval /></ProtectedRoute>} />
 
               {/* LMS */}
               <Route path="/lms/my-learning" element={<ProtectedRoute><Gate pageCode="LMS_MY_LEARNING"><NativeLMSMyLearning /></Gate></ProtectedRoute>} />
