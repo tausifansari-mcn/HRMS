@@ -43,6 +43,14 @@ async function migrateOneEmployee(
   masters: MasterMaps,
   result: EmployeeMigrationResult,
 ): Promise<void> {
+  if (!row.EmpCode || !row.EmpCode.trim()) {
+    result.skipped++;
+    return;
+  }
+  if (!row.EmpName || !row.EmpName.trim()) {
+    result.skipped++;
+    return;
+  }
   const { firstName, lastName } = splitName(row.EmpName);
 
   const isLeft   = row.Status === 'L';
