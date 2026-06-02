@@ -5,6 +5,7 @@ import type { Response } from "express";
 import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 import { atsController as c } from "./ats.controller.js";
 import { convertCandidateToEmployee } from "./ats.convert.service.js";
+import onboardingRouter from "./ats.onboarding.routes.js";
 
 export const atsRouter = Router();
 
@@ -72,3 +73,6 @@ atsRouter.get("/waiting-queue",                  h(async (req: any, res: any) =>
   ) as any[];
   return res.json({ success: true, data: rows });
 }));
+
+// Onboarding flow — token generation, profile submission, offer mgmt, approve/reject
+atsRouter.use("/onboarding", onboardingRouter);
