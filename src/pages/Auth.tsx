@@ -186,42 +186,6 @@ const Auth = () => {
 
     setIsLoading(true);
 
-    try {
-      const { data: settings } = await supabase
-        .from("organization_settings")
-        .select("setting_value")
-        .eq("setting_key", "domain_whitelist")
-        .single();
-
-      if (settings?.setting_value) {
-        const whitelist = settings.setting_value as unknown as {
-          enabled: boolean;
-          domains: string[];
-        };
-
-        if (whitelist.enabled && whitelist.domains.length > 0) {
-          const emailDomain = signupEmail.split("@")[1]?.toLowerCase();
-
-          const isAllowed = whitelist.domains.some(
-            (domain) => emailDomain === domain.toLowerCase()
-          );
-
-          if (!isAllowed) {
-            setIsLoading(false);
-
-            showAlert(
-              "Registration Restricted",
-              "Only approved company email domains are allowed. Please contact your administrator."
-            );
-
-            return;
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error checking domain whitelist:", error);
-    }
-
     const { error } = await signUp(signupEmail, signupPassword, signupName);
 
     setIsLoading(false);
