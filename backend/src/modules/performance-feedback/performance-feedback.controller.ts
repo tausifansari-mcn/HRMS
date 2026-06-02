@@ -362,7 +362,7 @@ export const performanceFeedbackController = {
         return res.status(400).json({ error: parsed.error.flatten() });
       }
 
-      const managerId = (req as any).user?.emp_id || (req as any).userId;
+      const managerId = (req as any).authUser?.id || (req as any).user?.emp_id || (req as any).userId;
       if (!managerId) {
         return res.status(401).json({ error: "Unauthorized: manager ID not found" });
       }

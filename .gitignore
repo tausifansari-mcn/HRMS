@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 .env
 .vercel
+
+# Local dev tools with credentials — never commit
+backend/mysql-tunnel.cjs
+backend/*.tunnel.cjs
