@@ -43,6 +43,8 @@ export default function NativeATSOnboardingBridge() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [convertedMap, setConvertedMap] = useState<Record<string, ConvertResult>>({});
+  const [sendingToken, setSendingToken] = useState<string | null>(null);
+  const [tokenSent, setTokenSent] = useState<Set<string>>(new Set());
 
   const load = async () => {
     setLoading(true);
@@ -76,6 +78,18 @@ export default function NativeATSOnboardingBridge() {
       setMessage(err.message || "Unable to load candidates");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendToken = async (candidateId: string) => {
+    setSendingToken(candidateId);
+    try {
+      await hrmsApi.post(`/ats/onboarding/send-token/${candidateId}`, {});
+      setTokenSent(prev => new Set([...prev, candidateId]));
+    } catch (err: any) {
+      alert(err?.response?.data?.error ?? 'Failed to send onboarding link');
+    } finally {
+      setSendingToken(null);
     }
   };
 
@@ -214,7 +228,20 @@ export default function NativeATSOnboardingBridge() {
                             </span>
                           )}
                         </td>
-                        <td className="p-4">
+                        <td className="p-4 space-y-2">
+                          {decision === "Selected" && (
+                            <button
+                              onClick={() => handleSendToken(r.id)}
+                              disabled={sendingToken === r.id || tokenSent.has(r.id)}
+                              className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              {sendingToken === r.id
+                                ? 'Sending...'
+                                : tokenSent.has(r.id)
+                                ? 'Link Sent ✓'
+                                : 'Send Onboarding Link'}
+                            </button>
+                          )}
                           <button
                             disabled={!canConvert || converting === r.id}
                             onClick={() => void convert(r.id)}
