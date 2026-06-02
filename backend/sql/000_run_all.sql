@@ -59,6 +59,7 @@ SOURCE sql/047_roster_preference.sql;
 SOURCE sql/048_offerletter_cc.sql;
 SOURCE sql/049_report_master.sql;
 SOURCE sql/050_auth_mysql.sql;
+SOURCE sql/051_ats_form_config.sql;
 -- NOTE: SOURCE sql/043_demo_data.sql; -- development seed only, do not run in production
 
 SELECT 'mas_hrms schema complete' AS status;
