@@ -102,8 +102,8 @@ export const useUserRole = () => {
       // No MySQL token — unauthenticated; do not fall back to Supabase
       return {
         roles: [],
-        roleKeys: ["employee"],
-        primaryRole: "employee" as AppRole,
+        roleKeys: [],
+        primaryRole: null,
         employeeId: null,
         employeeCode: null,
         employeeName: null,
