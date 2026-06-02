@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,33 +8,21 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Lock } from "lucide-react";
 import hrHubLogo from "@/assets/brand/mcn-logo.png";
 
+const API_URL = import.meta.env.VITE_HRMS_API_URL || 'http://localhost:5055';
+
 const ResetPassword = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [checking, setChecking] = useState(true);
-  const [isValidSession, setIsValidSession] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
-        setIsValidSession(true);
-        setChecking(false);
-      }
-    });
-
-    // Check if there's already a valid session (recovery token already processed)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setIsValidSession(true);
-      }
-      setChecking(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    const t = searchParams.get('token');
+    setToken(t);
+  }, [searchParams]);
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,26 +37,27 @@ const ResetPassword = () => {
     }
 
     setIsLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    setIsLoading(false);
-
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Password Updated", description: "Your password has been reset successfully." });
-      navigate("/dashboard", { replace: true });
+    try {
+      const res = await fetch(`${API_URL}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast({ title: "Error", description: json.error || "Failed to reset password.", variant: "destructive" });
+      } else {
+        toast({ title: "Password Updated", description: "Your password has been reset. Please log in." });
+        navigate("/auth", { replace: true });
+      }
+    } catch {
+      toast({ title: "Error", description: "Network error. Please try again.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (checking) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isValidSession) {
+  if (!token) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-6">
         <Card className="w-full max-w-md border-border">

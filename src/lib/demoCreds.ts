@@ -216,27 +216,13 @@ export function getDemoCred(email: string): DemoCred | undefined {
   return _byEmail.get(email.toLowerCase());
 }
 
-/** Build mock Supabase session shape for a demo cred */
+/** Build demo session for localStorage — plain shape, no Supabase types */
 export function buildDemoSession(cred: DemoCred) {
   return {
-    access_token:  `mock-token-${cred.role}`,
-    token_type:    "bearer",
-    expires_in:    3600,
-    refresh_token: `mock-refresh-${cred.role}`,
+    access_token: `mock-token-${cred.role}`,
     user: {
-      id:                  cred.userId,
-      aud:                 "authenticated",
-      role:                "authenticated",
-      email:               cred.email,
-      email_confirmed_at:  new Date().toISOString(),
-      phone:               "",
-      confirmed_at:        new Date().toISOString(),
-      last_sign_in_at:     new Date().toISOString(),
-      app_metadata:        { provider: "email", providers: ["email"] },
-      user_metadata:       { full_name: cred.fullName, demo_role: cred.role },
-      identities:          [],
-      created_at:          new Date().toISOString(),
-      updated_at:          new Date().toISOString(),
+      id:    cred.userId,
+      email: cred.email,
     },
   };
 }

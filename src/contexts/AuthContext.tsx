@@ -1,209 +1,225 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getDemoCred, buildDemoSession } from "@/lib/demoCreds";
 
+export interface HrmsUser {
+  id: string;
+  email: string;
+}
+
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: HrmsUser | null;
   isLoading: boolean;
   isSigningOut: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (identifier: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  forgotPassword: (email: string) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const API_URL = import.meta.env.VITE_HRMS_API_URL || 'http://localhost:5055';
+
+function decodeJwtUser(token: string): HrmsUser | null {
+  try {
+    const [, b64] = token.split('.');
+    const payload = JSON.parse(atob(b64.replace(/-/g, '+').replace(/_/g, '/')));
+    if (payload?.sub && payload?.exp && payload.exp * 1000 > Date.now()) {
+      return { id: payload.sub, email: payload.email ?? '' };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function tryRefresh(): Promise<HrmsUser | null> {
+  const raw = localStorage.getItem('hrms_refresh_token');
+  if (!raw) return null;
+  try {
+    const res = await fetch(`${API_URL}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: raw }),
+    });
+    if (!res.ok) return null;
+    const { data } = await res.json();
+    localStorage.setItem('hrms_access_token', data.accessToken);
+    return decodeJwtUser(data.accessToken);
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<HrmsUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const queryClient = useQueryClient();
+  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    // Check if we are in local demo mode first
-    const localDemo = localStorage.getItem("hrms_demo_session");
-    if (localDemo) {
-      try {
-        const demoData = JSON.parse(localDemo);
-        setSession(demoData);
-        setUser(demoData.user);
-        setIsLoading(false);
-        return;
-      } catch (e) {
-        console.error("Failed to parse demo session", e);
-      }
-    }
-
-    // Check for MySQL JWT session (new auth path)
-    const mysqlToken = localStorage.getItem('hrms_access_token');
-    if (mysqlToken) {
-      try {
-        // Decode JWT payload (no verification needed client-side — server verifies on each request)
-        const [, payloadB64] = mysqlToken.split('.');
-        const payload = JSON.parse(atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/')));
-        if (payload?.sub && payload?.exp && payload.exp * 1000 > Date.now()) {
-          setUser({ id: payload.sub, email: payload.email } as any);
-          setIsLoading(false);
-          return;
-        }
-      } catch {
-        // Malformed token — clear and fall through
+  const scheduleRefresh = () => {
+    if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
+    // Refresh every 13 minutes (token expires at 15)
+    refreshTimerRef.current = setInterval(async () => {
+      const refreshed = await tryRefresh();
+      if (!refreshed) {
+        // Refresh failed — clear session
         localStorage.removeItem('hrms_access_token');
         localStorage.removeItem('hrms_refresh_token');
+        setUser(null);
+        queryClient.clear();
+        if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
       }
-    }
+    }, 13 * 60 * 1000);
+  };
 
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        // If a demo session is in progress, do not overwrite it with null
-        if (localStorage.getItem("hrms_demo_session")) return;
-
-        setSession(session);
-        setUser(session?.user ?? null);
-        setIsLoading(false);
-        
-        // Invalidate user-role cache on login/signup to force refetch
-        if (event === 'SIGNED_IN' && session?.user?.id) {
-          queryClient.invalidateQueries({ queryKey: ['user-role', session.user.id] });
-        }
-        
-        // Clear cache on logout
-        if (event === 'SIGNED_OUT') {
-          queryClient.removeQueries({ queryKey: ['user-role'] });
+  useEffect(() => {
+    const init = async () => {
+      // 1. Demo session
+      const demoRaw = localStorage.getItem('hrms_demo_session');
+      if (demoRaw) {
+        try {
+          const demo = JSON.parse(demoRaw);
+          if (demo?.user?.id) {
+            setUser({ id: demo.user.id, email: demo.user.email ?? '' });
+            setIsLoading(false);
+            return;
+          }
+        } catch {
+          localStorage.removeItem('hrms_demo_session');
         }
       }
-    );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (localStorage.getItem("hrms_demo_session")) return;
-      setSession(session);
-      setUser(session?.user ?? null);
+      // 2. MySQL JWT access token
+      const token = localStorage.getItem('hrms_access_token');
+      if (token) {
+        const decoded = decodeJwtUser(token);
+        if (decoded) {
+          setUser(decoded);
+          setIsLoading(false);
+          scheduleRefresh();
+          return;
+        }
+        // Access token expired — try refresh
+        localStorage.removeItem('hrms_access_token');
+        const refreshed = await tryRefresh();
+        if (refreshed) {
+          setUser(refreshed);
+          setIsLoading(false);
+          scheduleRefresh();
+          return;
+        }
+        localStorage.removeItem('hrms_refresh_token');
+      }
+
+      setUser(null);
       setIsLoading(false);
-    });
+    };
 
-    return () => subscription.unsubscribe();
+    init();
+
+    return () => {
+      if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
+    };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    // Role-based demo sign-in bypass (no Supabase call)
-    const demoCred = getDemoCred(email);
-    if (demoCred && password === demoCred.password) {
+  const signIn = async (identifier: string, password: string): Promise<{ error: Error | null }> => {
+    // Demo bypass — local only, no server call
+    const demoCred = getDemoCred(identifier);
+    if (demoCred) {
+      if (password !== demoCred.password) {
+        return { error: new Error('Incorrect password for demo account') };
+      }
       const mockSession = buildDemoSession(demoCred);
-      localStorage.setItem("hrms_demo_session", JSON.stringify(mockSession));
-      setSession(mockSession as any);
-      setUser(mockSession.user as any);
+      localStorage.setItem('hrms_demo_session', JSON.stringify(mockSession));
+      setUser({ id: mockSession.user.id, email: mockSession.user.email });
       queryClient.invalidateQueries();
       return { error: null };
     }
-    if (demoCred && password !== demoCred.password) {
-      return { error: new Error("Incorrect password for demo account") };
-    }
 
-    // Try MySQL JWT auth first
+    // MySQL JWT login
     try {
-      const response = await fetch(`${import.meta.env.VITE_HRMS_API_URL || ''}/api/auth/login`, {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier: email, password }),
+        body: JSON.stringify({ identifier, password }),
       });
-      if (response.ok) {
-        const { data: authData } = await response.json();
-        localStorage.setItem('hrms_access_token', authData.accessToken);
-        localStorage.setItem('hrms_refresh_token', authData.refreshToken);
-        // Set user state from MySQL auth response
-        setUser({ id: authData.user.id, email: authData.user.email } as any);
-        queryClient.invalidateQueries();
-        return { error: null };
-      }
-    } catch (networkErr) {
-      // Network failure — fall through to Supabase
-      console.warn('MySQL auth endpoint unreachable, falling back to Supabase', networkErr);
+      const json = await res.json();
+      if (!res.ok) return { error: new Error(json.error || 'Authentication failed') };
+      const { accessToken, refreshToken, user: authUser } = json.data;
+      localStorage.setItem('hrms_access_token', accessToken);
+      localStorage.setItem('hrms_refresh_token', refreshToken);
+      setUser({ id: authUser.id, email: authUser.email });
+      scheduleRefresh();
+      queryClient.invalidateQueries();
+      return { error: null };
+    } catch (err) {
+      return { error: err instanceof Error ? err : new Error('Network error') };
     }
-
-    // Fall back to Supabase auth (for users not yet in auth_user table)
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      return { error: error as Error };
-    }
-
-    // Check if user is blocked
-    if (data.user) {
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('blocked')
-        .eq('id', data.user.id)
-        .single();
-
-      if (profileError) {
-        console.error('Error checking blocked status:', profileError);
-      }
-
-      if (profile?.blocked) {
-        // Sign out the user immediately
-        await supabase.auth.signOut({ scope: 'local' });
-        return { error: new Error('Your account has been blocked. Please contact an administrator.') };
-      }
-    }
-
-    return { error: null };
   };
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
-
-    if (error) {
-      return { error: error as Error };
+  const signUp = async (email: string, password: string, _fullName: string): Promise<{ error: Error | null }> => {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const json = await res.json();
+      if (!res.ok) return { error: new Error(json.error || 'Registration failed') };
+      return { error: null };
+    } catch (err) {
+      return { error: err instanceof Error ? err : new Error('Network error') };
     }
-
-    // Supabase returns a fake user with empty identities for duplicate signups
-    if (data?.user?.identities && data.user.identities.length === 0) {
-      return { error: new Error("User already registered") };
-    }
-
-    return { error: null };
   };
 
   const signOut = async () => {
     setIsSigningOut(true);
     try {
-      localStorage.removeItem("hrms_demo_session");
+      const refreshToken = localStorage.getItem('hrms_refresh_token');
+      if (refreshToken) {
+        const token = localStorage.getItem('hrms_access_token');
+        await fetch(`${API_URL}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ refreshToken }),
+        }).catch(() => { /* best-effort */ });
+      }
+    } finally {
+      localStorage.removeItem('hrms_demo_session');
       localStorage.removeItem('hrms_access_token');
       localStorage.removeItem('hrms_refresh_token');
-      await supabase.auth.signOut({ scope: 'local' });
-    } catch (error) {
-      console.error('Sign out error:', error);
-    } finally {
-      // Clear local state regardless of server response
-      setSession(null);
+      if (refreshTimerRef.current) clearInterval(refreshTimerRef.current);
       setUser(null);
       queryClient.clear();
       setIsSigningOut(false);
     }
   };
 
+  const forgotPassword = async (email: string): Promise<{ error: Error | null }> => {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const json = await res.json();
+        return { error: new Error(json.error || 'Request failed') };
+      }
+      return { error: null };
+    } catch (err) {
+      return { error: err instanceof Error ? err : new Error('Network error') };
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, isSigningOut, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, isLoading, isSigningOut, signIn, signUp, signOut, forgotPassword }}>
       {children}
     </AuthContext.Provider>
   );
@@ -212,7 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 }

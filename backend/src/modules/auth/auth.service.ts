@@ -105,4 +105,32 @@ export const authService = {
     );
     return id;
   },
+
+  async forgotPassword(email: string): Promise<string | null> {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      'SELECT id FROM auth_user WHERE email = ? AND is_blocked = 0 LIMIT 1',
+      [email.toLowerCase().trim()]
+    );
+    if (!rows[0]) return null; // silent — don't leak whether email exists
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await db.execute(
+      'INSERT INTO auth_password_reset (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
+      [rows[0].id, tokenHash, expiresAt.toISOString().slice(0, 19).replace('T', ' ')]
+    );
+    return rawToken;
+  },
+
+  async resetPassword(rawToken: string, newPassword: string): Promise<void> {
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const [rows] = await db.execute<RowDataPacket[]>(
+      'SELECT user_id FROM auth_password_reset WHERE token_hash = ? AND used = 0 AND expires_at > NOW() LIMIT 1',
+      [tokenHash]
+    );
+    if (!rows[0]) throw new Error('Invalid or expired reset token');
+    const hash = await bcrypt.hash(newPassword, 10);
+    await db.execute('UPDATE auth_user SET password_hash = ? WHERE id = ?', [hash, rows[0].user_id]);
+    await db.execute('UPDATE auth_password_reset SET used = 1 WHERE token_hash = ?', [tokenHash]);
+  },
 };

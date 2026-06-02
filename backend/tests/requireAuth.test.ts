@@ -79,6 +79,6 @@ describe("requireAuth middleware", () => {
       .set("Authorization", "Bearer valid.token");
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.userId).toBe("user-123");
+    expect(res.body.userId).toBe("user-1");
   });
 });

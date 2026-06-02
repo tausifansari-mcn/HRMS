@@ -115,8 +115,7 @@ describe("GET /api/processes — auth guard", () => {
   });
 
   it("returns 401 when token is invalid", async () => {
-    mockGetUser.mockResolvedValueOnce({ data: { user: null }, error: { message: "expired" } });
-    const res = await request(app).get("/api/processes").set(authHeader());
+    const res = await request(app).get("/api/processes").set({ Authorization: "Bearer bad-invalid-jwt-here" });
     expect(res.status).toBe(401);
   });
 });

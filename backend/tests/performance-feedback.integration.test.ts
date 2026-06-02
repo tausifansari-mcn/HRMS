@@ -246,13 +246,13 @@ describe("Performance Feedback - Full Workflow Integration", () => {
 
   it("5. Manager submits feedback (generates report + training needs)", async () => {
     mockManager();
-    // getRequestById: service checks request.manager_id === managerId (authUser.id = MGR_UUID)
+    // getRequestById: service checks request.manager_id === req.authUser.id ('user-1' from test mock)
     mockExecute.mockResolvedValueOnce([
       [
         {
           request_id: requestId,
           employee_id: employeeId,
-          manager_id: managerId,  // must match authUser.id
+          manager_id: 'user-1',  // must match authUser.id returned by global test mock
           cycle_id: cycleId,
           status: "pending",
         },
@@ -367,13 +367,13 @@ describe("Performance Feedback - Full Workflow Integration", () => {
 
   it("8. Verifies training need auto-creation for low scores", async () => {
     mockManager();
-    // getRequestById: manager_id must match authUser.id = MGR_UUID
+    // getRequestById: manager_id must match authUser.id ('user-1' from global test mock)
     mockExecute.mockResolvedValueOnce([
       [
         {
           request_id: requestId,
           employee_id: employeeId,
-          manager_id: managerId,
+          manager_id: 'user-1',
           cycle_id: cycleId,
           status: "pending",
         },

@@ -20,6 +20,20 @@ router.post('/login', h(async (req: any, res: any) => {
   }
 }));
 
+// POST /api/auth/register — public
+router.post('/register', h(async (req: any, res: any) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+  if (password.length < 6) return res.status(400).json({ error: 'password must be at least 6 characters' });
+  try {
+    const id = await authService.register(email, password);
+    res.status(201).json({ data: { id, email: email.toLowerCase().trim() } });
+  } catch (err: any) {
+    if (err.message?.includes('Duplicate entry')) return res.status(409).json({ error: 'Email already registered' });
+    res.status(400).json({ error: err.message });
+  }
+}));
+
 // POST /api/auth/refresh — public
 router.post('/refresh', h(async (req: any, res: any) => {
   const { refreshToken } = req.body;
@@ -37,6 +51,33 @@ router.post('/logout', requireAuth, h(async (req: any, res: any) => {
   const { refreshToken } = req.body;
   if (refreshToken) await authService.logout(refreshToken);
   res.json({ success: true });
+}));
+
+// POST /api/auth/forgot-password — public
+router.post('/forgot-password', h(async (req: any, res: any) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'email required' });
+  const token = await authService.forgotPassword(email);
+  if (token) {
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
+    // TODO: replace console.log with nodemailer in production
+    console.log('[DEV] Password reset URL:', resetUrl);
+  }
+  // Always return success to prevent email enumeration
+  res.json({ success: true, message: 'If that email exists, a reset link has been sent.' });
+}));
+
+// POST /api/auth/reset-password — public
+router.post('/reset-password', h(async (req: any, res: any) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'token and password required' });
+  if (password.length < 6) return res.status(400).json({ error: 'password must be at least 6 characters' });
+  try {
+    await authService.resetPassword(token, password);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
 }));
 
 export { router as authRouter };

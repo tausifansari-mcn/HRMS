@@ -1,10 +1,8 @@
-import { supabase } from '@/integrations/supabase/client';
-
 // Empty string = use Vercel proxy (same origin, /api/* rewritten to Railway)
 // Local dev = http://localhost:5055
 const HRMS_API_URL = import.meta.env.VITE_HRMS_API_URL || 'http://localhost:5055';
 
-async function getAuthHeader(): Promise<Record<string, string>> {
+function getAuthHeader(): Record<string, string> {
   // Demo session stored in localStorage by AuthContext
   const demoRaw = localStorage.getItem('hrms_demo_session');
   if (demoRaw) {
@@ -15,21 +13,17 @@ async function getAuthHeader(): Promise<Record<string, string>> {
     } catch { /* fall through */ }
   }
 
-  // Check MySQL JWT token (new auth path)
+  // MySQL JWT token
   const mysqlToken = localStorage.getItem('hrms_access_token');
   if (mysqlToken) {
     return { Authorization: `Bearer ${mysqlToken}` };
   }
 
-  // Fall back to Supabase session token
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) throw new Error('No active session');
-  return { Authorization: `Bearer ${token}` };
+  throw new Error('No active session');
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers = await getAuthHeader();
+  const headers = getAuthHeader();
   const res = await fetch(`${HRMS_API_URL}${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', ...headers },
@@ -42,7 +36,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 /** Returns raw response text (for file downloads such as CSV exports). */
 async function requestRaw(method: string, path: string): Promise<string> {
-  const headers = await getAuthHeader();
+  const headers = getAuthHeader();
   const res = await fetch(`${HRMS_API_URL}${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', ...headers },
