@@ -43,6 +43,16 @@ function buildCrud(
   }));
 }
 
+// Call Centre Code: register GET before buildCrud to avoid /:id swallowing the static segment
+router.get("/branches/cc-code-map",
+  requireAuth,
+  requireRole("admin", "hr"),
+  h(async (_req: any, res: any) => {
+    const data = await branchService.getCallCentreCodeMap();
+    res.json({ data });
+  })
+);
+
 buildCrud("/branches",      branchService);
 buildCrud("/departments",   departmentService);
 buildCrud("/lobs",          lobService);
@@ -52,5 +62,19 @@ buildCrud("/cost-centres",  costCentreService);
 buildCrud("/grade-bands",   gradeBandService);
 buildCrud("/locations",     locationService);
 buildCrud("/policies",      policyService);
+
+// Call Centre Code: PATCH can safely follow buildCrud (different HTTP method, no collision)
+router.patch("/branches/:id/call-centre-code",
+  requireAuth,
+  requireRole("admin", "hr"),
+  h(async (req: any, res: any) => {
+    const { ccCode } = req.body;
+    if (!ccCode || typeof ccCode !== "string" || ccCode.trim().length === 0) {
+      return res.status(400).json({ error: "ccCode is required" });
+    }
+    await branchService.updateCallCentreCode(req.params.id, ccCode.trim().toUpperCase());
+    res.json({ success: true });
+  })
+);
 
 export { router as orgRouter };

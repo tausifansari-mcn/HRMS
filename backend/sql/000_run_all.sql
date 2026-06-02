@@ -53,6 +53,8 @@ SOURCE sql/040_communication.sql;
 SOURCE sql/041_schema_gap_fill.sql;
 SOURCE sql/042_maternity_schema_patch.sql;
 SOURCE sql/044_attendance_engine.sql;
+SOURCE sql/045_role_compat.sql;
+SOURCE sql/046_call_centre_code.sql;
 -- NOTE: SOURCE sql/043_demo_data.sql; -- development seed only, do not run in production
 
 SELECT 'mas_hrms schema complete' AS status;

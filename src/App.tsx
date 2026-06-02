@@ -124,6 +124,9 @@ const NativeDispatchCenter          = lazy(() => import("./pages/NativeDispatchC
 const NativeDispatchHistory         = lazy(() => import("./pages/NativeDispatchHistory"));
 const NativeNotificationPreferences = lazy(() => import("./pages/NativeNotificationPreferences"));
 
+// Call Centre Config
+const NativeCallCentreConfig        = lazy(() => import("./pages/NativeCallCentreConfig"));
+
 // System
 const NativeMigrationConsole        = lazy(() => import("./pages/NativeMigrationConsole"));
 const NativeExitManagement          = lazy(() => import("./pages/NativeExitManagement"));
@@ -237,6 +240,7 @@ const App = () => (
               {/* Performance */}
               <Route path="/performance/command-center" element={<ProtectedRoute><Gate pageCode="WORKFORCE_COMMAND_CENTER"><UnifiedPerformanceCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/settings/access-control" element={<ProtectedRoute><Gate pageCode="ACCESS_CONTROL"><UnifiedAccessControl /></Gate></ProtectedRoute>} />
+              <Route path="/settings/call-centre-config" element={<ProtectedRoute><NativeCallCentreConfig /></ProtectedRoute>} />
 
               {/* Performance Feedback */}
               <Route path="/performance-feedback/my-reports" element={<ProtectedRoute><NativePerformanceFeedbackMyReports /></ProtectedRoute>} />

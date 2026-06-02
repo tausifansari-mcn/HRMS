@@ -60,6 +60,28 @@ export const branchService = {
     return getById("branch_master", id);
   },
   delete: (id: string) => softDelete("branch_master", id),
+
+  async updateCallCentreCode(id: string, ccCode: string): Promise<void> {
+    await db.execute(
+      "UPDATE branch_master SET call_centre_code = ?, updated_at = NOW() WHERE id = ?",
+      [ccCode, id]
+    );
+  },
+
+  async getCallCentreCodeMap(): Promise<Array<{ id: string; branch_name: string; branch_code: string; call_centre_code: string | null; process_count: number; employee_count: number }>> {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT b.id, b.branch_name, b.branch_code, b.call_centre_code,
+              COUNT(DISTINCT p.id) AS process_count,
+              COUNT(DISTINCT e.id) AS employee_count
+         FROM branch_master b
+         LEFT JOIN process_master p ON p.branch_id = b.id AND p.active_status = 1
+         LEFT JOIN employees e ON e.branch_id = b.id AND e.active_status = 1
+        WHERE b.active_status = 1
+        GROUP BY b.id
+        ORDER BY b.branch_name`
+    );
+    return rows as any[];
+  },
 };
 
 // ── Department ────────────────────────────────────────────────────────────────

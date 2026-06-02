@@ -192,6 +192,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Settings", href: "/settings", icon: <Settings className="h-4 w-4" />, adminOnly: true, description: "System settings" },
       { label: "Org Masters", href: "/org-masters", icon: <Building2 className="h-4 w-4" />, adminOnly: true, description: "Branches, departments, LOBs, designations" },
+      { label: "CC Code Config", href: "/settings/call-centre-config", icon: <Building2 className="h-4 w-4" />, adminOnly: true, description: "Manage call centre master codes for reports and integrations" },
       { label: "Locations & Policies", href: "/org-masters/locations-policies", icon: <Landmark className="h-4 w-4" />, adminOnly: true, description: "Location and policy master data" },
       { label: "Client Master", href: "/client-master", icon: <Users className="h-4 w-4" />, adminOnly: true, description: "Portal clients and user management" },
       { label: "Portal Data Manager", href: "/portal-data-manager", icon: <ShieldCheck className="h-4 w-4" />, adminOnly: true, description: "Approve and publish data for client portal view" },
