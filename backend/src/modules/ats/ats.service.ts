@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto";
 import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
+import { sendSelectedEmail, sendRejectedEmail } from "./ats.email.service.js";
+import { sendOnboardingToken } from "./ats.onboarding.service.js";
 import type {
   AtsCandidate,
   AtsCandidateStageLog,
@@ -96,6 +98,27 @@ export const atsService = {
        VALUES (?, ?, ?, ?, ?, ?)`,
       [randomUUID(), candidateId, candidate.current_stage, toStage, remarks ?? null, userId]
     );
+
+    // Fire email side-effects after the stage is committed — failure must not break the stage move
+    if (toStage === 'Selected' && candidate.email) {
+      sendSelectedEmail({
+        candidateId,
+        to: candidate.email,
+        candidateName: candidate.full_name ?? '',
+        branchName: candidate.applied_for_branch ?? '',
+        hrName: 'HR Team',
+        hrPhone: '',
+      }).catch(() => { /* already logged in ats_email_log */ });
+      sendOnboardingToken(candidateId, userId).catch(() => {});
+    } else if (toStage === 'Rejected' && candidate.email) {
+      sendRejectedEmail({
+        candidateId,
+        to: candidate.email,
+        candidateName: candidate.full_name ?? '',
+        branchName: candidate.applied_for_branch ?? '',
+      }).catch(() => { /* already logged in ats_email_log */ });
+    }
+
     return this.getCandidate(candidateId);
   },
 
