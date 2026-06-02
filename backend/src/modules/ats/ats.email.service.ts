@@ -38,12 +38,13 @@ async function send(
   candidateId: string,
   type: EmailType,
 ): Promise<SendResult> {
-  if (!env.SMTP_HOST || !env.SMTP_USER) {
+  if (!env.SMTP_USER || !env.SMTP_PASS) {
     await logEmail(candidateId, type, to, 'skipped', 'SMTP not configured');
     return { ok: true };
   }
+  const fromAddr = env.SMTP_FROM || env.SMTP_USER;
   try {
-    await transporter.sendMail({ from: `"MAS Callnet" <${env.SMTP_USER}>`, to, subject, html });
+    await transporter.sendMail({ from: `"MAS Callnet" <${fromAddr}>`, to, subject, html });
     await logEmail(candidateId, type, to, 'sent');
     return { ok: true };
   } catch (err: unknown) {

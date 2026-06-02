@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
-import { RowDataPacket } from 'mysql2';
+import { RowDataPacket, PoolConnection } from 'mysql2/promise';
 import { db } from '../../db/mysql.js';
 import { env } from '../../config/env.js';
 import { calculateSalary, SalaryComponents } from './salary.calculator.js';
@@ -315,112 +315,119 @@ export async function approveOffer(offerId: string, approverId: string, remarks?
   const offer = offerRows[0];
   const candidateId: string = offer.req_candidate_id;
 
-  // Generate employee code: MAS + zero-padded 5-digit sequence
-  const [codeRows] = await db.execute<RowDataPacket[]>(
-    `SELECT MAX(CAST(SUBSTRING(employee_code, 4) AS UNSIGNED)) AS last_seq
-     FROM employees WHERE employee_code LIKE 'MAS%'`,
-  );
-  const lastSeq: number = (codeRows as RowDataPacket[])[0]?.last_seq ?? 0;
-  const employeeCode = `MAS${String(lastSeq + 1).padStart(5, '0')}`;
-
-  // Temp password: last 4 digits of mobile + @MAS
+  // Pre-compute values that don't need a DB connection
   const mobile: string = offer.mobile ?? '0000';
   const tempPassword = `${mobile.slice(-4)}@MAS`;
   const passwordHash = await bcrypt.hash(tempPassword, 10);
 
-  // Create auth_user
-  const authUserId = randomUUID();
-  await db.execute(
-    `INSERT INTO auth_user (id, email, password_hash, must_change_password)
-     VALUES (?, ?, ?, 1)
-     ON DUPLICATE KEY UPDATE must_change_password = 1`,
-    [authUserId, offer.email, passwordHash],
-  );
-
-  // Get the actual auth_user id in case of duplicate (email already exists)
-  const [existingAuthUser] = await db.execute<RowDataPacket[]>(
-    `SELECT id FROM auth_user WHERE email = ?`,
-    [offer.email],
-  );
-  const resolvedAuthUserId: string = (existingAuthUser as RowDataPacket[])[0]?.id ?? authUserId;
-
-  // Create employee — using actual employees table columns
-  const employeeId = randomUUID();
   const nameParts: string[] = ((offer.full_name as string) ?? '').trim().split(/\s+/);
   const firstName = nameParts[0] ?? '';
   const lastName = nameParts.slice(1).join(' ') || firstName;
 
-  await db.execute(
-    `INSERT INTO employees
-       (id, employee_code, first_name, last_name, email, mobile,
-        branch_id, process_id, department_id, designation_id,
-        date_of_joining, employment_type, reporting_manager_id,
-        user_id, active_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-    [
-      employeeId, employeeCode, firstName, lastName,
-      offer.email, offer.mobile,
-      offer.applied_for_branch, offer.applied_for_process,
-      offer.department_id ?? null, offer.designation_id ?? null,
-      offer.date_of_joining, offer.emp_type,
-      offer.reporting_manager_id ?? null,
-      resolvedAuthUserId,
-    ],
-  );
+  const employeeId = randomUUID();
+  const authUserId = randomUUID();
 
-  // Salary snapshot — using actual employee_salary_snapshot columns
-  // snapshot_date is required NOT NULL; effective_date/offered_ctc added by migration 054
-  // pf_* maps to epf_* in this table
-  await db.execute(
-    `INSERT INTO employee_salary_snapshot
-       (id, employee_id, snapshot_date, ctc_offered, basic, hra, conveyance,
-        da, special_allowance, other_allowance, bonus, gross,
-        epf_employee, epf_employer, esic_employee, esic_employer,
-        professional_tax, gratuity, admin_charges, net_in_hand)
-     VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      employeeId, offer.date_of_joining,
-      offer.offered_ctc, offer.basic, offer.hra, offer.conveyance,
-      offer.da, offer.special_allowance, offer.other_allowance, offer.bonus, offer.gross,
-      offer.pf_employee, offer.pf_employer, offer.esic_employee, offer.esic_employer,
-      offer.professional_tax, offer.gratuity, offer.admin_charges, offer.net_in_hand,
-    ],
-  );
+  // All DB writes inside a single transaction — partial failures roll back cleanly
+  const conn: PoolConnection = await db.getConnection();
+  let employeeCode = '';
+  let resolvedAuthUserId = authUserId;
 
-  // Approval record
-  await db.execute(
-    `INSERT INTO ats_offer_approval (id, offer_id, approver_id, action, remarks)
-     VALUES (UUID(), ?, ?, 'approved', ?)`,
-    [offerId, approverId, remarks ?? null],
-  );
+  try {
+    await conn.beginTransaction();
 
-  await db.execute(
-    `UPDATE ats_onboarding_request SET status = 'approved', updated_at = NOW()
-     WHERE id = ?`,
-    [offer.onboarding_request_id],
-  );
+    // Employee code — lock via FOR UPDATE to prevent concurrent duplicates
+    const [codeRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT MAX(CAST(SUBSTRING(employee_code, 4) AS UNSIGNED)) AS last_seq
+       FROM employees WHERE employee_code LIKE 'MAS%' FOR UPDATE`,
+    );
+    const lastSeq: number = (codeRows as RowDataPacket[])[0]?.last_seq ?? 0;
+    employeeCode = `MAS${String(lastSeq + 1).padStart(5, '0')}`;
 
-  await db.execute(
-    `UPDATE ats_onboarding_bridge
-     SET status = 'joined', hr_approved_by = ?, hr_approved_at = NOW()
-     WHERE candidate_id = ?`,
-    [approverId, candidateId],
-  );
+    await conn.execute(
+      `INSERT INTO auth_user (id, email, password_hash, must_change_password)
+       VALUES (?, ?, ?, 1)
+       ON DUPLICATE KEY UPDATE must_change_password = 1`,
+      [authUserId, offer.email, passwordHash],
+    );
+    const [existingAuth] = await conn.execute<RowDataPacket[]>(
+      `SELECT id FROM auth_user WHERE email = ?`, [offer.email],
+    );
+    resolvedAuthUserId = (existingAuth as RowDataPacket[])[0]?.id ?? authUserId;
 
-  await db.execute(
-    `UPDATE ats_candidate
-     SET profile_status = 'onboarded', current_stage = 'converted', updated_at = NOW()
-     WHERE id = ?`,
-    [candidateId],
-  );
+    await conn.execute(
+      `INSERT INTO employees
+         (id, employee_code, first_name, last_name, email, mobile,
+          branch_id, process_id, department_id, designation_id,
+          date_of_joining, employment_type, reporting_manager_id,
+          user_id, active_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      [
+        employeeId, employeeCode, firstName, lastName,
+        offer.email, offer.mobile,
+        offer.applied_for_branch, offer.applied_for_process,
+        offer.department_id ?? null, offer.designation_id ?? null,
+        offer.date_of_joining, offer.emp_type,
+        offer.reporting_manager_id ?? null,
+        resolvedAuthUserId,
+      ],
+    );
 
-  // Assign employee role using role_key (not role_id/role_code FK)
-  await db.execute(
-    `INSERT IGNORE INTO user_roles (id, user_id, role_key, active_status)
-     VALUES (UUID(), ?, 'employee', 1)`,
-    [resolvedAuthUserId],
-  );
+    await conn.execute(
+      `INSERT INTO employee_salary_snapshot
+         (id, employee_id, snapshot_date, ctc_offered, basic, hra, conveyance,
+          da, special_allowance, other_allowance, bonus, gross,
+          epf_employee, epf_employer, esic_employee, esic_employer,
+          professional_tax, gratuity, admin_charges, net_in_hand)
+       VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        employeeId, offer.date_of_joining,
+        offer.offered_ctc, offer.basic, offer.hra, offer.conveyance,
+        offer.da, offer.special_allowance, offer.other_allowance, offer.bonus, offer.gross,
+        offer.pf_employee, offer.pf_employer, offer.esic_employee, offer.esic_employer,
+        offer.professional_tax, offer.gratuity, offer.admin_charges, offer.net_in_hand,
+      ],
+    );
 
+    await conn.execute(
+      `INSERT INTO ats_offer_approval (id, offer_id, approver_id, action, remarks)
+       VALUES (UUID(), ?, ?, 'approved', ?)`,
+      [offerId, approverId, remarks ?? null],
+    );
+
+    await conn.execute(
+      `UPDATE ats_onboarding_request SET status = 'approved', updated_at = NOW() WHERE id = ?`,
+      [offer.onboarding_request_id],
+    );
+
+    await conn.execute(
+      `UPDATE ats_onboarding_bridge
+       SET status = 'joined', hr_approved_by = ?, hr_approved_at = NOW()
+       WHERE candidate_id = ?`,
+      [approverId, candidateId],
+    );
+
+    await conn.execute(
+      `UPDATE ats_candidate
+       SET profile_status = 'onboarded', current_stage = 'converted', updated_at = NOW()
+       WHERE id = ?`,
+      [candidateId],
+    );
+
+    await conn.execute(
+      `INSERT IGNORE INTO user_roles (id, user_id, role_key, active_status)
+       VALUES (UUID(), ?, 'employee', 1)`,
+      [resolvedAuthUserId],
+    );
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+
+  // Send welcome email after transaction commits — email failure should not roll back employee creation
   const baseUrl = env.FRONTEND_URL || 'http://localhost:5173';
   if (offer.email) {
     await sendWelcomeEmail({
@@ -458,5 +465,11 @@ export async function rejectOffer(offerId: string, approverId: string, remarks: 
   await db.execute(
     `UPDATE ats_onboarding_request SET status = 'rejected', updated_at = NOW() WHERE id = ?`,
     [(rows as RowDataPacket[])[0].onboarding_request_id],
+  );
+
+  // Remove the offer from the pending list by updating its status
+  await db.execute(
+    `UPDATE ats_employment_offer SET status = 'draft', updated_at = NOW() WHERE id = ?`,
+    [offerId],
   );
 }
