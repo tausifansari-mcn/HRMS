@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { hrmsApi } from "@/lib/hrmsApi";
 
 type Bootstrap = {
+  fields?: FieldDef[];
   companyName: string;
   educationOptions: string[];
   experienceOptions: string[];
@@ -54,6 +55,13 @@ type FieldConfig = {
   ic: string;
   ph?: string;
   ok?: keyof Bootstrap;
+};
+
+type FieldDef = FieldConfig & {
+  section: string;
+  visible: boolean;
+  required: boolean;
+  sort_order: number;
 };
 
 type SectionConfig = {
@@ -273,6 +281,34 @@ const css = `
 export default function NativeATSCandidateRegistration() {
   const [screen, setScreen] = useState<"loading" | "welcome" | "form" | "submitting" | "success" | "error">("loading");
   const [bootstrap, setBootstrap] = useState<Bootstrap>(DEFAULT_BOOTSTRAP);
+
+  // Build sections dynamically from API field schema; fall back to static SECTIONS if not loaded
+  const dynamicSections: SectionConfig[] = React.useMemo(() => {
+    if (!bootstrap.fields || bootstrap.fields.length === 0) return SECTIONS;
+    const visible = [...bootstrap.fields]
+      .filter((f: FieldDef) => f.visible)
+      .sort((a: FieldDef, b: FieldDef) => a.sort_order - b.sort_order);
+    const map: Record<string, FieldConfig[]> = {};
+    for (const f of visible) {
+      if (!map[f.section]) map[f.section] = [];
+      map[f.section].push({
+        k: f.k as keyof CandidateFormData,
+        lb: f.lb,
+        t: f.t as FieldConfig['t'],
+        ic: f.ic,
+        ph: f.ph ?? undefined,
+        ok: (f.ok ?? undefined) as keyof Bootstrap | undefined,
+      });
+    }
+    return Object.entries(map).map(([title, fields]) => ({ title, fields }));
+  }, [bootstrap.fields]);
+
+  const isFieldRequired = (fieldKey: string): boolean => {
+    if (!bootstrap.fields || bootstrap.fields.length === 0) return true;
+    const field = bootstrap.fields.find((f: FieldDef) => f.k === fieldKey);
+    return field ? (field.visible && field.required) : false;
+  };
+
   const [form, setForm] = useState<CandidateFormData>(EMPTY_FORM);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loadingStep, setLoadingStep] = useState(1);
@@ -290,6 +326,12 @@ export default function NativeATSCandidateRegistration() {
   const imageRef = useRef<HTMLImageElement | null>(null);
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [scanMode, setScanMode]   = useState<'idle'|'options'|'preview'|'scanning'|'done'>('idle');
+  const [scanImage, setScanImage] = useState<string | null>(null);
+  const [scanStatus, setScanStatus] = useState('');
+  const scanFileInputRef  = useRef<HTMLInputElement | null>(null);
+  const scanCameraInputRef = useRef<HTMLInputElement | null>(null);
 
   const coreData = useMemo(
     () => ({
@@ -329,35 +371,42 @@ export default function NativeATSCandidateRegistration() {
   }, [cameraStream]);
 
   const loadBootstrap = async () => {
-    try {
-      // Fetch sourcing channels for options; static defaults for others
-      // until ats_option_value / ats_recruiter_profile are migrated to MySQL
-      const channelsRes = await hrmsApi.get<{ success: boolean; data: { channel_name: string }[] }>(
-        "/api/ats/sourcing-channels"
-      ).catch(() => ({ data: [] as { channel_name: string }[] }));
-
-      const branchOptions = ["Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai", "Pune"];
-      const recruiterOptions: string[] = [];
-      const byCategory: Record<string, string[]> = {};
-
-      const channelNames = (channelsRes.data ?? []).map((c: any) => c.channel_name).filter(Boolean);
+  try {
+    const res = await hrmsApi.get('/ats/form-config/bootstrap').catch(() => null);
+    const data = res?.data?.data;
+    if (data) {
       setBootstrap({
-        companyName: "Mas Callnet India Pvt. Ltd.",
-        educationOptions: ["10th Pass", "12th Pass", "Graduate", "Post Graduate", "Diploma"],
-        experienceOptions: ["Fresher", "0-1 Year", "1-2 Years", "2-3 Years", "3+ Years"],
-        genderOptions: ["Male", "Female", "Other"],
-        roleOptions: ["Inbound Agent", "Outbound Agent", "Back Office", "Team Leader", "Quality Analyst"],
-        recruiterOptions: recruiterOptions,
-        branchOptions: branchOptions,
-        yesNoOptions: ["Yes", "No"],
-        preferredShiftOptions: ["Morning (6AM-2PM)", "Afternoon (2PM-10PM)", "Night (10PM-6AM)", "Rotational"],
-        nightShiftComfortOptions: ["Comfortable", "Not Comfortable", "On Request"],
+        companyName:             "Mas Callnet India Pvt. Ltd.",
+        fields:                  data.fields              ?? undefined,
+        educationOptions:        data.educationOptions    ?? ["10th Pass","12th Pass","Graduate","Post Graduate","Diploma"],
+        experienceOptions:       data.experienceOptions   ?? ["Fresher","0-1 Year","1-2 Years","2-3 Years","3+ Years"],
+        genderOptions:           data.genderOptions       ?? ["Male","Female","Other"],
+        roleOptions:             data.roleOptions         ?? ["Inbound Agent","Outbound Agent","Back Office","Team Leader","Quality Analyst"],
+        recruiterOptions:        data.recruiterOptions    ?? [],
+        branchOptions:           data.branchOptions       ?? ["Mumbai","Delhi","Bangalore"],
+        yesNoOptions:            ["Yes","No"],
+        preferredShiftOptions:   data.preferredShiftOptions   ?? ["Morning (6AM-2PM)","Afternoon (2PM-10PM)","Night (10PM-6AM)","Rotational"],
+        nightShiftComfortOptions:data.nightShiftComfortOptions ?? ["Comfortable","Not Comfortable","On Request"],
       });
-      setScreen("welcome");
-    } catch (err: any) {
-      setSubmitError(`Check deployment permissions and refresh.\n${err?.message || String(err || "")}`);
-      setScreen("error");
+    } else {
+      setBootstrap({
+        companyName:              "Mas Callnet India Pvt. Ltd.",
+        educationOptions:         ["10th Pass","12th Pass","Graduate","Post Graduate","Diploma"],
+        experienceOptions:        ["Fresher","0-1 Year","1-2 Years","2-3 Years","3+ Years"],
+        genderOptions:            ["Male","Female","Other"],
+        roleOptions:              ["Inbound Agent","Outbound Agent","Back Office","Team Leader","Quality Analyst"],
+        recruiterOptions:         [],
+        branchOptions:            ["Mumbai","Delhi","Bangalore","Hyderabad","Chennai","Pune"],
+        yesNoOptions:             ["Yes","No"],
+        preferredShiftOptions:    ["Morning (6AM-2PM)","Afternoon (2PM-10PM)","Night (10PM-6AM)","Rotational"],
+        nightShiftComfortOptions: ["Comfortable","Not Comfortable","On Request"],
+      });
     }
+    setScreen("welcome");
+  } catch (err: any) {
+    setSubmitError(`Check deployment permissions and refresh.\n${err?.message || String(err || "")}`);
+    setScreen("error");
+  }
   };
 
   const startReg = () => {
@@ -379,7 +428,7 @@ export default function NativeATSCandidateRegistration() {
   const validateForm = () => {
     const nextErrors: Record<string, string> = {};
 
-    SECTIONS.forEach((section) => {
+    dynamicSections.forEach((section) => {
       section.fields.forEach((f) => {
         if (f.t === "camera" || f.t === "file") return;
 
@@ -701,6 +750,96 @@ export default function NativeATSCandidateRegistration() {
     );
   };
 
+  const handleScanFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setScanImage(ev.target?.result as string);
+      setScanMode('preview');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const extractFromOCR = async (imageDataUrl: string) => {
+    setScanMode('scanning');
+    setScanStatus('Loading OCR engine...');
+    try {
+      await new Promise<void>((resolve, reject) => {
+        if (document.getElementById('tesseract-script') || (window as any).Tesseract) { resolve(); return; }
+        const s = document.createElement('script');
+        s.id = 'tesseract-script';
+        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('Failed to load Tesseract'));
+        document.head.appendChild(s);
+      });
+      setScanStatus('Extracting text from image...');
+      const TesseractLib = (window as any).Tesseract;
+      if (!TesseractLib) throw new Error('Tesseract not available');
+      const worker = await TesseractLib.createWorker('eng');
+      const { data: { text } } = await worker.recognize(imageDataUrl);
+      await worker.terminate();
+      setScanStatus('Mapping fields...');
+      const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean);
+      const extracted: Partial<CandidateFormData> = {};
+      const mobileMatch = text.match(/\b[6-9]\d{9}\b/);
+      if (mobileMatch) extracted.mobile = mobileMatch[0];
+      const emailMatch = text.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+      if (emailMatch) extracted.email = emailMatch[0];
+      const nameLabel = text.match(/(?:Name|Full Name)\s*[:\-]\s*(.+)/i);
+      if (nameLabel) {
+        extracted.name = nameLabel[1].trim().split('\n')[0].trim();
+      } else if (lines.length > 0) {
+        const firstLine = lines[0].replace(/[^a-zA-Z\s]/g, '').trim();
+        if (firstLine.length >= 3 && firstLine.length <= 60) extracted.name = firstLine;
+      }
+      const addressMatch = text.match(/(?:Address|Addr)\s*[:\-]\s*([\s\S]{5,100}?)(?=\n\n|\b(?:Mobile|Phone|Email|Education|Experience)\b|$)/i);
+      if (addressMatch) extracted.address = addressMatch[1].replace(/\n/g, ', ').trim();
+      const eduOptions = bootstrap.educationOptions;
+      const textLower = text.toLowerCase();
+      for (const opt of eduOptions) {
+        if (textLower.includes(opt.toLowerCase())) { extracted.education = opt; break; }
+      }
+      if (!extracted.education) {
+        if (textLower.includes('post graduate') || textLower.includes('postgraduate')) extracted.education = eduOptions.find(o => o.toLowerCase().includes('post')) ?? '';
+        else if (textLower.includes('graduate') || textLower.includes('b.tech') || textLower.includes('bsc') || textLower.includes('bcom')) extracted.education = eduOptions.find(o => o.toLowerCase() === 'graduate') ?? '';
+        else if (textLower.includes('diploma')) extracted.education = eduOptions.find(o => o.toLowerCase().includes('diploma')) ?? '';
+        else if (textLower.includes('12th') || textLower.includes('hsc') || textLower.includes('intermediate')) extracted.education = eduOptions.find(o => o.includes('12th')) ?? '';
+        else if (textLower.includes('10th') || textLower.includes('ssc') || textLower.includes('matric')) extracted.education = eduOptions.find(o => o.includes('10th')) ?? '';
+      }
+      const expOptions = bootstrap.experienceOptions;
+      for (const opt of expOptions) {
+        if (textLower.includes(opt.toLowerCase())) { extracted.experience = opt; break; }
+      }
+      if (!extracted.experience) {
+        if (textLower.includes('fresher') || textLower.includes('no experience')) extracted.experience = expOptions[0];
+        else {
+          const yearMatch = textLower.match(/(\d+)\s*(?:\+\s*)?year/);
+          if (yearMatch) {
+            const yrs = parseInt(yearMatch[1]);
+            if (yrs === 0)      extracted.experience = expOptions.find(o => o.includes('0-1')) ?? '';
+            else if (yrs === 1) extracted.experience = expOptions.find(o => o.includes('1-2')) ?? '';
+            else if (yrs === 2) extracted.experience = expOptions.find(o => o.includes('2-3')) ?? '';
+            else if (yrs >= 3)  extracted.experience = expOptions.find(o => o.includes('3+')) ?? '';
+          }
+        }
+      }
+      if (textLower.includes(' female') || textLower.includes('gender: f')) extracted.gender = 'Female';
+      else if (textLower.includes(' male') || textLower.includes('gender: m')) extracted.gender = 'Male';
+      setForm(prev => ({
+        ...prev,
+        ...Object.fromEntries(Object.entries(extracted).filter(([, v]) => v && String(v).trim())),
+      }));
+      const count = Object.keys(extracted).filter(k => extracted[k as keyof typeof extracted]).length;
+      setScanStatus(`Extracted ${count} field(s). Please review and correct before submitting.`);
+      setScanMode('done');
+    } catch (err: any) {
+      setScanStatus(`OCR failed: ${err?.message ?? 'Unknown error'}. Please fill the form manually.`);
+      setScanMode('done');
+    }
+  };
+
   const renderLoading = () => (
     <div className="native-ats-loading-wrap">
       <div className="native-ats-spinner" />
@@ -725,7 +864,52 @@ export default function NativeATSCandidateRegistration() {
         <p className="native-ats-step-dsc">Fill all details below in one page</p>
       </div>
       <div className="native-ats-form-card">
-        {SECTIONS.map((section) => (
+          {/* Scan Resume — optional, above form sections */}
+          <div style={{ marginBottom: 24, padding: 16, background: '#f0f4ff', borderRadius: 12, border: '1px solid #c7d2fe' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: scanMode !== 'idle' ? 12 : 0 }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#3730a3' }}>📄 Scan Resume (Optional)</div>
+                <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: 2 }}>Capture a photo of your resume to auto-fill this form. You can still fill manually.</div>
+              </div>
+              {scanMode === 'idle' && (
+                <button type="button" onClick={() => setScanMode('options')}
+                  style={{ background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>
+                  Scan Resume
+                </button>
+              )}
+              {scanMode !== 'idle' && (
+                <button type="button" onClick={() => { setScanMode('idle'); setScanImage(null); setScanStatus(''); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '0.8rem' }}>✕ Close</button>
+              )}
+            </div>
+            {scanMode === 'options' && (
+              <div style={{ display: 'flex', gap: 10 }}>
+                <input type="file" accept="image/*" capture="environment" ref={scanCameraInputRef} style={{ display: 'none' }} onChange={handleScanFileChange} />
+                <input type="file" accept="image/*" ref={scanFileInputRef} style={{ display: 'none' }} onChange={handleScanFileChange} />
+                <button type="button" onClick={() => scanCameraInputRef.current?.click()}
+                  style={{ flex: 1, padding: 10, background: '#fff', border: '1px solid #c7d2fe', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}>📷 Take Photo</button>
+                <button type="button" onClick={() => scanFileInputRef.current?.click()}
+                  style={{ flex: 1, padding: 10, background: '#fff', border: '1px solid #c7d2fe', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}>📁 Upload Image</button>
+              </div>
+            )}
+            {scanMode === 'preview' && scanImage && (
+              <div style={{ textAlign: 'center' }}>
+                <img src={scanImage} alt="Resume preview" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, marginBottom: 10, objectFit: 'contain' }} />
+                <button type="button" onClick={() => extractFromOCR(scanImage)}
+                  style={{ background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', cursor: 'pointer', fontWeight: 600 }}>Extract Details</button>
+              </div>
+            )}
+            {scanMode === 'scanning' && (
+              <div style={{ textAlign: 'center', padding: 12, color: '#4f46e5' }}>
+                <div style={{ fontSize: '1.5rem', marginBottom: 6 }}>⏳</div>
+                <div style={{ fontSize: '0.85rem' }}>{scanStatus}</div>
+              </div>
+            )}
+            {scanMode === 'done' && (
+              <div style={{ background: '#f0fdf4', borderRadius: 8, padding: '10px 14px', fontSize: '0.85rem', color: '#166534' }}>✅ {scanStatus}</div>
+            )}
+          </div>
+        {dynamicSections.map((section) => (
           <div className="native-ats-sec-block" key={section.title}>
             <div className="native-ats-sec-title">{section.title}</div>
             {section.fields.map(buildField)}
