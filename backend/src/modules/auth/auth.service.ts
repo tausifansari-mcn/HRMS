@@ -106,6 +106,41 @@ export const authService = {
     return id;
   },
 
+  async registerFromATS(
+    email: string,
+    password: string,
+    onboardingToken: string,
+  ): Promise<string> {
+    // Validate token exists and is not expired
+    const [tokenRows] = await db.execute<RowDataPacket[]>(
+      `SELECT b.candidate_id, b.onboarding_token_expires_at, c.email AS candidate_email
+       FROM ats_onboarding_bridge b
+       JOIN ats_candidate c ON c.id = b.candidate_id
+       WHERE b.onboarding_token = ?`,
+      [onboardingToken],
+    );
+    if (!tokenRows.length) {
+      throw Object.assign(new Error('Invalid onboarding token'), { status: 400 });
+    }
+    const tokenRow = (tokenRows as RowDataPacket[])[0];
+    if (new Date(tokenRow.onboarding_token_expires_at) < new Date()) {
+      throw Object.assign(new Error('Onboarding token expired'), { status: 410 });
+    }
+    if (tokenRow.candidate_email && tokenRow.candidate_email !== email) {
+      throw Object.assign(new Error('Email must match your candidate registration email'), { status: 400 });
+    }
+
+    const userId = await this.register(email, password);
+
+    // Link auth user to candidate record
+    await db.execute(
+      `UPDATE ats_candidate SET user_id = ?, updated_at = NOW() WHERE id = ?`,
+      [userId, tokenRow.candidate_id],
+    );
+
+    return userId;
+  },
+
   async forgotPassword(email: string): Promise<string | null> {
     const [rows] = await db.execute<RowDataPacket[]>(
       'SELECT id FROM auth_user WHERE email = ? AND is_blocked = 0 LIMIT 1',

@@ -22,15 +22,22 @@ router.post('/login', h(async (req: any, res: any) => {
 
 // POST /api/auth/register — public
 router.post('/register', h(async (req: any, res: any) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: 'email and password required' });
-  if (password.length < 6) return res.status(400).json({ error: 'password must be at least 6 characters' });
+  const { email, password, onboardingToken } = req.body;
+  if (!email || !password || password.length < 6) {
+    return res.status(400).json({ error: 'email and password (min 6 chars) required' });
+  }
   try {
-    const id = await authService.register(email, password);
-    res.status(201).json({ data: { id, email: email.toLowerCase().trim() } });
+    let userId: string;
+    if (onboardingToken) {
+      userId = await authService.registerFromATS(email, password, String(onboardingToken));
+    } else {
+      userId = await authService.register(email, password);
+    }
+    res.status(201).json({ ok: true, userId });
   } catch (err: any) {
     if (err.message?.includes('Duplicate entry')) return res.status(409).json({ error: 'Email already registered' });
-    res.status(400).json({ error: err.message });
+    const status = err.status || 400;
+    res.status(status).json({ error: err.message });
   }
 }));
 
