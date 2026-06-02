@@ -63,11 +63,18 @@ export const atsService = {
     await db.execute(
       `INSERT INTO ats_candidate
          (id, candidate_code, full_name, mobile, email, gender, date_of_birth, applied_for_process,
-          applied_for_branch, sourcing_channel, referred_by, walk_in_date, remarks, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          applied_for_branch, sourcing_channel, referred_by, walk_in_date, remarks, created_by,
+          address, education, experience, rotational_shift, preferred_shift, night_shift_ok,
+          leaves_in_3months, owns_two_wheeler, id_proof_available, education_proof_available,
+          recruiter_name, profile_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, candidateCode(), input.fullName, input.mobile, input.email ?? null, input.gender ?? null,
        input.dateOfBirth ?? null, input.appliedForProcess ?? null, input.appliedForBranch ?? null,
-       input.sourcingChannel ?? null, input.referredBy ?? null, input.walkInDate ?? null, input.remarks ?? null, userId]
+       input.sourcingChannel ?? null, input.referredBy ?? null, input.walkInDate ?? null, input.remarks ?? null, userId,
+       input.address ?? null, input.education ?? null, input.experience ?? null,
+       input.rotationalShift ?? null, input.preferredShift ?? null, input.nightShiftOk ?? null,
+       input.leavesIn3months ?? null, input.ownsTwoWheeler ?? null, input.idProofAvailable ?? null,
+       input.educationProofAvailable ?? null, input.recruiterName ?? null, input.profileStatus ?? 'registered']
     );
     return this.getCandidate(id);
   },

@@ -559,23 +559,31 @@ export default function NativeATSCandidateRegistration() {
     const step3 = window.setTimeout(() => setLoadingStep(3), 1400);
 
     try {
+      const payload = {
+        fullName:                 coreData.name,
+        mobile:                   coreData.mobile,
+        email:                    coreData.email || null,
+        gender:                   coreData.gender || null,
+        appliedForProcess:        coreData.roleApplied || null,
+        appliedForBranch:         coreData.branch || null,
+        sourcingChannel:          'walk-in',
+        walkInDate:               new Date().toISOString().slice(0, 10),
+        // New fields from migration 054:
+        address:                  coreData.address || null,
+        education:                coreData.education || null,
+        experience:               coreData.experience || null,
+        rotationalShift:          coreData.rotationalShift || null,
+        preferredShift:           coreData.preferredShift || null,
+        nightShiftOk:             coreData.nightShiftComfort || null,
+        leavesIn3months:          coreData.leavesRequired || null,
+        ownsTwoWheeler:           coreData.ownTwoWheeler || null,
+        idProofAvailable:         coreData.idProofAvailable || null,
+        educationProofAvailable:  coreData.educationProofAvailable || null,
+        recruiterName:            coreData.recruiterName || null,
+      };
       const apiRes = await hrmsApi.post<{ success: boolean; data: any; message?: string }>(
         "/api/ats/candidates",
-        {
-          fullName:          coreData.name,
-          mobile:            coreData.mobile,
-          email:             coreData.email || null,
-          gender:            coreData.gender || null,
-          appliedForProcess: coreData.roleApplied || null,
-          appliedForBranch:  coreData.branch || null,
-          walkInDate:        new Date().toISOString().slice(0, 10),
-          remarks: [
-            coreData.address && `Address: ${coreData.address}`,
-            coreData.education && `Education: ${coreData.education}`,
-            coreData.experience && `Experience: ${coreData.experience}`,
-            coreData.recruiterName && `Recruiter: ${coreData.recruiterName}`,
-          ].filter(Boolean).join(" | ") || null,
-        }
+        payload
       );
 
       const res: SubmitResponse = {

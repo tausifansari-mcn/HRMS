@@ -82,6 +82,19 @@ export interface CreateCandidateInput {
   referredBy?: string | null;
   walkInDate?: string | null;
   remarks?: string | null;
+  // New fields from migration 054_ats_onboarding_flow
+  address?: string | null;
+  education?: string | null;
+  experience?: string | null;
+  rotationalShift?: string | null;
+  preferredShift?: string | null;
+  nightShiftOk?: string | null;
+  leavesIn3months?: string | null;
+  ownsTwoWheeler?: string | null;
+  idProofAvailable?: string | null;
+  educationProofAvailable?: string | null;
+  recruiterName?: string | null;
+  profileStatus?: string | null;
 }
 
 export interface CreateOnboardingBridgeInput {
