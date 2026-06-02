@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { hrmsApi } from "@/lib/hrmsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import { Database } from "@/integrations/supabase/types";
@@ -100,59 +99,16 @@ export const useUserRole = () => {
         }
       }
 
-      const [{ data: roleRows, error: roleError }, { data: employeeRows, error: employeeError }, { data: scopeRows, error: scopeError }] = await Promise.all([
-        supabase.from("user_roles").select("role").eq("user_id", user.id),
-        supabase
-          .from("employees")
-          .select("id, employee_code, first_name, last_name")
-          .eq("user_id", user.id)
-          .maybeSingle(),
-        supabase
-          .from("user_assignment_scope")
-          .select("id, role_key, scope_type, branch_id, process_id, lob_id, department_id, manager_employee_id")
-          .eq("user_id", user.id)
-          .eq("active_status", true),
-      ]);
-
-      if (roleError) throw roleError;
-      if (employeeError) throw employeeError;
-      if (scopeError) throw scopeError;
-
-      const roles = unique((roleRows ?? []).map((r) => r.role as AppRole));
-      const scopeRoleKeys = unique((scopeRows ?? []).map((s: any) => s.role_key as string));
-      const roleKeys = unique<string>([...roles.map(String), ...scopeRoleKeys, "employee"]);
-
-      const { data: accessRows, error: accessError } = await supabase
-        .from("role_page_access")
-        .select("page_code, can_view, can_create, can_edit, can_delete, can_export")
-        .in("role_key", roleKeys)
-        .eq("active_status", true);
-
-      if (accessError) throw accessError;
-
-      const accessMap = new Map<string, WorkforcePageAccess>();
-      (accessRows ?? []).forEach((row: any) => {
-        const existing = accessMap.get(row.page_code);
-        accessMap.set(row.page_code, {
-          page_code: row.page_code,
-          can_view: Boolean(existing?.can_view || row.can_view),
-          can_create: Boolean(existing?.can_create || row.can_create),
-          can_edit: Boolean(existing?.can_edit || row.can_edit),
-          can_delete: Boolean(existing?.can_delete || row.can_delete),
-          can_export: Boolean(existing?.can_export || row.can_export),
-        });
-      });
-
-      const employee = employeeRows as any;
+      // No MySQL token — unauthenticated; do not fall back to Supabase
       return {
-        roles,
-        roleKeys,
-        primaryRole: getPrimaryRole(roles),
-        employeeId: employee?.id ?? null,
-        employeeCode: employee?.employee_code ?? null,
-        employeeName: employee ? `${employee.first_name ?? ""} ${employee.last_name ?? ""}`.trim() : null,
-        scopes: (scopeRows ?? []) as WorkforceScope[],
-        pages: Array.from(accessMap.values()),
+        roles: [],
+        roleKeys: ["employee"],
+        primaryRole: "employee" as AppRole,
+        employeeId: null,
+        employeeCode: null,
+        employeeName: null,
+        scopes: [],
+        pages: [],
       };
     },
     enabled: !!user?.id,
