@@ -24,7 +24,8 @@ export const atsController = {
 
   async createCandidate(req: AuthenticatedRequest, res: Response) {
     const input = createCandidateSchema.parse(req.body);
-    const data  = await atsService.createCandidate(input, req.authUser!.id);
+    // Public endpoint — authUser may be null for self-registering walk-in candidates
+    const data  = await atsService.createCandidate(input, req.authUser?.id ?? null);
     return res.status(201).json({ success: true, data, message: "Candidate registered" });
   },
 

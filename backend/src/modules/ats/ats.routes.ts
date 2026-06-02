@@ -7,14 +7,18 @@ import { atsController as c } from "./ats.controller.js";
 import { convertCandidateToEmployee } from "./ats.convert.service.js";
 
 export const atsRouter = Router();
-atsRouter.use(requireAuth);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
-// Candidates
-atsRouter.get("/candidates",                     h(c.listCandidates.bind(c)));
+// ── PUBLIC — candidate self-registration (no auth required) ──────────────────
 atsRouter.post("/candidates",                    h(c.createCandidate.bind(c)));
+
+// ── PROTECTED — all remaining routes require a logged-in HR/recruiter ────────
+atsRouter.use(requireAuth);
+
+// Candidates (HR/recruiter facing)
+atsRouter.get("/candidates",                     h(c.listCandidates.bind(c)));
 atsRouter.get("/candidates/:id",                 h(c.getCandidate.bind(c)));
 atsRouter.put("/candidates/:id",                 h(c.updateCandidate.bind(c)));
 atsRouter.post("/candidates/:id/move-stage",     h(c.moveStage.bind(c)));

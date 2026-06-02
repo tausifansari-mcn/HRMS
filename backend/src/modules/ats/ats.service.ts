@@ -51,7 +51,7 @@ export const atsService = {
     return candidate;
   },
 
-  async createCandidate(input: CreateCandidateInput, userId: string): Promise<AtsCandidate> {
+  async createCandidate(input: CreateCandidateInput, userId: string | null): Promise<AtsCandidate> {
     const [dup] = await db.execute<RowDataPacket[]>(
       "SELECT id FROM ats_candidate WHERE mobile = ? LIMIT 1", [input.mobile]
     );
