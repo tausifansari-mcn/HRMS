@@ -30,25 +30,30 @@ import { Building2, CalendarDays, Plus, Pencil, Trash2, Loader2, ShieldAlert, Us
 import { useToast } from "@/hooks/use-toast";
 import { useDepartments } from "@/hooks/useEmployees";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { useIsAdminOrHR, useUserRole } from "@/hooks/useUserRole";
 import { UserRolesManager } from "@/components/settings/UserRolesManager";
 import { EmployeeCodeSettings } from "@/components/settings/EmployeeCodeSettings";
 import DomainWhitelistSettings from "@/components/settings/DomainWhitelistSettings";
 import OfficeLocationSettings from "@/components/settings/OfficeLocationSettings";
 
-// Fetch leave types
+// Fetch leave types from MySQL backend
 const useLeaveTypes = () => {
   return useQuery({
     queryKey: ['leave-types'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('leave_types')
-        .select('*')
-        .order('name');
-      
-      if (error) throw error;
-      return data || [];
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>('/api/leave/types');
+      // Normalise MySQL field names to the shape the UI expects
+      return (res.data ?? []).map((lt: any) => ({
+        id: lt.id,
+        name: lt.leave_name,
+        description: null,          // MySQL table has no description column
+        days_per_year: lt.max_days_per_year,
+        is_paid: Boolean(lt.paid_leave),
+        leave_code: lt.leave_code,
+        carry_forward: Boolean(lt.carry_forward),
+        requires_approval: Boolean(lt.requires_approval),
+      }));
     },
   });
 };
@@ -93,11 +98,11 @@ const Settings = () => {
   // Department mutations - must be before any early returns
   const createDeptMutation = useMutation({
     mutationFn: async (data: DepartmentForm) => {
-      const { error } = await supabase.from('departments').insert({
-        name: data.name.trim(),
+      await hrmsApi.post('/api/org/departments', {
+        dept_name: data.name.trim(),
+        dept_code: data.name.trim().toUpperCase().replace(/\s+/g, '_').slice(0, 20),
         description: data.description.trim() || null,
       });
-      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['departments'] });
@@ -112,11 +117,9 @@ const Settings = () => {
 
   const updateDeptMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: DepartmentForm }) => {
-      const { error } = await supabase.from('departments').update({
-        name: data.name.trim(),
-        description: data.description.trim() || null,
-      }).eq('id', id);
-      if (error) throw error;
+      await hrmsApi.put(`/api/org/departments/${id}`, {
+        dept_name: data.name.trim(),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['departments'] });
@@ -132,8 +135,7 @@ const Settings = () => {
 
   const deleteDeptMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('departments').delete().eq('id', id);
-      if (error) throw error;
+      await hrmsApi.delete(`/api/org/departments/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['departments'] });
@@ -147,13 +149,14 @@ const Settings = () => {
   // Leave type mutations - must be before any early returns
   const createLeaveMutation = useMutation({
     mutationFn: async (data: LeaveTypeForm) => {
-      const { error } = await supabase.from('leave_types').insert({
-        name: data.name.trim(),
-        description: data.description.trim() || null,
-        days_per_year: data.days_per_year,
-        is_paid: data.is_paid,
+      await hrmsApi.post('/api/leave/types', {
+        leaveCode: data.name.trim().toUpperCase().replace(/\s+/g, '_').slice(0, 20),
+        leaveName: data.name.trim(),
+        maxDaysPerYear: data.days_per_year,
+        carryForward: false,
+        requiresApproval: true,
+        paidLeave: data.is_paid,
       });
-      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave-types'] });
@@ -168,13 +171,11 @@ const Settings = () => {
 
   const updateLeaveMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: LeaveTypeForm }) => {
-      const { error } = await supabase.from('leave_types').update({
-        name: data.name.trim(),
-        description: data.description.trim() || null,
-        days_per_year: data.days_per_year,
-        is_paid: data.is_paid,
-      }).eq('id', id);
-      if (error) throw error;
+      await hrmsApi.put(`/api/leave/types/${id}`, {
+        leave_name: data.name.trim(),
+        max_days_per_year: data.days_per_year,
+        paid_leave: data.is_paid,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave-types'] });
@@ -190,8 +191,7 @@ const Settings = () => {
 
   const deleteLeaveMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('leave_types').delete().eq('id', id);
-      if (error) throw error;
+      await hrmsApi.delete(`/api/leave/types/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave-types'] });
