@@ -73,7 +73,7 @@ export const employeeService = {
   },
 
   async listEmployees(filters: EmployeeFilters): Promise<PaginatedResult<Employee>> {
-    const { page, limit, status, processId, branchId, search } = filters;
+    const { page, limit, status, processId, branchId, search, scopeFilter } = filters;
     const offset = (page - 1) * limit;
     const conds: string[] = ["active_status = 1"];
     const params: unknown[] = [];
@@ -82,6 +82,12 @@ export const employeeService = {
     if (processId) { conds.push("process_id = ?");        params.push(processId); }
     if (branchId)  { conds.push("branch_id = ?");         params.push(branchId); }
     if (search)    { conds.push("(full_name LIKE ? OR employee_code LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
+
+    // Apply scope filter from middleware
+    if (scopeFilter) {
+      const scopeClause = String(scopeFilter).replace(/^WHERE\s+/i, '').trim();
+      if (scopeClause) conds.push(`(${scopeClause})`);
+    }
 
     const where = `WHERE ${conds.join(" AND ")}`;
 
