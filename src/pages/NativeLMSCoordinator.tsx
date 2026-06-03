@@ -5,7 +5,8 @@ import { hrmsApi } from "@/lib/hrmsApi";
 import { useUserRole } from "@/hooks/useUserRole";
 
 export default function NativeLMSCoordinator() {
-  const { employeeId } = useUserRole();
+  const { data: roleData } = useUserRole();
+  const employeeId = roleData?.employeeId ?? null;
 
   const { data: launchUrls } = useQuery({
     queryKey: ["lms-launch-urls", employeeId],
@@ -20,7 +21,7 @@ export default function NativeLMSCoordinator() {
   const { data: mappings = [], isLoading: loadingMappings } = useQuery({
     queryKey: ["lms-mappings"],
     queryFn: async () => {
-      const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/lms/mappings");
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/lms/mapping");
       return res.data ?? [];
     },
   });
