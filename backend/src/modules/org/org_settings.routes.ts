@@ -26,10 +26,13 @@ router.get("/:key", h(async (req: AuthenticatedRequest, res: Response) => {
 
 router.put("/:key", requireRole("admin"), h(async (req: AuthenticatedRequest, res: Response) => {
   const { setting_value } = req.body;
-  await db.execute(
+  const [result] = await db.execute(
     "UPDATE org_settings SET setting_value = ?, updated_by = ? WHERE setting_key = ?",
     [setting_value ?? null, req.authUser!.id, req.params.key]
   );
+  if ((result as any).affectedRows === 0) {
+    return res.status(404).json({ error: `Setting '${req.params.key}' not found` });
+  }
   const [rows] = await db.execute<RowDataPacket[]>("SELECT * FROM org_settings WHERE setting_key = ? LIMIT 1", [req.params.key]);
   res.json({ success: true, data: (rows as RowDataPacket[])[0] });
 }));

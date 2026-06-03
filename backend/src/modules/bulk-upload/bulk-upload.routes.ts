@@ -32,6 +32,12 @@ router.post("/batches", requireRole("admin", "hr"), h(async (req: AuthenticatedR
     file_path?: string; file_size_bytes?: number; total_rows: number; valid_rows: number;
     error_rows: number; batch_status?: string; error_summary?: string; metadata?: any;
   };
+  if (!body.upload_type_code) {
+    return res.status(400).json({ error: "upload_type_code is required" });
+  }
+  if (body.total_rows === undefined || body.valid_rows === undefined || body.error_rows === undefined) {
+    return res.status(400).json({ error: "total_rows, valid_rows, and error_rows are required" });
+  }
   const id = randomUUID();
   const batchNo = body.upload_batch_no || `BATCH-${Date.now()}`;
   await db.execute(
