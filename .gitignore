@@ -28,3 +28,6 @@ dist-ssr
 # Local dev tools with credentials — never commit
 backend/mysql-tunnel.cjs
 backend/*.tunnel.cjs
+
+# Local disk uploads — never commit uploaded files
+backend/uploads/
