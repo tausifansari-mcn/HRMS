@@ -221,6 +221,13 @@ export const payrollService = {
     const params: unknown[] = [];
     if (runMonth) { conds.push("run_month = ?"); params.push(runMonth); }
     if (status)   { conds.push("status = ?");    params.push(status); }
+
+    // Apply scope filter from middleware
+    if ((filters as any).scopeFilter) {
+      const scopeClause = String((filters as any).scopeFilter).replace(/^WHERE\s+/i, '').trim();
+      if (scopeClause) conds.push(`(${scopeClause})`);
+    }
+
     const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT * FROM salary_prep_run ${where} ORDER BY run_month DESC LIMIT ${limit} OFFSET ${offset}`,

@@ -67,7 +67,9 @@ export const payrollController = {
   async listRuns(req: Request, res: Response) {
     const parsed = runFiltersSchema.safeParse(req.query);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    const result = await payrollService.listRuns(parsed.data);
+    // Pass scopeFilter from middleware
+    const filtersWithScope = { ...parsed.data, scopeFilter: (req as any).scopeFilter };
+    const result = await payrollService.listRuns(filtersWithScope);
     res.json({ data: result.data, total: result.total, page: result.page, limit: result.limit });
   },
 
