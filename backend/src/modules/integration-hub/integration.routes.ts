@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../../middleware/authMiddleware.js";
+import { requireRole } from "../../middleware/requireRole.js";
 import { integrationController } from "./integration.controller.js";
 import { integrationService } from "./integration.service.js";
 import { syncDatabaseConnector } from "./adapters/dbSyncService.js";
@@ -7,6 +8,7 @@ import { syncDatabaseConnector } from "./adapters/dbSyncService.js";
 export const integrationRouter = Router();
 
 integrationRouter.use(requireAuth);
+integrationRouter.use(requireRole("admin"));  // ALL integration operations admin-only
 
 integrationRouter.get("/runs", (req, res, next) => {
   integrationController.listRuns(req as any, res).catch(next);

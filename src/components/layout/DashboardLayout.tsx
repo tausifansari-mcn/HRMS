@@ -73,6 +73,7 @@ interface NavItem {
   adminOnly?: boolean;
   employeeOnly?: boolean;
   pageCode?: string;
+  roles?: string[]; // Show if user has any of these roles
   description?: string;
 }
 
@@ -125,17 +126,17 @@ const navGroups: NavGroup[] = [
       { label: "Work Inbox", href: "/work-inbox", icon: <ClipboardList className="h-4 w-4" />, pageCode: "WORK_INBOX", description: "Pending actions and approvals" },
       { label: "Helpdesk", href: "/helpdesk", icon: <HelpCircle className="h-4 w-4" />, description: "Support tickets and grievances" },
       { label: "Benefits & Claims", href: "/benefits", icon: <ShieldCheck className="h-4 w-4" />, description: "Benefit plans, enrollment and reimbursements" },
-      { label: "Bulk Upload Hub", href: "/bulk-upload", icon: <Package className="h-4 w-4" />, adminOnly: true, description: "Bulk upload templates and staging" },
-      { label: "Assets", href: "/assets-manager", icon: <Briefcase className="h-4 w-4" />, adminOnly: true, description: "Asset inventory and assignments" },
-      { label: "Letters", href: "/letters", icon: <FileText className="h-4 w-4" />, adminOnly: true, description: "HR letter generation" },
-      { label: "Offer Letters", href: "/offer-letter", icon: <FilePen className="h-4 w-4" />, adminOnly: true, description: "Generate and track offer & HR letters" },
-      { label: "ERP", href: "/erp", icon: <Landmark className="h-4 w-4" />, adminOnly: true, description: "Expenses, vendors, contracts, procurement" },
-      { label: "Advanced Reports", href: "/advanced-reports", icon: <BarChart3 className="h-4 w-4" />, adminOnly: true, description: "Headcount, attendance, leave and payroll reports" },
-      { label: "Master Reports", href: "/master-reports", icon: <BarChart3 className="h-4 w-4" />, adminOnly: true, description: "Branch, user, process and employee master reports" },
-      { label: "Payroll", href: "/payroll", icon: <CreditCard className="h-4 w-4" />, adminOnly: true, description: "Payroll workspace" },
-      { label: "Payslips", href: "/payroll/payslips", icon: <CreditCard className="h-4 w-4" />, adminOnly: true, description: "Payslip generation and acknowledgement" },
+      { label: "Bulk Upload Hub", href: "/bulk-upload", icon: <Package className="h-4 w-4" />, roles: ["admin", "hr"], description: "Bulk upload templates and staging" },
+      { label: "Assets", href: "/assets-manager", icon: <Briefcase className="h-4 w-4" />, roles: ["admin", "hr"], description: "Asset inventory and assignments" },
+      { label: "Letters", href: "/letters", icon: <FileText className="h-4 w-4" />, roles: ["admin", "hr"], description: "HR letter generation" },
+      { label: "Offer Letters", href: "/offer-letter", icon: <FilePen className="h-4 w-4" />, roles: ["admin", "hr"], description: "Generate and track offer & HR letters" },
+      { label: "ERP", href: "/erp", icon: <Landmark className="h-4 w-4" />, roles: ["admin", "hr", "finance"], description: "Expenses, vendors, contracts, procurement" },
+      { label: "Advanced Reports", href: "/advanced-reports", icon: <BarChart3 className="h-4 w-4" />, roles: ["admin", "hr", "manager", "ceo"], description: "Headcount, attendance, leave and payroll reports" },
+      { label: "Master Reports", href: "/master-reports", icon: <BarChart3 className="h-4 w-4" />, roles: ["admin", "hr", "ceo"], description: "Branch, user, process and employee master reports" },
+      { label: "Payroll", href: "/payroll", icon: <CreditCard className="h-4 w-4" />, roles: ["admin", "hr", "finance", "payroll"], description: "Payroll workspace" },
+      { label: "Payslips", href: "/payroll/payslips", icon: <CreditCard className="h-4 w-4" />, roles: ["admin", "hr", "finance", "payroll"], description: "Payslip generation and acknowledgement" },
       { label: "Tax Declaration", href: "/payroll/tax-declaration", icon: <Landmark className="h-4 w-4" />, description: "Investment declaration" },
-      { label: "Full & Final", href: "/payroll/full-final", icon: <Zap className="h-4 w-4" />, adminOnly: true, description: "F&F settlement for exits" },
+      { label: "Full & Final", href: "/payroll/full-final", icon: <Zap className="h-4 w-4" />, roles: ["admin", "hr", "finance", "payroll"], description: "F&F settlement for exits" },
     ],
   },
   {
@@ -235,7 +236,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const { user, signOut, isSigningOut } = useAuth();
   const { isAdminOrHR } = useIsAdminOrHR();
-  const { canViewPage, visiblePageCodes } = useWorkforceAccess();
+  const { canViewPage, visiblePageCodes, hasAnyRole } = useWorkforceAccess();
   const { data: versionData } = useVersionCheck();
 
   const displayVersion = isAutoUpdatingEnvironment()
@@ -253,13 +254,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           if (item.pageCode) {
             return visibleSet.has(item.pageCode) || canViewPage(item.pageCode);
           }
+          if (item.roles && item.roles.length > 0) {
+            return hasAnyRole(...item.roles);
+          }
           if (item.adminOnly && !isAdminOrHR) return false;
           if (item.employeeOnly && isAdminOrHR) return false;
           return true;
         }),
       }))
       .filter((group) => group.items.length > 0);
-  }, [isAdminOrHR, canViewPage, visiblePageCodes]);
+  }, [isAdminOrHR, canViewPage, visiblePageCodes, hasAnyRole]);
 
   const searchableItems = useMemo(() => {
     return filteredNavGroups.flatMap((group) =>

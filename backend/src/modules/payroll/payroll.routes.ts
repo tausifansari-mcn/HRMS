@@ -21,12 +21,12 @@ router.use(requireAuth);
 
 // ─── Structures ───────────────────────────────────────────────────────────────
 
-router.get("/structures", h(c.listStructures));
+router.get("/structures", requireRole("admin", "hr", "finance", "payroll"), h(c.listStructures));
 router.post("/structures", requireRole("admin", "hr", "finance", "payroll"), h(c.createStructure));
 
 // ─── Components ───────────────────────────────────────────────────────────────
 
-router.get("/components", h(c.listComponents));
+router.get("/components", requireRole("admin", "hr", "finance", "payroll"), h(c.listComponents));
 router.post("/components", requireRole("admin", "hr", "finance", "payroll"), h(c.createComponent));
 
 // ─── Salary Assignments ───────────────────────────────────────────────────────
@@ -37,11 +37,11 @@ router.get("/salary-assignments/:employeeId", requireRole("admin", "hr", "financ
 
 // ─── Payroll Runs — static paths before :id ───────────────────────────────────
 
-router.get("/runs", h(c.listRuns));
+router.get("/runs", requireRole("admin", "hr", "finance", "payroll"), h(c.listRuns));
 router.post("/runs", requireRole("admin", "finance", "payroll"), h(c.createRun));
-router.get("/runs/:id", h(c.getRun));
+router.get("/runs/:id", requireRole("admin", "hr", "finance", "payroll"), h(c.getRun));
 router.patch("/runs/:id/status", requireRole("admin", "finance", "payroll"), h(c.updateRunStatus));
-router.get("/runs/:id/lines", h(c.listLines));
+router.get("/runs/:id/lines", requireRole("admin", "hr", "finance", "payroll"), h(c.listLines));
 router.post("/runs/:id/calculate", requireRole("admin", "finance", "payroll"), async (req: any, res: any, next: any) => {
   try {
     const actorId = req.authUser?.id ?? "system";
@@ -404,7 +404,7 @@ router.get(
 // ─── PT Slabs ─────────────────────────────────────────────────────────────────
 
 // GET /api/payroll/pt-slabs — list PT slabs; optional ?state_code=
-router.get("/pt-slabs", h(async (req: AuthenticatedRequest, res: Response) => {
+router.get("/pt-slabs", requireRole("admin", "hr", "finance", "payroll"), h(async (req: AuthenticatedRequest, res: Response) => {
   const { state_code } = req.query as { state_code?: string };
   const params: unknown[] = [];
   let where = "WHERE is_active = 1";
@@ -498,7 +498,7 @@ router.patch(
 // ─── Minimum Wages ────────────────────────────────────────────────────────────
 
 // GET /api/payroll/minimum-wages — list minimum wages; optional ?state_code=
-router.get("/minimum-wages", h(async (req: AuthenticatedRequest, res: Response) => {
+router.get("/minimum-wages", requireRole("admin", "hr", "finance", "payroll"), h(async (req: AuthenticatedRequest, res: Response) => {
   const { state_code } = req.query as { state_code?: string };
   const params: unknown[] = [];
   let where = "WHERE is_active = 1";

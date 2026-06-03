@@ -37,9 +37,20 @@ export type UserRoleData = {
 };
 
 const getPrimaryRole = (roles: AppRole[]): AppRole | null => {
+  // Priority order for primary role determination
   if (roles.includes("admin")) return "admin";
   if (roles.includes("hr")) return "hr";
+  if (roles.includes("ceo")) return "ceo";
+  if (roles.includes("branch_head")) return "branch_head";
+  if (roles.includes("process_manager")) return "process_manager";
   if (roles.includes("manager")) return "manager";
+  if (roles.includes("wfm")) return "wfm";
+  if (roles.includes("finance")) return "finance";
+  if (roles.includes("payroll")) return "payroll";
+  if (roles.includes("qa")) return "qa";
+  if (roles.includes("recruiter")) return "recruiter";
+  if (roles.includes("trainer")) return "trainer";
+  if (roles.includes("tl")) return "tl";
   if (roles.includes("employee")) return "employee";
   return null;
 };
@@ -134,14 +145,16 @@ export const useWorkforceAccess = () => {
 
   const access = useMemo(() => {
     const pageSet = new Set((roleQuery.data?.pages ?? []).filter((p) => p.can_view).map((p) => p.page_code));
+    const roleKeys = roleQuery.data?.roleKeys ?? [];
     return {
       canViewPage: (pageCode: string) => pageSet.has(pageCode),
       visiblePageCodes: Array.from(pageSet),
-      roleKeys: roleQuery.data?.roleKeys ?? [],
+      roleKeys,
       scopes: roleQuery.data?.scopes ?? [],
       employeeId: roleQuery.data?.employeeId ?? null,
       employeeCode: roleQuery.data?.employeeCode ?? null,
       employeeName: roleQuery.data?.employeeName ?? null,
+      hasAnyRole: (...roles: string[]) => roles.some(r => roleKeys.includes(r)),
     };
   }, [roleQuery.data]);
 
@@ -149,4 +162,10 @@ export const useWorkforceAccess = () => {
     ...roleQuery,
     ...access,
   };
+};
+
+/** Check if user has any of the specified roles */
+export const useHasRole = (...roles: string[]) => {
+  const { roleKeys } = useWorkforceAccess();
+  return roles.some(r => roleKeys.includes(r));
 };

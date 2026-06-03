@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { RowDataPacket } from "mysql2";
 import { requireAuth } from "../../middleware/authMiddleware.js";
+import { requireRole } from "../../middleware/requireRole.js";
 import { db } from "../../db/mysql.js";
 import { employeeController as c } from "./employee.controller.js";
 import { appendJourneyEvent, listJourneyEvents } from "./journeyLog.service.js";
@@ -26,7 +27,7 @@ router.get("/me", h(async (req: any, res: any) => {
 }));
 
 // GET /api/employees/stats — aggregate counts (must be before /:id to avoid route collision)
-router.get("/stats", h(async (_req: any, res: any) => {
+router.get("/stats", requireRole("admin", "hr", "manager", "ceo"), h(async (_req: any, res: any) => {
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT
        COUNT(*) AS total_employees,
@@ -37,14 +38,14 @@ router.get("/stats", h(async (_req: any, res: any) => {
   res.json({ data: rows[0] });
 }));
 
-router.get("/", h(c.listEmployees));
-router.post("/", h(c.createEmployee));
-router.get("/:id", h(c.getEmployee));
-router.patch("/:id", h(c.updateEmployee));
-router.delete("/:id", h(c.deactivateEmployee));
+router.get("/", requireRole("admin", "hr", "manager"), h(c.listEmployees));
+router.post("/", requireRole("admin", "hr"), h(c.createEmployee));
+router.get("/:id", requireRole("admin", "hr", "manager"), h(c.getEmployee));  // TODO: Add self-scope check
+router.patch("/:id", requireRole("admin", "hr"), h(c.updateEmployee));
+router.delete("/:id", requireRole("admin"), h(c.deactivateEmployee));
 
 // Journey log
-router.get("/:id/journey", async (req: any, res: any, next: any) => {
+router.get("/:id/journey", requireRole("admin", "hr", "manager"), async (req: any, res: any, next: any) => {
   try {
     const data = await listJourneyEvents(req.params.id, {
       module:    req.query.module    as string | undefined,
@@ -56,7 +57,7 @@ router.get("/:id/journey", async (req: any, res: any, next: any) => {
   } catch (err) { next(err); }
 });
 
-router.post("/:id/journey", async (req: any, res: any, next: any) => {
+router.post("/:id/journey", requireRole("admin", "hr"), async (req: any, res: any, next: any) => {
   try {
     const b = req.body;
     if (!b.eventType || !b.eventDate) {

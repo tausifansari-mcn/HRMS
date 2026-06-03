@@ -1,15 +1,31 @@
 import { useQuery } from "@tanstack/react-query";
 import { hrmsApi } from "@/lib/hrmsApi";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+
 export default function NativeLMSMyLearning() {
-  const { data: contents = [] } = useQuery({
+  const { data: contents = [], isLoading, error } = useQuery({
     queryKey: ["native-lms-my-learning"],
     queryFn: async () => {
-      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
-      if (error) throw error;
-      return data ?? [];
+      // Use LMS integration endpoint - get own progress
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>(
+        "/api/lms/progress/me"
+      );
+      if (!res.data.success) {
+        throw new Error("Failed to fetch learning content");
+      }
+      return res.data.data ?? [];
     },
   });
+
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
+          <p className="text-red-800">Error loading content: {(error as Error).message}</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

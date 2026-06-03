@@ -1,17 +1,17 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import NativeLMSAdmin from "./NativeLMSAdmin";
-import NativeLMSManagementDashboard from "./NativeLMSManagementDashboard";
+import LMSIntegrationAdmin from "./LMSIntegrationAdmin";
+import LMSProgressDashboard from "./LMSProgressDashboard";
 import NativeWFMLiveTracker from "./NativeWFMLiveTracker";
 import NativeQualityDashboard from "./NativeQualityDashboard";
 import NativeOperationsDashboard from "./NativeOperationsDashboard";
 
 export default function NativePlaceholderPage({ title, module }: { title: string; module: string }) {
   if (title === "LMS Admin") {
-    return <NativeLMSAdmin />;
+    return <LMSIntegrationAdmin />;
   }
 
   if (title === "LMS Management Dashboard") {
-    return <NativeLMSManagementDashboard />;
+    return <LMSProgressDashboard />;
   }
 
   if (title === "WFM Live Tracker") {

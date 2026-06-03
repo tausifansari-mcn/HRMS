@@ -55,12 +55,12 @@ router.get("/certifications/:employeeId", h(async (req: AuthenticatedRequest, re
   res.json({ success: true, data: await lmsService.getCertifications(req.params.employeeId) });
 }));
 
-// Get/update employee-to-LMS learner mapping (admin/hr only)
-router.get("/mapping", requireRole("admin", "hr"), h(async (_req: AuthenticatedRequest, res: Response) => {
+// Get/update employee-to-LMS learner mapping (admin/hr/trainer)
+router.get("/mapping", requireRole("admin", "hr", "trainer"), h(async (_req: AuthenticatedRequest, res: Response) => {
   res.json({ success: true, data: await lmsService.listMappings() });
 }));
 
-router.post("/mapping", requireRole("admin", "hr"), h(async (req: AuthenticatedRequest, res: Response) => {
+router.post("/mapping", requireRole("admin", "hr", "trainer"), h(async (req: AuthenticatedRequest, res: Response) => {
   const { employee_id, lms_learner_id, email } = req.body;
   if (!employee_id || !lms_learner_id) {
     return res.status(400).json({ error: "employee_id and lms_learner_id required" });
@@ -69,7 +69,7 @@ router.post("/mapping", requireRole("admin", "hr"), h(async (req: AuthenticatedR
 }));
 
 // Sync audit log
-router.get("/sync-log", requireRole("admin", "hr"), h(async (_req: AuthenticatedRequest, res: Response) => {
+router.get("/sync-log", requireRole("admin", "hr", "trainer"), h(async (_req: AuthenticatedRequest, res: Response) => {
   res.json({ success: true, data: await lmsService.getSyncLog() });
 }));
 

@@ -15,26 +15,26 @@ const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any,
 router.use(requireAuth);
 
 // Metrics
-router.get("/metrics", h(c.listMetrics));
-router.post("/metrics", h(c.createMetric));
+router.get("/metrics", requireRole("admin", "hr", "manager", "qa", "process_manager"), h(c.listMetrics));
+router.post("/metrics", requireRole("admin", "manager", "process_manager"), h(c.createMetric));
 
 // Templates
-router.get("/templates", h(c.listTemplates));
-router.post("/templates", h(c.createTemplate));
-router.get("/templates/:id/metrics", h(c.listTemplateMetrics));
-router.post("/templates/:id/metrics", h(c.addTemplateMetric));
+router.get("/templates", requireRole("admin", "hr", "manager", "qa", "process_manager"), h(c.listTemplates));
+router.post("/templates", requireRole("admin", "manager", "process_manager"), h(c.createTemplate));
+router.get("/templates/:id/metrics", requireRole("admin", "hr", "manager", "qa", "process_manager"), h(c.listTemplateMetrics));
+router.post("/templates/:id/metrics", requireRole("admin", "manager", "process_manager"), h(c.addTemplateMetric));
 
 // Assignments — static path before dynamic
-router.post("/assignments", h(c.assignTemplate));
-router.get("/assignments/employee/:employeeId", h(c.getEmployeeTemplate));
+router.post("/assignments", requireRole("admin", "manager", "process_manager"), h(c.assignTemplate));
+router.get("/assignments/employee/:employeeId", requireRole("admin", "hr", "manager", "qa"), h(c.getEmployeeTemplate));  // TODO: Add self-scope
 
 // Scores — static path before dynamic
-router.post("/scores/bulk", h(c.bulkRecordScores));
-router.post("/scores", h(c.recordScore));
+router.post("/scores/bulk", requireRole("admin", "manager", "qa"), h(c.bulkRecordScores));
+router.post("/scores", requireRole("admin", "manager", "qa"), h(c.recordScore));  // TODO: Add self-scope for employees
 
 // Summary + Leaderboard
-router.get("/summary/:employeeId/:templateId/:period", h(c.getEmployeeSummary));
-router.get("/leaderboard", h(c.getLeaderboard));
+router.get("/summary/:employeeId/:templateId/:period", requireRole("admin", "hr", "manager", "qa"), h(c.getEmployeeSummary));  // TODO: Add self-scope
+router.get("/leaderboard", requireRole("admin", "hr", "manager", "qa", "process_manager"), h(c.getLeaderboard));
 
 // Family summary — aggregated scores per family for a process/period
 router.get("/family-summary/:processId/:period", requireRole("admin", "hr", "manager"), h(async (req: AuthenticatedRequest, res: Response) => {
@@ -61,7 +61,7 @@ router.get("/process-config/:processId", requireRole("admin", "hr", "manager"), 
   res.json({ success: true, data: rows });
 }));
 
-router.post("/process-config/:processId", requireRole("admin", "hr"), h(async (req: AuthenticatedRequest, res: Response) => {
+router.post("/process-config/:processId", requireRole("admin", "hr", "process_manager"), h(async (req: AuthenticatedRequest, res: Response) => {
   const { metric_id, target_value, min_threshold, max_achievement, weightage } = req.body;
   if (!metric_id || target_value === undefined) return res.status(400).json({ error: "metric_id and target_value required" });
   await db.execute(

@@ -14,7 +14,7 @@ leaveRouter.use(requireAuth);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
 
-leaveRouter.get("/types",                         h(leaveController.listLeaveTypes.bind(leaveController)));
+leaveRouter.get("/types",                         h(leaveController.listLeaveTypes.bind(leaveController)));  // All can view
 leaveRouter.post("/types", requireRole("admin", "hr"), h(leaveController.createLeaveType.bind(leaveController)));
 
 // PUT /types/:id — update leave type (admin/hr)
@@ -80,12 +80,12 @@ leaveRouter.delete(
     return res.json({ success: true, message: "Leave type deactivated" });
   })
 );
-leaveRouter.post("/requests",                     h(leaveController.submitRequest.bind(leaveController)));
-leaveRouter.get("/requests",                      h(leaveController.listRequests.bind(leaveController)));
-leaveRouter.patch("/requests/:id/review",         h(leaveController.reviewRequest.bind(leaveController)));
-leaveRouter.get("/balance/:employeeId",           h(leaveController.getBalance.bind(leaveController)));
-leaveRouter.get("/holidays",                      h(leaveController.listHolidays.bind(leaveController)));
-leaveRouter.post("/holidays",                     h(leaveController.createHoliday.bind(leaveController)));
+leaveRouter.post("/requests",                     h(leaveController.submitRequest.bind(leaveController)));  // Employee can submit own
+leaveRouter.get("/requests",                      requireRole("admin", "hr", "manager"), h(leaveController.listRequests.bind(leaveController)));  // TODO: Add self-scope
+leaveRouter.patch("/requests/:id/review",         requireRole("admin", "hr", "manager"), h(leaveController.reviewRequest.bind(leaveController)));
+leaveRouter.get("/balance/:employeeId",           requireRole("admin", "hr", "manager"), h(leaveController.getBalance.bind(leaveController)));  // TODO: Add self-scope
+leaveRouter.get("/holidays",                      h(leaveController.listHolidays.bind(leaveController)));  // All can view
+leaveRouter.post("/holidays",                     requireRole("admin", "hr"), h(leaveController.createHoliday.bind(leaveController)));
 
 // POST /balance/seed — bulk seed leave balances during onboarding
 leaveRouter.post("/balance/seed", requireRole("admin", "hr"), h(async (req: AuthenticatedRequest, res: Response) => {

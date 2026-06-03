@@ -57,6 +57,7 @@ import { rosterMasterRouter } from "./modules/roster/roster-master.routes.js";
 import rosterCapacityRouter from "./modules/roster/roster-capacity.routes.js";
 import { reportingRouter } from "./modules/reporting/reporting.routes.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
+import { roleAssignmentRouter } from "./modules/admin/role-assignment.routes.js";
 
 export const app = express();
 
@@ -93,6 +94,7 @@ app.get("/", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/health", healthRouter);
+app.use("/api/admin", roleAssignmentRouter);
 app.use("/api/processes", processRouter);
 app.use("/api/integration-hub", integrationRouter);
 app.use("/api/wfm", wfmRouter);

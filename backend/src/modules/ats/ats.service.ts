@@ -18,6 +18,24 @@ function candidateCode(): string {
   return `CND-${Date.now().toString(36).toUpperCase()}`;
 }
 
+/** Normalize sourcing channel to canonical values */
+function normalizeSourceChannel(channel: string | null | undefined): string | null {
+  if (!channel) return null;
+  const normalized = channel.trim().toLowerCase();
+  const mapping: Record<string, string> = {
+    "walk-in": "Walk-In",
+    "walkin": "Walk-In",
+    "walk_in": "Walk-In",
+    "employee-referral": "Employee Referral",
+    "employee referral": "Employee Referral",
+    "job-portal": "Job Portal",
+    "job portal": "Job Portal",
+    "social-media": "Social Media",
+    "social media": "Social Media",
+  };
+  return mapping[normalized] || channel; // Return normalized or original if no match
+}
+
 export const atsService = {
   async listCandidates(filters: CandidateListFilters): Promise<PaginatedResult<AtsCandidate>> {
     const conds: string[] = ["active_status = 1"];
@@ -59,6 +77,9 @@ export const atsService = {
     );
     if ((dup as RowDataPacket[]).length > 0) throw new Error("This mobile already registered");
 
+    // Normalize sourcing channel before insert
+    const normalizedChannel = normalizeSourceChannel(input.sourcingChannel);
+
     const id = randomUUID();
     await db.execute(
       `INSERT INTO ats_candidate
@@ -70,7 +91,7 @@ export const atsService = {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, candidateCode(), input.fullName, input.mobile, input.email ?? null, input.gender ?? null,
        input.dateOfBirth ?? null, input.appliedForProcess ?? null, input.appliedForBranch ?? null,
-       input.sourcingChannel ?? null, input.referredBy ?? null, input.walkInDate ?? null, input.remarks ?? null, userId,
+       normalizedChannel, input.referredBy ?? null, input.walkInDate ?? null, input.remarks ?? null, userId,
        input.address ?? null, input.education ?? null, input.experience ?? null,
        input.rotationalShift ?? null, input.preferredShift ?? null, input.nightShiftOk ?? null,
        input.leavesIn3months ?? null, input.ownsTwoWheeler ?? null, input.idProofAvailable ?? null,
@@ -88,7 +109,12 @@ export const atsService = {
       ["sourcingChannel", "sourcing_channel"], ["referredBy", "referred_by"], ["walkInDate", "walk_in_date"], ["remarks", "remarks"],
     ];
     fields.forEach(([key, column]) => {
-      if (input[key] !== undefined) { sets.push(`${column} = ?`); params.push(input[key] ?? null); }
+      if (input[key] !== undefined) {
+        // Normalize sourcing channel if being updated
+        const value = key === "sourcingChannel" ? normalizeSourceChannel(input[key] as string) : (input[key] ?? null);
+        sets.push(`${column} = ?`);
+        params.push(value);
+      }
     });
     if (sets.length) {
       params.push(id);
