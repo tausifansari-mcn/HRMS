@@ -165,7 +165,7 @@ router.post('/clock-in', h(async (req: AuthenticatedRequest, res: Response) => {
   const id = randomUUID();
   // Check if record already exists for today
   const [existing] = await db.execute<RowDataPacket[]>(
-    'SELECT id FROM attendance_daily_record WHERE employee_id = ? AND work_date = ? LIMIT 1',
+    'SELECT id FROM attendance_daily_record WHERE employee_id = ? AND record_date = ? LIMIT 1',
     [employee_id, today]
   );
   if ((existing as RowDataPacket[]).length > 0) {
@@ -173,7 +173,7 @@ router.post('/clock-in', h(async (req: AuthenticatedRequest, res: Response) => {
   }
   await db.execute(
     `INSERT INTO attendance_daily_record
-       (id, employee_id, work_date, clock_in_time, work_mode, clock_in_lat, clock_in_lng, clock_in_location, attendance_status)
+       (id, employee_id, record_date, clock_in_time, work_mode, clock_in_lat, clock_in_lng, clock_in_location, attendance_status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'present')`,
     [id, employee_id, today, now, work_mode ?? 'office', latitude ?? null, longitude ?? null, location_name ?? null]
   );

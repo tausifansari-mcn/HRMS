@@ -5,19 +5,21 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 export interface AttendanceRecord {
   id: string;
   employee_id: string;
-  date: string;
-  clock_in: string | null;
-  clock_out: string | null;
-  total_hours: number | null;
-  status: string;
-  notes: string | null;
-  clock_in_latitude: number | null;
-  clock_in_longitude: number | null;
-  clock_in_location_name: string | null;
-  clock_out_latitude: number | null;
-  clock_out_longitude: number | null;
-  clock_out_location_name: string | null;
-  work_mode: 'wfh' | 'wfo' | null;
+  record_date: string;
+  clock_in_time: string | null;
+  clock_out_time: string | null;
+  raw_minutes: number | null;
+  attendance_status: string;
+  work_mode: string | null;
+  clock_in_lat: number | null;
+  clock_in_lng: number | null;
+  clock_in_location: string | null;
+  clock_out_lat: number | null;
+  clock_out_lng: number | null;
+  clock_out_location: string | null;
+  late_mark: number | null;
+  late_by_minutes: number | null;
+  is_locked: number | null;
   employee?: {
     first_name: string;
     last_name: string;
@@ -177,9 +179,10 @@ export function useAttendanceReport(month: Date) {
         const empData = employeeMap.get(key)!;
         empData.records.push(record as unknown as AttendanceRecord);
         empData.totalDays++;
-        empData.totalHours += record.total_hours || 0;
-        if (record.attendance_status === "present" || record.status === "present") empData.presentDays++;
-        if (record.attendance_status === "late" || record.status === "late") empData.lateDays++;
+        // raw_minutes is the authoritative column; fall back to legacy total_hours if present
+        empData.totalHours += record.raw_minutes != null ? record.raw_minutes / 60 : (record.total_hours || 0);
+        if (record.attendance_status === "present") empData.presentDays++;
+        if (record.attendance_status === "late" || record.late_mark === 1) empData.lateDays++;
         if (record.work_mode === "wfo" || record.work_mode === "office") empData.wfoDays++;
       });
 

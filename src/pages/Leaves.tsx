@@ -241,13 +241,13 @@ const Leaves = () => {
 
       await hrmsApi.patch(`/api/leave/requests/${requestId}/review`, {
         status,
-        reviewNotes: reviewNotes.trim() || null,
+        remarks: reviewNotes.trim() || null,
       });
 
       // Notify employee (fire and forget)
       hrmsApi.post("/api/communication/dispatch/send", {
         template_code: "leave_status",
-        recipient_employee_ids: [],
+        recipient_employee_ids: [selectedRequest?.employeeId ?? selectedRequest?.employee_id].filter(Boolean) as string[],
         variables: {
           status,
           reviewer_name: reviewerName,
@@ -1077,8 +1077,8 @@ const Leaves = () => {
                   </p>
 
                   <p className="text-sm text-slate-500">
-                    {format(new Date(selectedRequest.startDate), "PPP")} -{" "}
-                    {format(new Date(selectedRequest.endDate), "PPP")}
+                    {selectedRequest.startDate ? format(parseISO(selectedRequest.startDate), "PPP") : "—"} -{" "}
+                    {selectedRequest.endDate ? format(parseISO(selectedRequest.endDate), "PPP") : "—"}
                   </p>
 
                   {selectedRequest.reason && (

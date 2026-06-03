@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { hrmsApi } from "@/lib/hrmsApi";
-import { format } from "date-fns";
 
 export interface LeaveRequest {
   id: string;
@@ -44,6 +43,9 @@ function mapRawToLeaveRequest(req: any): LeaveRequest {
   const reviewedAtRaw = req.reviewed_at ?? undefined;
   const reviewNotes = req.review_notes ?? req.remarks ?? undefined;
 
+  // Keep startDate/endDate as raw ISO strings (e.g. "2026-05-01") so callers
+  // can use parseISO() reliably. Formatting for display happens at render time.
+  // submittedAt and reviewedAt are also kept as ISO strings for the same reason.
   return {
     id: req.id,
     employeeId: req.employee_id,
@@ -53,14 +55,14 @@ function mapRawToLeaveRequest(req: any): LeaveRequest {
       department: dept,
     },
     type: typeName,
-    startDate: startRaw ? format(new Date(startRaw), "MMM d, yyyy") : "",
-    endDate: endRaw ? format(new Date(endRaw), "MMM d, yyyy") : "",
+    startDate: startRaw ?? "",
+    endDate: endRaw ?? "",
     days,
     reason: req.reason || "",
     status: req.status as LeaveRequest["status"],
-    submittedAt: submittedRaw ? format(new Date(submittedRaw), "MMM d, yyyy 'at' h:mm a") : "",
+    submittedAt: submittedRaw ?? "",
     reviewedBy: reviewerName ? { name: reviewerName } : undefined,
-    reviewedAt: reviewedAtRaw ? format(new Date(reviewedAtRaw), "MMM d, yyyy 'at' h:mm a") : undefined,
+    reviewedAt: reviewedAtRaw ?? undefined,
     reviewNotes: reviewNotes || undefined,
   };
 }
@@ -166,7 +168,7 @@ export function useUpdateLeaveStatus() {
     mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
       await hrmsApi.patch(`/api/leave/requests/${id}/review`, {
         status,
-        reviewNotes: null,
+        remarks: null,
       });
     },
     onSuccess: () => {

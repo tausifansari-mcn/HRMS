@@ -114,12 +114,16 @@ export const leaveService = {
     return { data: rows as LeaveRequest[], total: (countRows as any)[0]?.total ?? 0, page, limit };
   },
 
-  async getBalance(employeeId: string, year: number): Promise<LeaveBalanceLedger[]> {
+  async getBalance(employeeId: string, year: number): Promise<any[]> {
     const [rows] = await db.execute<RowDataPacket[]>(
-      "SELECT * FROM leave_balance_ledger WHERE employee_id = ? AND balance_year = ?",
+      `SELECT lbl.*, lt.leave_name, lt.leave_code, lt.paid_leave, lt.carry_forward
+       FROM leave_balance_ledger lbl
+       JOIN leave_type_master lt ON lt.id = lbl.leave_type_id
+       WHERE lbl.employee_id = ? AND lbl.balance_year = ?
+       ORDER BY lt.leave_name ASC`,
       [employeeId, year]
     );
-    return rows as LeaveBalanceLedger[];
+    return rows as RowDataPacket[];
   },
 
   async listHolidays(year?: number): Promise<LeaveHoliday[]> {
