@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { Database, CheckCircle2, RefreshCcw, AlertCircle, ArrowRight, Server } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { supabase } from "@/integrations/supabase/client";
 import { hrmsApi } from "@/lib/hrmsApi";
 
-const SERVICE_ROLE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlYm1pbnhvcWRqenpmaG5yc2dlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODUxMjg3MCwiZXhwIjoyMDk0MDg4ODcwfQ.NdLGsPpJ2vYoWLs6I-z4utVVGHU5kGDk02-qdotY6Pg";
-const SUPABASE_URL = "https://bebminxoqdjzzfhnrsge.supabase.co";
+// Supabase direct access removed — service role key revoked.
+// Legacy Supabase sync features are disabled. Use MySQL migration endpoints instead.
+const supabaseSyncAvailable = false;
 
 interface TableEntry {
   key: string;
@@ -31,26 +30,6 @@ const TRACKED_TABLES: TableEntry[] = [
   { key: "payroll_records", label: "Payroll Records", module: "Payroll" },
   { key: "assets", label: "Assets", module: "Assets" },
 ];
-
-async function countTable(table: string): Promise<number> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=id`, {
-    headers: {
-      apikey: SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "count=exact",
-      Range: "0-0",
-    },
-  });
-  const range = res.headers.get("content-range");
-  if (range) {
-    const match = range.match(/\/(\d+)/);
-    if (match) return parseInt(match[1], 10);
-  }
-  const data = await res.json();
-  if (Array.isArray(data)) return data.length;
-  return 0;
-}
 
 function migrationStatus(sbCount: number | null, mysqlCount: number | null): string {
   if (sbCount === null) return "unknown";
@@ -91,24 +70,16 @@ export default function NativeMigrationConsole() {
   const [counts, setCounts] = useState<CountMap>({});
   const [loading, setLoading] = useState(true);
   const [backendStatus, setBackendStatus] = useState<"offline" | "online" | "checking">("checking");
-  const [mysqlData, setMysqlData] = useState<Record<string, number> | null>(null);
 
   const fetchCounts = useCallback(async () => {
     setLoading(true);
     setBackendStatus("checking");
 
-    // Fetch Supabase row counts in parallel
-    const supabaseResults = await Promise.allSettled(
-      TRACKED_TABLES.map((t) => countTable(t.key))
-    );
-
+    // Supabase row counts disabled — service role key revoked.
+    // All supabase counts are reported as null (unavailable).
     const newCounts: CountMap = {};
-    TRACKED_TABLES.forEach((t, i) => {
-      const result = supabaseResults[i];
-      newCounts[t.key] = {
-        supabase: result.status === "fulfilled" ? result.value : null,
-        mysql: null,
-      };
+    TRACKED_TABLES.forEach((t) => {
+      newCounts[t.key] = { supabase: null, mysql: null };
     });
 
     // Try backend for MySQL counts
@@ -121,7 +92,6 @@ export default function NativeMigrationConsole() {
         res.data.forEach((item) => {
           mysqlMap[item.module] = item.mysql_count;
         });
-        setMysqlData(mysqlMap);
         TRACKED_TABLES.forEach((t) => {
           if (mysqlMap[t.key] !== undefined) {
             newCounts[t.key] = { ...newCounts[t.key], mysql: mysqlMap[t.key] };
@@ -143,8 +113,8 @@ export default function NativeMigrationConsole() {
     fetchCounts();
   }, [fetchCounts]);
 
-  const totalSupabase = TRACKED_TABLES.reduce((s, t) => s + (counts[t.key]?.supabase ?? 0), 0);
-  const tablesWithData = TRACKED_TABLES.filter((t) => (counts[t.key]?.supabase ?? 0) > 0).length;
+  const tablesWithMysqlData = TRACKED_TABLES.filter((t) => (counts[t.key]?.mysql ?? 0) > 0).length;
+  const totalMysql = TRACKED_TABLES.reduce((s, t) => s + (counts[t.key]?.mysql ?? 0), 0);
 
   return (
     <DashboardLayout>
@@ -157,7 +127,7 @@ export default function NativeMigrationConsole() {
             </div>
             <div>
               <h1 className="text-xl font-semibold text-gray-900">Migration Console</h1>
-              <p className="text-sm text-gray-500">Supabase vs MySQL data status per module</p>
+              <p className="text-sm text-gray-500">MySQL data status per module</p>
             </div>
           </div>
           <button
@@ -170,19 +140,20 @@ export default function NativeMigrationConsole() {
           </button>
         </div>
 
-        {/* Summary cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-3xl border bg-white p-5 shadow-sm flex items-center gap-4">
-            <div className="rounded-xl bg-indigo-50 p-2.5">
-              <Database className="h-5 w-5 text-indigo-600" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Supabase Total</p>
-              <p className="text-2xl font-bold text-gray-900">{loading ? "—" : totalSupabase.toLocaleString()}</p>
-              <p className="text-xs text-gray-400">{tablesWithData} of {TRACKED_TABLES.length} tables populated</p>
+        {/* Supabase sync disabled notice */}
+        {!supabaseSyncAvailable && (
+          <div className="rounded-3xl border border-amber-100 bg-amber-50 p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-amber-700">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span className="text-sm">
+                Supabase sync removed — use MySQL migration endpoints. Supabase row counts are unavailable.
+              </span>
             </div>
           </div>
+        )}
 
+        {/* Summary cards */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="rounded-3xl border bg-white p-5 shadow-sm flex items-center gap-4">
             <div className={`rounded-xl p-2.5 ${backendStatus === "online" ? "bg-emerald-50" : "bg-gray-100"}`}>
               <Server className={`h-5 w-5 ${backendStatus === "online" ? "text-emerald-600" : "text-gray-400"}`} />
@@ -203,13 +174,9 @@ export default function NativeMigrationConsole() {
               <ArrowRight className="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Migration State</p>
-              <p className="text-sm font-semibold text-gray-900">
-                {backendStatus === "online" ? "Side-by-side view active" : "Supabase-only view"}
-              </p>
-              <p className="text-xs text-gray-400">
-                {backendStatus === "offline" ? "Deploy backend to see MySQL data" : "Comparing counts"}
-              </p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">MySQL Total</p>
+              <p className="text-2xl font-bold text-gray-900">{loading ? "—" : totalMysql.toLocaleString()}</p>
+              <p className="text-xs text-gray-400">{tablesWithMysqlData} of {TRACKED_TABLES.length} tables populated</p>
             </div>
           </div>
         </div>
@@ -220,7 +187,7 @@ export default function NativeMigrationConsole() {
             <div className="flex items-center gap-2 text-amber-700">
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span className="text-sm">
-                Backend is offline — showing Supabase row counts only. Deploy mas-hrms-backend and restart to see MySQL comparison.
+                Backend is offline — MySQL row counts unavailable. Deploy mas-hrms-backend and restart to see MySQL data.
               </span>
             </div>
           </div>
@@ -236,9 +203,6 @@ export default function NativeMigrationConsole() {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                   Table
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Supabase Rows
                 </th>
                 {backendStatus === "online" && (
                   <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -260,9 +224,6 @@ export default function NativeMigrationConsole() {
                       <td className="px-6 py-4">
                         <div className="h-4 w-36 rounded bg-gray-200" />
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="ml-auto h-4 w-16 rounded bg-gray-200" />
-                      </td>
                       <td className="px-6 py-4 text-center">
                         <div className="mx-auto h-6 w-28 rounded-full bg-gray-200" />
                       </td>
@@ -278,9 +239,6 @@ export default function NativeMigrationConsole() {
                           {t.module}
                         </td>
                         <td className="px-6 py-4 font-medium text-gray-800">{t.label}</td>
-                        <td className="px-6 py-4 text-right tabular-nums text-gray-600">
-                          {sb !== null ? sb.toLocaleString() : <span className="text-gray-300">—</span>}
-                        </td>
                         {backendStatus === "online" && (
                           <td className="px-6 py-4 text-right tabular-nums text-gray-600">
                             {mysql !== null ? mysql.toLocaleString() : <span className="text-gray-300">—</span>}
@@ -303,12 +261,10 @@ export default function NativeMigrationConsole() {
             <div className="flex flex-wrap gap-3">
               <StatusBadge status="migrated" />
               <span className="text-xs text-gray-500 self-center">MySQL has data</span>
-              <StatusBadge status="ready" />
-              <span className="text-xs text-gray-500 self-center">Supabase has data, MySQL empty</span>
-              <StatusBadge status="seeded" />
-              <span className="text-xs text-gray-500 self-center">Supabase data present (no MySQL info)</span>
               <StatusBadge status="empty" />
-              <span className="text-xs text-gray-500 self-center">No data anywhere</span>
+              <span className="text-xs text-gray-500 self-center">No data in MySQL</span>
+              <StatusBadge status="unknown" />
+              <span className="text-xs text-gray-500 self-center">Status unavailable</span>
             </div>
           </div>
         )}
