@@ -78,7 +78,7 @@ export const useUserRole = () => {
 
       // MySQL backend path — if hrms_access_token present, use /api/access/me
       if (localStorage.getItem('hrms_access_token')) {
-        const res = await hrmsApi.get<{ success: boolean; data: any }>('/access/me');
+        const res = await hrmsApi.get<{ success: boolean; data: any }>('/api/access/me');
         const d = (res as any).data;
         if (d) {
           const roles = (d.roles ?? []) as AppRole[];
@@ -88,11 +88,11 @@ export const useUserRole = () => {
             roles,
             roleKeys,
             primaryRole: getPrimaryRole(roles),
-            employeeId: d.employee?.id ?? null,
-            employeeCode: d.employee?.employee_code ?? null,
-            employeeName: d.employee ? `${d.employee.first_name ?? ''} ${d.employee.last_name ?? ''}`.trim() : null,
+            employeeId: d.employeeId ?? d.employee?.id ?? null,
+            employeeCode: d.employeeCode ?? d.employee?.employee_code ?? null,
+            employeeName: d.employeeName ?? (d.employee ? `${d.employee.first_name ?? ''} ${d.employee.last_name ?? ''}`.trim() : null),
             scopes: d.scopes ?? [],
-            pages: d.pagePerms ?? [],
+            pages: d.pages ?? d.pagePerms ?? [],
           };
         }
       }

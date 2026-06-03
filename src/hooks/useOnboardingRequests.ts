@@ -37,16 +37,16 @@ export function useOnboardingRequests() {
       // Fire-and-forget notification
       if (request) {
         hrmsApi.post("/api/communication/dispatch/send", {
-          template_code: "onboarding_request_approved",
+          template_name: "onboarding_request_approved",
           recipient_employee_ids: [],
-          variables: {
+          data: {
             type: "approved",
             request_id: requestId,
             user_email: request.email,
             user_name: request.full_name,
             reviewed_by: userId,
           },
-          channel_type: "email",
+          channel: "email",
         }).catch(() => {});
       }
     },
@@ -80,16 +80,16 @@ export function useOnboardingRequests() {
       // Fire-and-forget notification
       if (request) {
         hrmsApi.post("/api/communication/dispatch/send", {
-          template_code: "onboarding_request_rejected",
+          template_name: "onboarding_request_rejected",
           recipient_employee_ids: [],
-          variables: {
+          data: {
             type: "rejected",
             request_id: requestId,
             user_email: request.email,
             user_name: request.full_name,
             reviewed_by: userId,
           },
-          channel_type: "email",
+          channel: "email",
         }).catch(() => {});
       }
     },

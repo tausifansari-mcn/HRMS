@@ -47,16 +47,16 @@ export function useOnboardingRequest() {
 
       // Fire-and-forget notification via communication dispatch
       hrmsApi.post("/api/communication/dispatch/send", {
-        template_code: "onboarding_request_submitted",
+        template_name: "onboarding_request_submitted",
         recipient_employee_ids: [],
-        variables: {
+        data: {
           type: "submitted",
           request_id: data?.data?.id,
           user_email: user.email,
           user_name: fullName,
           message,
         },
-        channel_type: "email",
+        channel: "email",
       }).catch(() => {});
     },
     onSuccess: () => {

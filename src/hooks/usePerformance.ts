@@ -160,9 +160,9 @@ export function useCreateReview() {
 
       // Fire-and-forget notification via communication dispatch
       hrmsApi.post("/api/communication/dispatch/send", {
-        template_code: "performance_review_created",
+        template_name: "performance_review_created",
         recipient_employee_ids: [review.employee_id],
-        variables: {
+        data: {
           review_id: data?.id,
           employee_id: review.employee_id,
           reviewer_name: reviewer_name || "HR Team",
@@ -170,7 +170,7 @@ export function useCreateReview() {
           overall_rating: review.overall_rating,
           status: review.status || "draft",
         },
-        channel_type: "email",
+        channel: "email",
       }).catch(() => {});
 
       return data;
@@ -239,14 +239,14 @@ export function useAcknowledgeReview() {
 
       // Fire-and-forget notification
       hrmsApi.post("/api/communication/dispatch/send", {
-        template_code: "performance_review_acknowledged",
+        template_name: "performance_review_acknowledged",
         recipient_employee_ids: [],
-        variables: {
+        data: {
           review_id: reviewId,
           employee_name: employeeName,
           review_period: reviewPeriod,
         },
-        channel_type: "email",
+        channel: "email",
       }).catch(() => {});
     },
     onSuccess: () => {

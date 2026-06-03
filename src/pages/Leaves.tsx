@@ -246,14 +246,14 @@ const Leaves = () => {
 
       // Notify employee (fire and forget)
       hrmsApi.post("/api/communication/dispatch/send", {
-        template_code: "leave_status",
+        template_name: "leave_status",
         recipient_employee_ids: [selectedRequest?.employeeId ?? selectedRequest?.employee_id].filter(Boolean) as string[],
-        variables: {
+        data: {
           status,
           reviewer_name: reviewerName,
           review_notes: reviewNotes.trim() || undefined,
         },
-        channel_type: "email",
+        channel: "email",
       }).catch((err) => {
         console.error("Failed to send leave status notification:", err);
       });

@@ -84,16 +84,16 @@ export function useSubmitLeaveRequest() {
 
       // Notify manager (fire and forget)
       hrmsApi.post("/api/communication/dispatch/send", {
-        template_code: "leave_submission",
+        template_name: "leave_submission",
         recipient_employee_ids: [employeeId],
-        variables: {
+        data: {
           leave_type: leaveTypeName,
           from_date: fromDate,
           to_date: toDate,
           total_days: daysCount,
           reason: reason.trim() || undefined,
         },
-        channel_type: "email",
+        channel: "email",
       }).catch((err) => {
         console.error("Failed to send leave submission notification:", err);
       });

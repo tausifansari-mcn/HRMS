@@ -431,14 +431,14 @@ const Onboarding = () => {
 
       // Send onboarding notification (fire and forget)
       hrmsApi.post("/api/communication/dispatch/send", {
-        template_code: "employee_onboarding",
+        template_name: "employee_onboarding",
         recipient_employee_ids: [employee.id],
-        variables: {
+        data: {
           employee_name: `${data.firstName.trim()} ${data.lastName.trim()}`,
           department_name: selectedDept?.name || "",
           email: data.email.trim(),
         },
-        channel_type: "email",
+        channel: "email",
       }).catch(() => {});
 
       return { employee, inviteSent };
