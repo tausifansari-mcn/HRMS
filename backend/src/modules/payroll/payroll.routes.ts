@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { requireAuth } from "../../middleware/authMiddleware.js";
 import { requireRole } from "../../middleware/requireRole.js";
+import { requireScopedRole } from "../../middleware/scopeMiddleware.js";
+import { buildScopeWhereClause } from "../../shared/scopeAccess.js";
 import { getEmployeeForUser, hasRole } from "../../shared/accessGuard.js";
 import { payrollController as c } from "./payroll.controller.js";
 import { calculatePayrollRun } from "./payrollCalculate.service.js";
@@ -31,14 +33,38 @@ router.post("/components", requireRole("admin", "hr", "finance", "payroll"), h(c
 
 // ─── Salary Assignments ───────────────────────────────────────────────────────
 
-router.post("/salary-assignments", requireRole("admin", "hr", "finance", "payroll"), h(c.assignSalary));
+router.post("/salary-assignments",
+  requireRole("admin", "hr", "finance", "payroll"),
+  requireScopedRole(["hr", "finance", "payroll"], async (req) => {
+    // Resolve employee's branch/process from DB
+    const [rows] = await db.execute(
+      'SELECT branch_id, process_id, department_id FROM employees WHERE id = ? LIMIT 1',
+      [req.body.employee_id]
+    ) as any[];
+    const emp = rows[0];
+    return {
+      branchId: emp?.branch_id,
+      processId: emp?.process_id,
+      departmentId: emp?.department_id
+    };
+  }),
+  h(c.assignSalary)
+);
 router.post("/salary-assignments/bulk", requireRole("admin", "hr", "finance", "payroll"), h(c.bulkAssignSalary));
 router.get("/salary-assignments/:employeeId", requireRole("admin", "hr", "finance", "payroll"), h(c.getEmployeeSalary));
 
 // ─── Payroll Runs — static paths before :id ───────────────────────────────────
 
 router.get("/runs", requireRole("admin", "hr", "finance", "payroll"), h(c.listRuns));
-router.post("/runs", requireRole("admin", "finance", "payroll"), h(c.createRun));
+router.post("/runs",
+  requireRole("admin", "finance", "payroll"),
+  requireScopedRole(["finance", "payroll"], async (req) => ({
+    branchId: req.body.branch_id,
+    processId: req.body.process_id,
+    departmentId: req.body.department_id
+  })),
+  h(c.createRun)
+);
 router.get("/runs/:id", requireRole("admin", "hr", "finance", "payroll"), h(c.getRun));
 router.patch("/runs/:id/status", requireRole("admin", "finance", "payroll"), h(c.updateRunStatus));
 router.get("/runs/:id/lines", requireRole("admin", "hr", "finance", "payroll"), h(c.listLines));
@@ -65,7 +91,23 @@ router.patch("/lines/:id", requireRole("admin", "finance", "payroll"), h(c.updat
 
 // ─── Advances ─────────────────────────────────────────────────────────────────
 
-router.post("/advances", requireRole("admin", "hr", "finance", "payroll"), h(c.createAdvance));
+router.post("/advances",
+  requireRole("admin", "hr", "finance", "payroll"),
+  requireScopedRole(["hr", "finance", "payroll"], async (req) => {
+    // Resolve employee's branch/process
+    const [rows] = await db.execute(
+      'SELECT branch_id, process_id, department_id FROM employees WHERE id = ? LIMIT 1',
+      [req.body.employee_id]
+    ) as any[];
+    const emp = rows[0];
+    return {
+      branchId: emp?.branch_id,
+      processId: emp?.process_id,
+      departmentId: emp?.department_id
+    };
+  }),
+  h(c.createAdvance)
+);
 router.get("/advances/:employeeId", h(async (req: AuthenticatedRequest, res: Response) => {
   const isPayrollRole = await hasRole(req.authUser!.id, "admin", "hr", "finance", "payroll");
   if (!isPayrollRole) {
