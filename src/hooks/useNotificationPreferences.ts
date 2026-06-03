@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { useAuth } from "@/contexts/AuthContext";
 
 export interface NotificationPreferences {
@@ -21,27 +21,8 @@ export function useNotificationPreferences() {
   return useQuery({
     queryKey: ["notification-preferences", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("notification_preferences")
-        .select("*")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-
-      if (error) throw error;
-      
-      // If no preferences exist, create default ones
-      if (!data) {
-        const { data: newData, error: insertError } = await supabase
-          .from("notification_preferences")
-          .insert({ user_id: user!.id })
-          .select()
-          .single();
-        
-        if (insertError) throw insertError;
-        return newData as NotificationPreferences;
-      }
-      
-      return data as NotificationPreferences;
+      const res = await hrmsApi.get<{ data: any }>("/api/communication/preferences");
+      return (res.data ?? null) as NotificationPreferences | null;
     },
     enabled: !!user,
   });
@@ -52,16 +33,11 @@ export function useUpdateNotificationPreferences() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (preferences: Partial<Omit<NotificationPreferences, "id" | "user_id" | "created_at" | "updated_at">>) => {
-      const { data, error } = await supabase
-        .from("notification_preferences")
-        .update(preferences)
-        .eq("user_id", user!.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+    mutationFn: async (
+      preferences: Partial<Omit<NotificationPreferences, "id" | "user_id" | "created_at" | "updated_at">>
+    ) => {
+      const res = await hrmsApi.patch<{ data: any }>("/api/communication/preferences", preferences);
+      return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notification-preferences"] });

@@ -1,7 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { hrmsApi } from "@/lib/hrmsApi";
-import { USE_HRMS_BACKEND } from "@/lib/dataSource";
 import { format } from "date-fns";
 
 export interface Employee {
@@ -85,51 +83,17 @@ export function useEmployees() {
         ];
       }
 
-      if (USE_HRMS_BACKEND.employees) {
-        const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/employees");
-        return (res.data || []).map((emp: any): Employee => ({
-          id: emp.id,
-          employeeCode: emp.employee_code,
-          name: `${emp.first_name} ${emp.last_name ?? ""}`.trim(),
-          email: emp.email,
-          phone: emp.mobile ?? null,
-          department: emp.department_name || "Unassigned",
-          designation: emp.designation_name || emp.designation || "",
-          joinDate: emp.date_of_joining ? format(new Date(emp.date_of_joining), "MMM d, yyyy") : "",
-          status: emp.employment_status as Employee["status"],
-        }));
-      }
-
-      const { data, error } = await supabase
-        .from("employees")
-        .select(`
-          id,
-          employee_code,
-          first_name,
-          last_name,
-          email,
-          phone,
-          designation,
-          hire_date,
-          status,
-          avatar_url,
-          department:departments!employees_department_id_fkey(name)
-        `)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      return (data || []).map((emp): Employee => ({
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/employees");
+      return (res.data || []).map((emp: any): Employee => ({
         id: emp.id,
         employeeCode: emp.employee_code,
-        name: `${emp.first_name} ${emp.last_name}`,
+        name: `${emp.first_name} ${emp.last_name ?? ""}`.trim(),
         email: emp.email,
-        phone: emp.phone,
-        avatar: emp.avatar_url || undefined,
-        department: emp.department?.name || "Unassigned",
-        designation: emp.designation,
-        joinDate: format(new Date(emp.hire_date), "MMM d, yyyy"),
-        status: emp.status as Employee["status"],
+        phone: emp.mobile ?? null,
+        department: emp.department_name || "Unassigned",
+        designation: emp.designation_name || emp.designation || "",
+        joinDate: emp.date_of_joining ? format(new Date(emp.date_of_joining), "MMM d, yyyy") : "",
+        status: emp.employment_status as Employee["status"],
       }));
     },
   });
@@ -144,17 +108,13 @@ export function useEmployeeStats() {
         return { total: 4, active: 4, onboarding: 0 };
       }
 
-      const { data: employees, error } = await supabase
-        .from("employees")
-        .select("id, status");
-
-      if (error) throw error;
-
-      const total = employees?.length || 0;
-      const active = employees?.filter((e) => e.status === "active").length || 0;
-      const onboarding = employees?.filter((e) => e.status === "onboarding").length || 0;
-
-      return { total, active, onboarding };
+      const res = await hrmsApi.get<{ data: any }>("/api/employees/stats");
+      const stats = res.data ?? {};
+      return {
+        total: stats.total_employees ?? 0,
+        active: stats.active_employees ?? 0,
+        onboarding: stats.onboarding_employees ?? 0,
+      };
     },
   });
 }
@@ -189,19 +149,18 @@ export function useBulkDeleteEmployees() {
 
   return useMutation({
     mutationFn: async (employeeIds: string[]) => {
-      // Delete in sequence to handle any cascading properly
+      // Deactivate in parallel via backend API
       const errors: string[] = [];
-      
-      for (const id of employeeIds) {
-        const { error } = await supabase
-          .from("employees")
-          .delete()
-          .eq("id", id);
-        
-        if (error) {
-          errors.push(`Failed to delete employee ${id}: ${error.message}`);
-        }
-      }
+
+      await Promise.all(
+        employeeIds.map(async (id) => {
+          try {
+            await hrmsApi.delete(`/api/employees/${id}`);
+          } catch (err: any) {
+            errors.push(`Failed to delete employee ${id}: ${err.message}`);
+          }
+        })
+      );
 
       if (errors.length > 0) {
         throw new Error(errors.join("; "));
@@ -225,15 +184,9 @@ export function useBulkUpdateEmployeeStatus() {
 
   return useMutation({
     mutationFn: async ({ employeeIds, status }: { employeeIds: string[]; status: "active" | "inactive" }) => {
-      const { error } = await supabase
-        .from("employees")
-        .update({ status })
-        .in("id", employeeIds);
-      
-      if (error) {
-        throw new Error(`Failed to update employee status: ${error.message}`);
-      }
-
+      await Promise.all(
+        employeeIds.map((id) => hrmsApi.patch(`/api/employees/${id}`, { employment_status: status }))
+      );
       return { updatedCount: employeeIds.length, status };
     },
     onSuccess: () => {

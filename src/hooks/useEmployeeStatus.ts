@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function useEmployeeStatus() {
@@ -15,18 +15,16 @@ export function useEmployeeStatus() {
         return { isEmployee: true, employeeId: "demo-employee-id" };
       }
 
-      const { data, error } = await supabase
-        .from("employees")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      return {
-        isEmployee: !!data,
-        employeeId: data?.id ?? null,
-      };
+      try {
+        const res = await hrmsApi.get<{ data: any }>("/api/employees/me");
+        const emp = res.data;
+        return {
+          isEmployee: !!emp?.id,
+          employeeId: emp?.id ?? null,
+        };
+      } catch {
+        return { isEmployee: false, employeeId: null };
+      }
     },
     enabled: !!user?.id,
   });

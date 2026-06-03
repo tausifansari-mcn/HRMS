@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+
+// Supabase Realtime push_subscriptions table removed.
+// Push subscriptions are not available in local MySQL deployment.
+// Service worker registration is preserved for future PWA support.
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -42,6 +45,8 @@ export function usePushNotifications() {
 
   const subscribe = useCallback(async () => {
     if (!user || !isSupported) return false;
+
+    console.info("[PushNotifications] Supabase Realtime removed — push subscriptions not available in local deployment");
     setIsLoading(true);
 
     try {
@@ -52,10 +57,9 @@ export function usePushNotifications() {
         return false;
       }
 
-      // Fetch VAPID public key from env
       const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
       if (!vapidPublicKey) {
-        console.error("VAPID public key not configured");
+        console.info("[PushNotifications] VAPID public key not configured — push disabled");
         setIsLoading(false);
         return false;
       }
@@ -67,24 +71,9 @@ export function usePushNotifications() {
         applicationServerKey: applicationServerKey.buffer as ArrayBuffer,
       });
 
-      const subJson = subscription.toJSON();
-
-      // Save subscription to Supabase
-      const { error } = await supabase.from("push_subscriptions").upsert(
-        {
-          user_id: user.id,
-          endpoint: subJson.endpoint!,
-          p256dh: subJson.keys!.p256dh,
-          auth_key: subJson.keys!.auth,
-        },
-        { onConflict: "user_id,endpoint" }
-      );
-
-      if (error) {
-        console.error("Error saving push subscription:", error);
-        setIsLoading(false);
-        return false;
-      }
+      // Note: subscription endpoint persisted to backend not yet implemented.
+      // Supabase push_subscriptions table removed. Backend endpoint TBD.
+      console.info("[PushNotifications] Subscribed to browser push (endpoint not persisted — backend endpoint pending)");
 
       setIsSubscribed(true);
       setIsLoading(false);
@@ -106,13 +95,8 @@ export function usePushNotifications() {
 
       if (subscription) {
         await subscription.unsubscribe();
-
-        // Remove from database
-        await supabase
-          .from("push_subscriptions")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("endpoint", subscription.endpoint);
+        // Note: backend removal not yet implemented (Supabase table removed; backend endpoint TBD).
+        console.info("[PushNotifications] Unsubscribed from browser push");
       }
 
       setIsSubscribed(false);

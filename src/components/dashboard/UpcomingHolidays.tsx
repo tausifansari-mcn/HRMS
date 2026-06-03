@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, parseISO, isSameDay, addDays, startOfDay } from "date-fns";
 
@@ -22,17 +22,14 @@ export function UpcomingHolidays() {
   const { data: holidays = [], isLoading } = useQuery({
     queryKey: ["upcoming-holidays", todayStr],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("company_events")
-        .select("id, title, event_date, end_date, event_type")
-        .eq("is_holiday", true)
-        .gte("event_date", todayStr)
-        .lte("event_date", next30Days)
-        .order("event_date", { ascending: true })
-        .limit(5);
-
-      if (error) throw error;
-      return (data || []) as Holiday[];
+      try {
+        const res = await hrmsApi.get<{ data: any[] }>(
+          `/api/org/events?is_holiday=true&start=${todayStr}&end=${next30Days}`
+        );
+        return ((res.data ?? []) as Holiday[]).slice(0, 5);
+      } catch {
+        return [] as Holiday[];
+      }
     },
   });
 

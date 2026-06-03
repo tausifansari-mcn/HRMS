@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -12,14 +12,14 @@ export function useOnboardingRequest() {
     queryFn: async () => {
       if (!user?.id) return null;
 
-      const { data, error } = await supabase
-        .from("onboarding_requests")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
+      try {
+        const res = await hrmsApi.get<{ data: any }>("/api/ats/onboarding/requests");
+        // The endpoint returns all requests; find the one belonging to this user
+        const requests = Array.isArray(res.data) ? res.data : [];
+        return requests.find((r: any) => r.user_id === user.id) ?? null;
+      } catch {
+        return null;
+      }
     },
     enabled: !!user?.id,
   });
@@ -28,38 +28,36 @@ export function useOnboardingRequest() {
     mutationFn: async ({ message }: { message?: string }) => {
       if (!user?.id || !user?.email) throw new Error("User not authenticated");
 
-      // Get user's full name from profile
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", user.id)
-        .single();
+      // Get user's name from employee record
+      let fullName = user.email.split("@")[0];
+      try {
+        const meRes = await hrmsApi.get<{ data: any }>("/api/employees/me");
+        if (meRes.data) {
+          const emp = meRes.data;
+          fullName = `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() || fullName;
+        }
+      } catch { /* fall through to email-derived name */ }
 
-      const fullName = profile?.full_name || user.email.split("@")[0];
-
-      const { data, error } = await supabase.from("onboarding_requests").insert({
+      const data = await hrmsApi.post<{ data: any }>("/api/ats/onboarding/requests", {
         user_id: user.id,
         email: user.email,
         full_name: fullName,
         message,
-      }).select().single();
+      });
 
-      if (error) throw error;
-
-      // Send notification to HR
-      try {
-        await supabase.functions.invoke("onboarding-request-notification", {
-          body: {
-            type: "submitted",
-            request_id: data.id,
-            user_email: user.email,
-            user_name: fullName,
-            message,
-          },
-        });
-      } catch (notifError) {
-        console.error("Failed to send notification:", notifError);
-      }
+      // Fire-and-forget notification via communication dispatch
+      hrmsApi.post("/api/communication/dispatch/send", {
+        template_code: "onboarding_request_submitted",
+        recipient_employee_ids: [],
+        variables: {
+          type: "submitted",
+          request_id: data?.data?.id,
+          user_email: user.email,
+          user_name: fullName,
+          message,
+        },
+        channel_type: "email",
+      }).catch(() => {});
     },
     onSuccess: () => {
       toast.success("Onboarding request submitted successfully!");

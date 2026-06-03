@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { UserX } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, parseISO } from "date-fns";
 
@@ -22,51 +22,22 @@ export function WhosOut() {
   const { data: whosOut = [], isLoading } = useQuery({
     queryKey: ["whos-out-today", today],
     queryFn: async () => {
-      // Get all approved leaves that include today
-      const { data: leaves, error } = await supabase
-        .from("leave_requests")
-        .select(`
-          id,
-          start_date,
-          end_date,
-          employee_id,
-          leave_type_id
-        `)
-        .eq("status", "approved")
-        .lte("start_date", today)
-        .gte("end_date", today);
+      const res = await hrmsApi.get<{ data: any[] }>(
+        `/api/leave/requests?status=approved&activeOn=${today}`
+      );
+      const leaves = res.data ?? [];
+      if (leaves.length === 0) return [];
 
-      if (error) throw error;
-      if (!leaves || leaves.length === 0) return [];
-
-      // Get employee details
-      const employeeIds = [...new Set(leaves.map((l) => l.employee_id))];
-      const { data: employees } = await supabase
-        .from("employees")
-        .select("id, first_name, last_name, avatar_url")
-        .in("id", employeeIds);
-
-      // Get leave types
-      const leaveTypeIds = [...new Set(leaves.map((l) => l.leave_type_id))];
-      const { data: leaveTypes } = await supabase
-        .from("leave_types")
-        .select("id, name")
-        .in("id", leaveTypeIds);
-
-      const employeeMap = new Map(employees?.map((e) => [e.id, e]) || []);
-      const leaveTypeMap = new Map(leaveTypes?.map((lt) => [lt.id, lt.name]) || []);
-
-      return leaves.map((leave): LeaveInfo => {
-        const emp = employeeMap.get(leave.employee_id);
-        return {
-          id: leave.id,
-          employee_name: emp ? `${emp.first_name} ${emp.last_name}` : "Unknown",
-          employee_avatar: emp?.avatar_url || undefined,
-          leave_type: leaveTypeMap.get(leave.leave_type_id) || "Leave",
-          start_date: leave.start_date,
-          end_date: leave.end_date,
-        };
-      });
+      return leaves.map((leave: any): LeaveInfo => ({
+        id: leave.id,
+        employee_name: leave.employee_name
+          ? leave.employee_name
+          : `${leave.first_name ?? ""} ${leave.last_name ?? ""}`.trim() || "Unknown",
+        employee_avatar: leave.avatar_url ?? undefined,
+        leave_type: leave.leave_type_name ?? leave.leave_type ?? "Leave",
+        start_date: leave.start_date,
+        end_date: leave.end_date,
+      }));
     },
   });
 
