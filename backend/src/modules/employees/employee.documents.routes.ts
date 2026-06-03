@@ -6,6 +6,7 @@ import { requireRole } from "../../middleware/requireRole.js";
 import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 import { db } from "../../db/mysql.js";
 import type { RowDataPacket } from "mysql2";
+import { selfOrAdminHr } from "../../shared/accessGuard.js";
 
 const router = Router();
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
@@ -13,7 +14,7 @@ const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any,
 router.use(requireAuth);
 
 // GET /api/employee-docs/:employeeId
-router.get("/:employeeId", h(async (req: AuthenticatedRequest, res: Response) => {
+router.get("/:employeeId", selfOrAdminHr("employeeId"), h(async (req: AuthenticatedRequest, res: Response) => {
   const [rows] = await db.execute<RowDataPacket[]>(
     "SELECT id, employee_id, doc_type AS document_type, doc_name AS document_name, file_url, verified, created_at AS uploaded_at FROM employee_documents WHERE employee_id = ? ORDER BY created_at DESC",
     [req.params.employeeId]
@@ -29,6 +30,9 @@ router.post("/:employeeId", requireRole("admin", "hr"), h(async (req: Authentica
     file_url: string;
   };
   if (!document_type || !file_url) return res.status(400).json({ error: "document_type and file_url required" });
+  if (document_name && document_name.length > 255) {
+    return res.status(400).json({ error: "document_name must be 255 characters or fewer" });
+  }
   const id = randomUUID();
   await db.execute(
     "INSERT INTO employee_documents (id, employee_id, doc_type, doc_name, file_url, uploaded_by) VALUES (?, ?, ?, ?, ?, ?)",
@@ -40,10 +44,12 @@ router.post("/:employeeId", requireRole("admin", "hr"), h(async (req: Authentica
 
 // DELETE /api/employee-docs/:employeeId/:docId
 router.delete("/:employeeId/:docId", requireRole("admin", "hr"), h(async (req: AuthenticatedRequest, res: Response) => {
-  await db.execute(
+  const [result] = await db.execute(
     "DELETE FROM employee_documents WHERE id = ? AND employee_id = ?",
     [req.params.docId, req.params.employeeId]
   );
+  const affected = (result as any).affectedRows;
+  if (affected === 0) return res.status(404).json({ success: false, message: "Document not found" });
   res.json({ success: true });
 }));
 
