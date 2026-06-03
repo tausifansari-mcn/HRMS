@@ -8,8 +8,6 @@ import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 import { atsController as c } from "./ats.controller.js";
 import { convertCandidateToEmployee } from "./ats.convert.service.js";
 import onboardingRouter from "./ats.onboarding.routes.js";
-import { onboardingFullRouter } from "./onboarding-full.routes.js";
-import { bgvVerificationRouter } from "./bgv-verification.routes.js";
 import multer from "multer";
 import path from "path";
 import { randomUUID } from "crypto";
@@ -22,10 +20,6 @@ const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any,
 
 // ── PUBLIC — candidate self-registration (no auth required) ──────────────────
 atsRouter.post("/candidates",                    h(c.createCandidate.bind(c)));
-
-// ── PUBLIC — candidate onboarding with token (no auth required) ──────────────
-atsRouter.use("/onboarding-full", onboardingFullRouter);
-atsRouter.use("/bgv", bgvVerificationRouter);
 
 // ── PROTECTED — all remaining routes require a logged-in HR/recruiter ────────
 atsRouter.use(requireAuth);

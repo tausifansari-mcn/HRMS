@@ -1,0 +1,483 @@
+import { randomUUID, createHash } from "crypto";
+import type { RowDataPacket } from "mysql2";
+import { db } from "../../db/mysql.js";
+
+type ActorType = "candidate" | "hr" | "system";
+
+const hashValue = (value: unknown) => {
+  const normalized = String(value ?? "").trim().toUpperCase();
+  return normalized ? createHash("sha256").update(normalized).digest("hex") : null;
+};
+
+const maskAadhaar = (value: unknown) => {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  if (!digits) return null;
+  return `XXXX-XXXX-${digits.slice(-4)}`;
+};
+
+const maskPan = (value: unknown) => {
+  const pan = String(value ?? "").trim().toUpperCase();
+  if (!pan) return null;
+  return `${pan.slice(0, 3)}XXXX${pan.slice(-2)}`;
+};
+
+const maskAccount = (value: unknown) => {
+  const account = String(value ?? "").replace(/\s/g, "");
+  if (!account) return null;
+  return `XXXXXX${account.slice(-4)}`;
+};
+
+async function logCandidateAction(candidateId: string, actionType: string, payload?: unknown, meta?: { ip?: string; userAgent?: string; actorType?: ActorType; actorId?: string | null }) {
+  await db.execute(
+    `INSERT INTO candidate_onboarding_submission_log
+       (id, candidate_id, action_type, action_by_type, action_by, action_payload, ip_address, user_agent)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      randomUUID(),
+      candidateId,
+      actionType,
+      meta?.actorType ?? "candidate",
+      meta?.actorId ?? null,
+      payload ? JSON.stringify(payload) : null,
+      meta?.ip ?? null,
+      meta?.userAgent ?? null,
+    ]
+  );
+}
+
+export async function validateOnboardingToken(token: string) {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT b.candidate_id, b.onboarding_token_expires_at,
+            c.id, c.candidate_code, c.full_name, c.mobile, c.email,
+            c.gender, c.date_of_birth, c.applied_for_branch, c.applied_for_process,
+            c.sourcing_channel, c.source_type, c.source, c.resume_url, c.selfie_url,
+            c.profile_status, br.branch_name, pm.process_name
+       FROM ats_onboarding_bridge b
+       JOIN ats_candidate c ON c.id = b.candidate_id
+       LEFT JOIN branch_master br ON br.id = c.applied_for_branch
+       LEFT JOIN process_master pm ON pm.id = c.applied_for_process
+      WHERE b.onboarding_token = ?
+      LIMIT 1`,
+    [token]
+  );
+
+  if (!rows.length) throw Object.assign(new Error("Invalid onboarding token"), { status: 400 });
+  const row = rows[0];
+  if (new Date(row.onboarding_token_expires_at as string) < new Date()) {
+    throw Object.assign(new Error("Onboarding token expired"), { status: 410 });
+  }
+
+  const [profileRows] = await db.execute<RowDataPacket[]>(
+    `SELECT * FROM candidate_onboarding_profile WHERE candidate_id = ? LIMIT 1`,
+    [row.candidate_id]
+  );
+
+  return {
+    candidate_id: row.candidate_id,
+    candidate_code: row.candidate_code,
+    full_name: row.full_name,
+    mobile: row.mobile,
+    email: row.email,
+    gender: row.gender,
+    date_of_birth: row.date_of_birth,
+    branch_id: row.applied_for_branch,
+    branch_name: row.branch_name,
+    process_id: row.applied_for_process,
+    process_name: row.process_name,
+    source_type: row.source_type ?? row.sourcing_channel,
+    source: row.source ?? row.sourcing_channel,
+    resume_url: row.resume_url,
+    selfie_url: row.selfie_url,
+    profile_status: row.profile_status,
+    saved_profile: profileRows[0] ?? null,
+  };
+}
+
+export async function getFullOnboardingStatus(token: string) {
+  const tokenData = await validateOnboardingToken(token);
+  const candidateId = tokenData.candidate_id as string;
+
+  const [documents] = await db.execute<RowDataPacket[]>(
+    `SELECT id, doc_type, doc_name, page_no, file_original_name, file_url, mime_type, file_size_bytes,
+            document_status, verification_method, verification_ref, uploaded_at
+       FROM candidate_onboarding_document
+      WHERE candidate_id = ? AND deleted_at IS NULL
+      ORDER BY uploaded_at DESC`,
+    [candidateId]
+  );
+  const [bankRows] = await db.execute<RowDataPacket[]>(
+    `SELECT * FROM candidate_onboarding_bank_detail WHERE candidate_id = ? LIMIT 1`,
+    [candidateId]
+  );
+  const [qualificationRows] = await db.execute<RowDataPacket[]>(
+    `SELECT * FROM candidate_onboarding_qualification WHERE candidate_id = ? ORDER BY created_at DESC`,
+    [candidateId]
+  );
+  const [familyRows] = await db.execute<RowDataPacket[]>(
+    `SELECT * FROM candidate_onboarding_family WHERE candidate_id = ? LIMIT 1`,
+    [candidateId]
+  );
+  const [experienceRows] = await db.execute<RowDataPacket[]>(
+    `SELECT * FROM candidate_onboarding_experience WHERE candidate_id = ? LIMIT 1`,
+    [candidateId]
+  );
+
+  return {
+    token: tokenData,
+    documents,
+    bank: bankRows[0] ?? null,
+    qualifications: qualificationRows,
+    family: familyRows[0] ?? null,
+    experience: experienceRows[0] ?? null,
+  };
+}
+
+export async function saveEmployeeDetails(token: string, input: Record<string, unknown>, meta?: { ip?: string; userAgent?: string }) {
+  const tokenData = await validateOnboardingToken(token);
+  const candidateId = tokenData.candidate_id as string;
+  const id = randomUUID();
+  const panMasked = maskPan(input.panNumber ?? input.pan_number ?? input.pan_number_masked);
+  const panHash = hashValue(input.panNumber ?? input.pan_number);
+  const aadhaarMasked = maskAadhaar(input.aadhaarNumber ?? input.aadhar_number ?? input.aadhaar_number);
+  const aadhaarHash = hashValue(input.aadhaarNumber ?? input.aadhar_number ?? input.aadhaar_number);
+
+  await db.execute(
+    `INSERT INTO candidate_onboarding_profile
+       (id, candidate_id, onboarding_token_hash, title, employee_name, relation, father_husband_name,
+        gender, marital_status, date_of_birth, blood_group, nominee_name, nominee_relation,
+        nominee_date_of_birth, permanent_address, permanent_state, permanent_city, permanent_pincode,
+        present_address, present_state, present_city, present_pincode, mobile_number, alt_mobile_number,
+        personal_email_id, official_email_id, pan_number_masked, pan_number_hash, aadhaar_number_masked,
+        aadhaar_number_hash, source_type, source, profile_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'employee_details_saved')
+     ON DUPLICATE KEY UPDATE
+        title = VALUES(title), employee_name = VALUES(employee_name), relation = VALUES(relation),
+        father_husband_name = VALUES(father_husband_name), gender = VALUES(gender), marital_status = VALUES(marital_status),
+        date_of_birth = VALUES(date_of_birth), blood_group = VALUES(blood_group), nominee_name = VALUES(nominee_name),
+        nominee_relation = VALUES(nominee_relation), nominee_date_of_birth = VALUES(nominee_date_of_birth),
+        permanent_address = VALUES(permanent_address), permanent_state = VALUES(permanent_state), permanent_city = VALUES(permanent_city),
+        permanent_pincode = VALUES(permanent_pincode), present_address = VALUES(present_address), present_state = VALUES(present_state),
+        present_city = VALUES(present_city), present_pincode = VALUES(present_pincode), mobile_number = VALUES(mobile_number),
+        alt_mobile_number = VALUES(alt_mobile_number), personal_email_id = VALUES(personal_email_id), official_email_id = VALUES(official_email_id),
+        pan_number_masked = VALUES(pan_number_masked), pan_number_hash = VALUES(pan_number_hash), aadhaar_number_masked = VALUES(aadhaar_number_masked),
+        aadhaar_number_hash = VALUES(aadhaar_number_hash), source_type = VALUES(source_type), source = VALUES(source),
+        profile_status = IF(profile_status='submitted', profile_status, 'employee_details_saved'), updated_at = NOW()`,
+    [
+      id,
+      candidateId,
+      hashValue(token),
+      input.title ?? null,
+      input.employeeName ?? tokenData.full_name ?? null,
+      input.relation ?? null,
+      input.fatherHusbandName ?? input.father_name ?? null,
+      input.gender ?? tokenData.gender ?? null,
+      input.maritalStatus ?? null,
+      input.dateOfBirth ?? tokenData.date_of_birth ?? null,
+      input.bloodGroup ?? null,
+      input.nominee ?? input.nomineeName ?? null,
+      input.nomineeRelation ?? null,
+      input.nomineeDateOfBirth ?? null,
+      input.permanentAddress ?? null,
+      input.permanentState ?? null,
+      input.permanentCity ?? null,
+      input.permanentPincode ?? null,
+      input.presentAddress ?? input.current_address ?? null,
+      input.presentState ?? null,
+      input.presentCity ?? null,
+      input.presentPincode ?? null,
+      input.mobileNumber ?? tokenData.mobile ?? null,
+      input.altMobileNumber ?? null,
+      input.personalEmailId ?? tokenData.email ?? null,
+      input.officialEmailId ?? null,
+      panMasked,
+      panHash,
+      aadhaarMasked,
+      aadhaarHash,
+      input.sourceType ?? tokenData.source_type ?? null,
+      input.source ?? tokenData.source ?? null,
+    ]
+  );
+
+  await db.execute(
+    `UPDATE ats_candidate SET
+       title = ?, relation = ?, father_husband_name = ?, father_name = ?, gender = ?, marital_status = ?,
+       date_of_birth = ?, blood_group = ?, nominee_name = ?, nominee_relation = ?, nominee_date_of_birth = ?,
+       permanent_address = ?, permanent_state = ?, permanent_city = ?, permanent_pincode = ?,
+       current_address = ?, present_state = ?, present_city = ?, present_pincode = ?, alt_mobile_number = ?,
+       personal_email_id = ?, official_email_id = ?, pan_number = COALESCE(?, pan_number), aadhar_number = COALESCE(?, aadhar_number),
+       source_type = ?, source = ?, profile_status = 'profile_in_progress', updated_at = NOW()
+     WHERE id = ?`,
+    [
+      input.title ?? null,
+      input.relation ?? null,
+      input.fatherHusbandName ?? input.father_name ?? null,
+      input.fatherHusbandName ?? input.father_name ?? null,
+      input.gender ?? tokenData.gender ?? null,
+      input.maritalStatus ?? null,
+      input.dateOfBirth ?? tokenData.date_of_birth ?? null,
+      input.bloodGroup ?? null,
+      input.nominee ?? input.nomineeName ?? null,
+      input.nomineeRelation ?? null,
+      input.nomineeDateOfBirth ?? null,
+      input.permanentAddress ?? null,
+      input.permanentState ?? null,
+      input.permanentCity ?? null,
+      input.permanentPincode ?? null,
+      input.presentAddress ?? input.current_address ?? null,
+      input.presentState ?? null,
+      input.presentCity ?? null,
+      input.presentPincode ?? null,
+      input.altMobileNumber ?? null,
+      input.personalEmailId ?? tokenData.email ?? null,
+      input.officialEmailId ?? null,
+      input.panNumber ?? input.pan_number ?? null,
+      input.aadhaarNumber ?? input.aadhar_number ?? null,
+      input.sourceType ?? tokenData.source_type ?? null,
+      input.source ?? tokenData.source ?? null,
+      candidateId,
+    ]
+  );
+
+  await logCandidateAction(candidateId, "SAVE_EMPLOYEE_DETAILS", { fields: Object.keys(input) }, meta);
+  return getFullOnboardingStatus(token);
+}
+
+export async function saveBankDetails(token: string, input: Record<string, unknown>, meta?: { ip?: string; userAgent?: string }) {
+  const tokenData = await validateOnboardingToken(token);
+  const candidateId = tokenData.candidate_id as string;
+  const accountNo = input.accountNo ?? input.bank_account_no ?? input.account_no;
+  const id = randomUUID();
+
+  await db.execute(
+    `INSERT INTO candidate_onboarding_bank_detail
+       (id, candidate_id, bank_name, branch_name, account_holder_name, account_no_masked,
+        account_no_hash, ifsc_code, account_type, cancelled_cheque_document_id, verification_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'not_started')
+     ON DUPLICATE KEY UPDATE
+       bank_name = VALUES(bank_name), branch_name = VALUES(branch_name), account_holder_name = VALUES(account_holder_name),
+       account_no_masked = VALUES(account_no_masked), account_no_hash = VALUES(account_no_hash), ifsc_code = VALUES(ifsc_code),
+       account_type = VALUES(account_type), cancelled_cheque_document_id = VALUES(cancelled_cheque_document_id),
+       updated_at = NOW()`,
+    [
+      id,
+      candidateId,
+      input.bankName ?? input.bank_name ?? null,
+      input.branchName ?? null,
+      input.accountHolderName ?? null,
+      maskAccount(accountNo),
+      hashValue(accountNo),
+      String(input.ifscCode ?? input.bank_ifsc ?? "").trim().toUpperCase() || null,
+      input.accountType ?? null,
+      input.cancelledChequeDocumentId ?? null,
+    ]
+  );
+
+  await db.execute(
+    `UPDATE candidate_onboarding_profile SET profile_status = IF(profile_status='submitted', profile_status, 'bank_saved'), updated_at = NOW()
+      WHERE candidate_id = ?`,
+    [candidateId]
+  );
+  await db.execute(
+    `UPDATE ats_candidate SET bank_name = ?, bank_ifsc = ?, bank_account_no = COALESCE(?, bank_account_no), updated_at = NOW() WHERE id = ?`,
+    [input.bankName ?? input.bank_name ?? null, input.ifscCode ?? input.bank_ifsc ?? null, accountNo ?? null, candidateId]
+  );
+
+  await logCandidateAction(candidateId, "SAVE_BANK_DETAILS", { bankName: input.bankName ?? input.bank_name, ifsc: input.ifscCode ?? input.bank_ifsc }, meta);
+  return getFullOnboardingStatus(token);
+}
+
+export async function addQualification(token: string, input: Record<string, unknown>, meta?: { ip?: string; userAgent?: string }) {
+  const tokenData = await validateOnboardingToken(token);
+  const candidateId = tokenData.candidate_id as string;
+  const id = randomUUID();
+  await db.execute(
+    `INSERT INTO candidate_onboarding_qualification
+      (id, candidate_id, qualification, specialization_course_name, passed_out_year,
+       passed_out_state, passed_out_city, passed_out_percentage, document_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      candidateId,
+      input.qualification ?? null,
+      input.specializationCourseName ?? input.specialization ?? null,
+      input.passedOutYear ?? null,
+      input.passedOutState ?? null,
+      input.passedOutCity ?? null,
+      input.passedOutPercentage ?? input.percentage ?? null,
+      input.documentId ?? null,
+    ]
+  );
+  await logCandidateAction(candidateId, "ADD_QUALIFICATION", input, meta);
+  return getFullOnboardingStatus(token);
+}
+
+export async function saveFamilyDetails(token: string, input: Record<string, unknown>, meta?: { ip?: string; userAgent?: string }) {
+  const tokenData = await validateOnboardingToken(token);
+  const candidateId = tokenData.candidate_id as string;
+  await db.execute(
+    `INSERT INTO candidate_onboarding_family (id, candidate_id, annual_income, count_of_dependents)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE annual_income = VALUES(annual_income), count_of_dependents = VALUES(count_of_dependents), updated_at = NOW()`,
+    [randomUUID(), candidateId, input.annualIncome ?? null, input.countOfDependents ?? null]
+  );
+  await logCandidateAction(candidateId, "SAVE_FAMILY_DETAILS", input, meta);
+  return getFullOnboardingStatus(token);
+}
+
+export async function saveExperienceDetails(token: string, input: Record<string, unknown>, meta?: { ip?: string; userAgent?: string }) {
+  const tokenData = await validateOnboardingToken(token);
+  const candidateId = tokenData.candidate_id as string;
+  await db.execute(
+    `INSERT INTO candidate_onboarding_experience
+       (id, candidate_id, working_experience, experience_year, experience_doc_type,
+        experience_document_id, employer_name, last_designation, last_ctc)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       working_experience = VALUES(working_experience), experience_year = VALUES(experience_year),
+       experience_doc_type = VALUES(experience_doc_type), experience_document_id = VALUES(experience_document_id),
+       employer_name = VALUES(employer_name), last_designation = VALUES(last_designation), last_ctc = VALUES(last_ctc), updated_at = NOW()`,
+    [
+      randomUUID(),
+      candidateId,
+      input.workingExperience ?? "fresher",
+      input.experienceYear ?? null,
+      input.experienceDocType ?? null,
+      input.experienceDocumentId ?? null,
+      input.employerName ?? null,
+      input.lastDesignation ?? null,
+      input.lastCtc ?? null,
+    ]
+  );
+  await logCandidateAction(candidateId, "SAVE_EXPERIENCE_DETAILS", input, meta);
+  return getFullOnboardingStatus(token);
+}
+
+export async function saveFinalSection(token: string, input: Record<string, unknown>, meta?: { ip?: string; userAgent?: string }) {
+  const tokenData = await validateOnboardingToken(token);
+  const candidateId = tokenData.candidate_id as string;
+  await db.execute(
+    `UPDATE candidate_onboarding_profile SET profile_status = IF(profile_status='submitted', profile_status, 'final_saved'), updated_at = NOW()
+      WHERE candidate_id = ?`,
+    [candidateId]
+  );
+  await logCandidateAction(candidateId, "SAVE_FINAL_SECTION", input, meta);
+  return getFullOnboardingStatus(token);
+}
+
+export async function submitFullOnboarding(token: string, meta?: { ip?: string; userAgent?: string }) {
+  const tokenData = await validateOnboardingToken(token);
+  const candidateId = tokenData.candidate_id as string;
+
+  const [profileRows] = await db.execute<RowDataPacket[]>(
+    `SELECT id, employee_name, mobile_number, personal_email_id, pan_number_hash, aadhaar_number_hash
+       FROM candidate_onboarding_profile WHERE candidate_id = ? LIMIT 1`,
+    [candidateId]
+  );
+  if (!profileRows.length) throw Object.assign(new Error("Employee details are required before submit"), { status: 400 });
+
+  const [bankRows] = await db.execute<RowDataPacket[]>(
+    `SELECT id FROM candidate_onboarding_bank_detail WHERE candidate_id = ? LIMIT 1`,
+    [candidateId]
+  );
+  if (!bankRows.length) throw Object.assign(new Error("Bank details are required before submit"), { status: 400 });
+
+  await db.execute(
+    `UPDATE candidate_onboarding_profile SET profile_status = 'submitted', submitted_at = NOW(), updated_at = NOW()
+      WHERE candidate_id = ?`,
+    [candidateId]
+  );
+  await db.execute(
+    `UPDATE ats_candidate SET profile_status = 'profile_submitted', profile_submitted_at = NOW(), updated_at = NOW()
+      WHERE id = ?`,
+    [candidateId]
+  );
+  await db.execute(
+    `UPDATE ats_onboarding_request SET status = 'profile_submitted', updated_at = NOW()
+      WHERE candidate_id = ?`,
+    [candidateId]
+  );
+  await logCandidateAction(candidateId, "SUBMIT_ONBOARDING", null, meta);
+  return { candidateId, status: "submitted" };
+}
+
+export async function uploadOnboardingDocument(token: string, file: Express.Multer.File, input: Record<string, unknown>, meta?: { ip?: string; userAgent?: string }) {
+  if (!file) throw Object.assign(new Error("File is required"), { status: 400 });
+  const tokenData = await validateOnboardingToken(token);
+  const candidateId = tokenData.candidate_id as string;
+
+  const id = randomUUID();
+  const fileUrl = `/uploads/onboarding/${file.filename}`;
+  await db.execute(
+    `INSERT INTO candidate_onboarding_document
+       (id, candidate_id, doc_type, doc_name, page_no, file_original_name, file_path, file_url, mime_type, file_size_bytes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      candidateId,
+      input.docType ?? input.doc_type ?? "Other",
+      input.docName ?? input.doc_name ?? file.originalname,
+      input.pageNo ?? input.page_no ?? null,
+      file.originalname,
+      file.path,
+      fileUrl,
+      file.mimetype,
+      file.size,
+    ]
+  );
+  await logCandidateAction(candidateId, "UPLOAD_DOCUMENT", { documentId: id, docType: input.docType ?? input.doc_type }, meta);
+  return { id, fileUrl };
+}
+
+export async function deleteOnboardingDocument(token: string, documentId: string, meta?: { ip?: string; userAgent?: string }) {
+  const tokenData = await validateOnboardingToken(token);
+  const candidateId = tokenData.candidate_id as string;
+  await db.execute(
+    `UPDATE candidate_onboarding_document
+        SET document_status = 'deleted', deleted_at = NOW(), deleted_by = NULL
+      WHERE id = ? AND candidate_id = ?`,
+    [documentId, candidateId]
+  );
+  await logCandidateAction(candidateId, "DELETE_DOCUMENT", { documentId }, meta);
+  return getFullOnboardingStatus(token);
+}
+
+export async function listFullOnboardingRequests(branchId?: string) {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT p.*, c.candidate_code, c.full_name, c.mobile, c.email,
+            br.branch_name, pm.process_name,
+            bank.verification_status AS bank_verification_status,
+            COUNT(doc.id) AS documents_uploaded
+       FROM candidate_onboarding_profile p
+       JOIN ats_candidate c ON c.id = p.candidate_id
+       LEFT JOIN branch_master br ON br.id = c.applied_for_branch
+       LEFT JOIN process_master pm ON pm.id = c.applied_for_process
+       LEFT JOIN candidate_onboarding_bank_detail bank ON bank.candidate_id = p.candidate_id
+       LEFT JOIN candidate_onboarding_document doc ON doc.candidate_id = p.candidate_id AND doc.deleted_at IS NULL
+      WHERE (? IS NULL OR c.applied_for_branch = ?)
+      GROUP BY p.id, c.candidate_code, c.full_name, c.mobile, c.email, br.branch_name, pm.process_name, bank.verification_status
+      ORDER BY p.updated_at DESC`,
+    [branchId ?? null, branchId ?? null]
+  );
+  return rows;
+}
+
+export async function getFullOnboardingByCandidate(candidateId: string) {
+  const [profileRows] = await db.execute<RowDataPacket[]>(`SELECT * FROM candidate_onboarding_profile WHERE candidate_id = ? LIMIT 1`, [candidateId]);
+  const [documents] = await db.execute<RowDataPacket[]>(`SELECT * FROM candidate_onboarding_document WHERE candidate_id = ? AND deleted_at IS NULL ORDER BY uploaded_at DESC`, [candidateId]);
+  const [bankRows] = await db.execute<RowDataPacket[]>(`SELECT * FROM candidate_onboarding_bank_detail WHERE candidate_id = ? LIMIT 1`, [candidateId]);
+  const [qualificationRows] = await db.execute<RowDataPacket[]>(`SELECT * FROM candidate_onboarding_qualification WHERE candidate_id = ? ORDER BY created_at DESC`, [candidateId]);
+  const [familyRows] = await db.execute<RowDataPacket[]>(`SELECT * FROM candidate_onboarding_family WHERE candidate_id = ? LIMIT 1`, [candidateId]);
+  const [experienceRows] = await db.execute<RowDataPacket[]>(`SELECT * FROM candidate_onboarding_experience WHERE candidate_id = ? LIMIT 1`, [candidateId]);
+  return { profile: profileRows[0] ?? null, documents, bank: bankRows[0] ?? null, qualifications: qualificationRows, family: familyRows[0] ?? null, experience: experienceRows[0] ?? null };
+}
+
+export async function reviewFullOnboarding(candidateId: string, input: { status: "approved" | "rejected" | "hr_review"; remarks?: string }, reviewedBy: string) {
+  const dbStatus = input.status === "approved" ? "approved" : input.status === "rejected" ? "rejected" : "hr_review";
+  await db.execute(
+    `UPDATE candidate_onboarding_profile SET profile_status = ?, reviewed_by = ?, reviewed_at = NOW(), review_remarks = ?, updated_at = NOW()
+      WHERE candidate_id = ?`,
+    [dbStatus, reviewedBy, input.remarks ?? null, candidateId]
+  );
+  await logCandidateAction(candidateId, "HR_REVIEW", input, { actorType: "hr", actorId: reviewedBy });
+  return getFullOnboardingByCandidate(candidateId);
+}

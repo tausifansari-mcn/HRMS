@@ -47,8 +47,10 @@ const ModuleLauncher                = lazy(() => import("./pages/ModuleLauncher"
 
 // ATS Onboarding
 const CandidateOnboardingPage       = lazy(() => import("./pages/CandidateOnboardingPage"));
+const CandidateOnboardingFullPage   = lazy(() => import("./pages/CandidateOnboardingFullPage"));
 const NativeHROnboardingRequests    = lazy(() => import("./pages/NativeHROnboardingRequests"));
 const NativeBranchHeadApproval      = lazy(() => import("./pages/NativeBranchHeadApproval"));
+const NativeBGVVerificationCenter   = lazy(() => import("./pages/NativeBGVVerificationCenter"));
 
 // ATS
 const NativeATSDashboardReplica     = lazy(() => import("./pages/NativeATSDashboardReplica"));
@@ -252,6 +254,8 @@ const App = () => (
               <Route path="/ats/command-center" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativeATSFullParityCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/ats/onboarding-requests" element={<ProtectedRoute><NativeHROnboardingRequests /></ProtectedRoute>} />
               <Route path="/ats/offer-approvals" element={<ProtectedRoute><NativeBranchHeadApproval /></ProtectedRoute>} />
+              <Route path="/onboard-full" element={<CandidateOnboardingFullPage />} />
+              <Route path="/ats/bgv" element={<ProtectedRoute><Gate pageCode="ATS_BGV"><NativeBGVVerificationCenter /></Gate></ProtectedRoute>} />
 
               {/* LMS */}
               <Route path="/lms/my-learning" element={<ProtectedRoute><Gate pageCode="LMS_MY_LEARNING"><NativeLMSMyLearning /></Gate></ProtectedRoute>} />
