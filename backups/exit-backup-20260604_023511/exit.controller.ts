@@ -16,10 +16,6 @@ export const exitController = {
 
   async getExitRequest(req: AuthenticatedRequest, res: Response) {
     const data = await exitService.getExitRequest(req.params.id);
-    const resolvedEmployeeId = (req as any).resolvedEmployeeId;
-    if (resolvedEmployeeId && (data as any).employee_id !== resolvedEmployeeId) {
-      return res.status(403).json({ success: false, message: "Forbidden" });
-    }
     return res.json({ success: true, data });
   },
 
@@ -27,17 +23,14 @@ export const exitController = {
     const input = createExitRequestSchema.parse(req.body);
     const data = await exitService.createExitRequest(
       {
-        employeeId: input.employeeId!,
-        exitDate: input.exitDate!,
+        employeeId: input.employeeId,
+        exitDate: input.exitDate,
         exitType: input.exitType,
-        exitSubType: input.exitSubType,
-        exitReasonCategory: input.exitReasonCategory,
         reason: input.reason,
-        noticePeriodDays: input.noticePeriodDays,
       },
       req.authUser!.id
     );
-    return res.status(201).json({ success: true, data, message: "Exit request submitted" });
+    return res.status(201).json({ success: true, data, message: "Exit request created" });
   },
 
   async updateExitStatus(req: AuthenticatedRequest, res: Response) {

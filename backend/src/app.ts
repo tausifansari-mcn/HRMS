@@ -63,6 +63,7 @@ import { autoRosterSyncedRouter } from "./modules/wfm/auto-roster-synced.routes.
 import { controlTowerRouter } from "./modules/control-tower/control-tower.routes.js";
 import { payrollComplianceRouter } from "./modules/payroll-compliance/payrollCompliance.routes.js";
 import { atsFullParityRouter } from "./modules/ats-full-parity/atsFullParity.routes.js";
+import { engagementIntelligenceRouter } from "./modules/engagement/engagement-intelligence.routes.js";
 
 export const app = express();
 
@@ -148,6 +149,7 @@ app.use("/api/compliance", complianceRouter);
 app.use("/api/privacy", privacyRouter);
 app.use("/api/performance-feedback", performanceFeedbackRouter);
 app.use("/api/engagement", engagementRouter);
+app.use("/api/engagement-intelligence", engagementIntelligenceRouter); // Health scoring + command center
 app.use("/api/communication", communicationRouter);
 app.use('/api/wfm/attendance', attendanceEngineRouter);
 app.use("/api/customization", customizationRouter);

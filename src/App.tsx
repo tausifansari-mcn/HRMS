@@ -97,6 +97,10 @@ const NativeBadges                    = lazy(() => import("./pages/NativeBadges"
 const NativeKudos                     = lazy(() => import("./pages/NativeKudos"));
 const NativeSurveys                   = lazy(() => import("./pages/NativeSurveys"));
 const NativeLeaderboard               = lazy(() => import("./pages/NativeLeaderboard"));
+const NativeEngagementCommandCenter   = lazy(() => import("./pages/NativeEngagementCommandCenter"));
+
+// Exit
+const NativeExitCommandCenter         = lazy(() => import("./pages/NativeExitCommandCenter"));
 
 // Offer Letters & Master Reports
 const NativeOfferLetterGeneration   = lazy(() => import("./pages/NativeOfferLetterGeneration"));
@@ -286,6 +290,7 @@ const App = () => (
               <Route path="/engagement/kudos" element={<ProtectedRoute><NativeKudos /></ProtectedRoute>} />
               <Route path="/engagement/surveys" element={<ProtectedRoute><NativeSurveys /></ProtectedRoute>} />
               <Route path="/engagement/leaderboard" element={<ProtectedRoute><NativeLeaderboard /></ProtectedRoute>} />
+              <Route path="/engagement/command-center" element={<ProtectedRoute><Gate pageCode="ENGAGEMENT_COMMAND_CENTER"><NativeEngagementCommandCenter /></Gate></ProtectedRoute>} />
 
               {/* Employee Stat Card / Journey */}
               <Route path="/employee-stat-card" element={<ProtectedRoute><NativeEmployeeStatCard /></ProtectedRoute>} />
@@ -355,6 +360,7 @@ const App = () => (
               {/* System */}
               <Route path="/migration-console" element={<ProtectedRoute><NativeMigrationConsole /></ProtectedRoute>} />
               <Route path="/exit-management" element={<ProtectedRoute><NativeExitManagement /></ProtectedRoute>} />
+              <Route path="/exit/command-center" element={<ProtectedRoute><Gate pageCode="EXIT_COMMAND_CENTER"><NativeExitCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/kpi-config" element={<ProtectedRoute><Gate pageCode="KPI_CONFIG"><NativeKPIConfiguration /></Gate></ProtectedRoute>} />
               <Route path="/operations-kpi" element={<ProtectedRoute><Gate pageCode="OPERATIONS_KPI"><NativeOperationsKPI /></Gate></ProtectedRoute>} />
               <Route path="/portal-data-manager" element={<ProtectedRoute><Gate pageCode="PORTAL_DATA_MANAGER"><NativePortalDataManager /></Gate></ProtectedRoute>} />

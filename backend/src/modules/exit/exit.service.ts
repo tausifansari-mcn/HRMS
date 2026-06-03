@@ -2,36 +2,74 @@ import { randomUUID } from "crypto";
 import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
 import type { ExitRequest, ExitStats, PaginatedResult } from "./exit.types.js";
+import { createDefaultClearanceTasks, createExitHealthSnapshot } from "./exit-intelligence.service.js";
+
+function normalizeStatus(status: string) {
+  return status === "exit_confirmed" ? "exited" : status;
+}
 
 export const exitService = {
   async listExitRequests(filters: {
     status?: string;
     employeeId?: string;
+    branchId?: string;
+    processId?: string;
+    search?: string;
     page: number;
     limit: number;
   }): Promise<PaginatedResult<ExitRequest>> {
-    const { page, limit, status, employeeId } = filters;
+    const { page, limit, status, employeeId, branchId, processId, search } = filters;
     const offset = (page - 1) * limit;
     const conds: string[] = [];
     const params: unknown[] = [];
 
-    if (employeeId) { conds.push("employee_id = ?"); params.push(employeeId); }
-    if (status)     { conds.push("status = ?");      params.push(status); }
+    if (employeeId) { conds.push("er.employee_id = ?"); params.push(employeeId); }
+    if (status)     { conds.push("er.status = ?");      params.push(normalizeStatus(status)); }
+    if (branchId)   { conds.push("e.branch_id = ?");    params.push(branchId); }
+    if (processId)  { conds.push("e.process_id = ?");   params.push(processId); }
+    if (search) {
+      conds.push("(e.employee_code LIKE ? OR e.full_name LIKE ? OR er.resignation_reason LIKE ? OR er.exit_reason_category LIKE ?)");
+      const q = `%${search}%`;
+      params.push(q, q, q, q);
+    }
 
     const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
 
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT * FROM exit_request ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      `SELECT er.*,
+              e.employee_code,
+              CONCAT_WS(' ', e.first_name, e.last_name) AS employee_name,
+              b.branch_name,
+              p.process_name,
+              hs.engagement_score,
+              hs.regrettable_exit,
+              hs.risk_label,
+              COALESCE(clearance.total_tasks, 0) AS clearance_total,
+              COALESCE(clearance.cleared_tasks, 0) AS clearance_cleared
+         FROM exit_request er
+         LEFT JOIN employees e ON e.id = er.employee_id
+         LEFT JOIN branch_master b ON b.id = e.branch_id
+         LEFT JOIN process_master p ON p.id = e.process_id
+         LEFT JOIN exit_employee_health_snapshot hs ON hs.exit_request_id = er.id
+         LEFT JOIN (
+           SELECT exit_request_id,
+                  COUNT(*) AS total_tasks,
+                  SUM(CASE WHEN status IN ('cleared','waived') THEN 1 ELSE 0 END) AS cleared_tasks
+             FROM exit_clearance_task GROUP BY exit_request_id
+         ) clearance ON clearance.exit_request_id = er.id
+         ${where}
+        ORDER BY er.created_at DESC
+        LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
     const [countRows] = await db.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) AS total FROM exit_request ${where}`,
+      `SELECT COUNT(*) AS total FROM exit_request er LEFT JOIN employees e ON e.id = er.employee_id ${where}`,
       params
     );
 
     return {
       data: rows as ExitRequest[],
-      total: (countRows as { total: number }[])[0]?.total ?? 0,
+      total: Number((countRows as { total: number }[])[0]?.total ?? 0),
       page,
       limit,
     };
@@ -39,7 +77,16 @@ export const exitService = {
 
   async getExitRequest(id: string): Promise<ExitRequest> {
     const [rows] = await db.execute<RowDataPacket[]>(
-      "SELECT * FROM exit_request WHERE id = ? LIMIT 1",
+      `SELECT er.*,
+              e.employee_code,
+              CONCAT_WS(' ', e.first_name, e.last_name) AS employee_name,
+              b.branch_name,
+              p.process_name
+         FROM exit_request er
+         LEFT JOIN employees e ON e.id = er.employee_id
+         LEFT JOIN branch_master b ON b.id = e.branch_id
+         LEFT JOIN process_master p ON p.id = e.process_id
+        WHERE er.id = ? LIMIT 1`,
       [id]
     );
     const rec = (rows as ExitRequest[])[0];
@@ -48,25 +95,47 @@ export const exitService = {
   },
 
   async createExitRequest(
-    input: { employeeId: string; exitDate: string; exitType: string; reason?: string | null },
+    input: {
+      employeeId: string;
+      exitDate: string;
+      exitType: string;
+      exitSubType?: string | null;
+      exitReasonCategory?: string | null;
+      reason?: string | null;
+      noticePeriodDays?: number;
+    },
     userId: string
   ): Promise<ExitRequest> {
+    const [openRows] = await db.execute<RowDataPacket[]>(
+      `SELECT id FROM exit_request
+        WHERE employee_id = ? AND status NOT IN ('rejected','revoked','exited')
+        LIMIT 1`,
+      [input.employeeId]
+    );
+    if (openRows.length) throw new Error("An active exit request already exists for this employee");
+
     const id = randomUUID();
     await db.execute(
       `INSERT INTO exit_request
-         (id, employee_id, initiated_by, initiated_by_user_id, exit_type, last_working_day_proposed, resignation_reason, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, employee_id, initiated_by, initiated_by_user_id, exit_type, exit_sub_type,
+          exit_reason_category, last_working_day_proposed, resignation_reason, notice_period_days, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         input.employeeId,
         "employee",
         userId,
         input.exitType,
+        input.exitSubType ?? "resignation",
+        input.exitReasonCategory ?? null,
         input.exitDate,
         input.reason ?? null,
-        "draft",
+        input.noticePeriodDays ?? 0,
+        "submitted",
       ]
     );
+
+    await createExitHealthSnapshot(id).catch(() => null);
     return this.getExitRequest(id);
   },
 
@@ -76,7 +145,8 @@ export const exitService = {
     remarks: string,
     userId: string
   ): Promise<ExitRequest> {
-    await this.getExitRequest(id);
+    const existing = await this.getExitRequest(id);
+    const nextStatus = normalizeStatus(status);
 
     const stageMap: Record<string, string> = {
       manager_review: "manager_actioned_at",
@@ -85,41 +155,59 @@ export const exitService = {
       exited: "exit_confirmed_at",
     };
 
-    const timestampCol = stageMap[status];
+    const timestampCol = stageMap[nextStatus];
     const tsClause = timestampCol ? `, ${timestampCol} = NOW()` : "";
 
     await db.execute(
       `UPDATE exit_request SET status = ?${tsClause}, updated_at = NOW() WHERE id = ?`,
-      [status, id]
+      [nextStatus, id]
     );
 
     await db.execute(
       `INSERT INTO exit_approval_log (id, exit_request_id, stage, action, action_by, discussion_remarks)
        VALUES (UUID(), ?, ?, ?, ?, ?)`,
-      [id, status, "status_update", userId, remarks]
+      [id, nextStatus, "status_update", userId, remarks]
     );
+
+    if (["accepted", "notice_serving"].includes(nextStatus)) {
+      await createDefaultClearanceTasks(id, (existing as any).employee_id).catch(() => null);
+    }
+
+    if (nextStatus === "exited") {
+      await db.execute(
+        `UPDATE employees SET employment_status = 'inactive', updated_at = NOW() WHERE id = ?`,
+        [(existing as any).employee_id]
+      ).catch(() => null);
+    }
 
     return this.getExitRequest(id);
   },
 
-  async getExitStats(): Promise<ExitStats> {
+  async getExitStats(): Promise<ExitStats & Record<string, number>> {
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT status, COUNT(*) AS cnt FROM exit_request GROUP BY status`
     );
 
     const counts: Record<string, number> = {};
     for (const row of rows as { status: string; cnt: number }[]) {
-      counts[row.status] = row.cnt;
+      counts[row.status] = Number(row.cnt);
     }
 
     const statuses = [
       "draft", "submitted", "manager_review", "hr_review", "admin_review",
       "accepted", "rejected", "revoked", "notice_serving", "exited",
     ];
+    const detailed = Object.fromEntries(statuses.map((s) => [s, counts[s] ?? 0])) as Record<string, number>;
+    const total = Object.values(detailed).reduce((a, b) => a + b, 0);
+    const pending = (detailed.submitted ?? 0) + (detailed.manager_review ?? 0) + (detailed.hr_review ?? 0) + (detailed.admin_review ?? 0);
+    const completed = detailed.exited ?? 0;
 
-    const stats = Object.fromEntries(statuses.map((s) => [s, counts[s] ?? 0])) as Omit<ExitStats, "total">;
-    const total = Object.values(stats).reduce((a, b) => a + b, 0);
-
-    return { ...stats, total };
+    return {
+      ...detailed,
+      total,
+      pending,
+      completed,
+      active_notice: (detailed.accepted ?? 0) + (detailed.notice_serving ?? 0),
+    } as ExitStats & Record<string, number>;
   },
 };
