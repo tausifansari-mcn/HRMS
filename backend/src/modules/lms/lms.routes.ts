@@ -2,8 +2,10 @@ import { Router } from "express";
 import type { Response } from "express";
 import { requireAuth } from "../../middleware/authMiddleware.js";
 import { requireRole } from "../../middleware/requireRole.js";
+import { requireScopedRole } from "../../middleware/scopeMiddleware.js";
 import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 import { getEmployeeForUser, hasRole } from "../../shared/accessGuard.js";
+import { db } from "../../db/mysql.js";
 import { lmsService } from "./lms.service.js";
 
 const router = Router();
@@ -60,13 +62,28 @@ router.get("/mapping", requireRole("admin", "hr", "trainer"), h(async (_req: Aut
   res.json({ success: true, data: await lmsService.listMappings() });
 }));
 
-router.post("/mapping", requireRole("admin", "hr", "trainer"), h(async (req: AuthenticatedRequest, res: Response) => {
-  const { employee_id, lms_learner_id, email } = req.body;
-  if (!employee_id || !lms_learner_id) {
-    return res.status(400).json({ error: "employee_id and lms_learner_id required" });
-  }
-  res.status(201).json({ success: true, data: await lmsService.upsertMapping(employee_id, lms_learner_id, email) });
-}));
+router.post("/mapping",
+  requireRole("admin", "hr", "trainer"),
+  requireScopedRole(["hr", "trainer"], async (req) => {
+    // Trainer scoped by branch/process
+    const [rows] = await db.execute(
+      'SELECT branch_id, process_id FROM employees WHERE id = ? LIMIT 1',
+      [req.body.employee_id]
+    ) as any[];
+    const emp = rows[0];
+    return {
+      branchId: emp?.branch_id,
+      processId: emp?.process_id
+    };
+  }),
+  h(async (req: AuthenticatedRequest, res: Response) => {
+    const { employee_id, lms_learner_id, email } = req.body;
+    if (!employee_id || !lms_learner_id) {
+      return res.status(400).json({ error: "employee_id and lms_learner_id required" });
+    }
+    res.status(201).json({ success: true, data: await lmsService.upsertMapping(employee_id, lms_learner_id, email) });
+  })
+);
 
 // Sync audit log
 router.get("/sync-log", requireRole("admin", "hr", "trainer"), h(async (_req: AuthenticatedRequest, res: Response) => {
