@@ -59,6 +59,7 @@ class ProviderFactory {
         secrets.smtp_user,
         secrets.smtp_pass,
         config.smtp_from as string | undefined,
+        config.smtp_from_name as string | undefined,
       );
     }
 

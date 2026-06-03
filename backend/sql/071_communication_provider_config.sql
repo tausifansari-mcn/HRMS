@@ -1,5 +1,5 @@
 -- Communication provider configuration per channel.
--- Secrets stored AES-256-GCM encrypted using COMM_SECRET env key.
+-- Secrets stored AES-256-GCM encrypted using COMM_SECRET env key (fallback: PAYROLL_BANK_KEY).
 -- Only one active config per channel (UNIQUE KEY on channel).
 CREATE TABLE IF NOT EXISTS communication_provider_config (
   id             CHAR(36)      NOT NULL DEFAULT (UUID()) PRIMARY KEY,

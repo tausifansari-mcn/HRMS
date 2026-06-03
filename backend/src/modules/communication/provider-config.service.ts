@@ -9,7 +9,8 @@ import type {
 const ALG = 'aes-256-gcm';
 
 function getKey(): Buffer {
-  const raw = env.PAYROLL_BANK_KEY;
+  // Prefer dedicated COMM_SECRET; fall back to PAYROLL_BANK_KEY for backward compatibility
+  const raw = env.COMM_SECRET ?? env.PAYROLL_BANK_KEY;
   const buf = Buffer.alloc(32, 0);
   Buffer.from(raw, 'utf8').copy(buf, 0, 0, 32);
   return buf;
@@ -84,10 +85,13 @@ export const providerConfigService = {
   },
 
   async setEnabled(channel: Channel, enabled: boolean, userId: string): Promise<void> {
-    await db.execute(
+    const [result] = await db.execute(
       'UPDATE communication_provider_config SET is_enabled = ?, updated_by = ? WHERE channel = ?',
       [enabled ? 1 : 0, userId, channel],
     );
+    if ((result as any).affectedRows === 0) {
+      throw Object.assign(new Error(`No configuration found for channel: ${channel}. Run database migrations first.`), { statusCode: 404 });
+    }
   },
 
   async saveTestResult(channel: Channel, ok: boolean, error: string | null, userId: string): Promise<void> {

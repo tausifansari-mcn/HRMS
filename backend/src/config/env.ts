@@ -27,6 +27,8 @@ const envSchema = z.object({
   PORTAL_DEMO_BYPASS: z.string().optional().default("false"),
   // Required secret for payroll bank account AES encryption. Must be set in production.
   PAYROLL_BANK_KEY: z.string().min(16).default("hrms-bank-key-dev"),
+  // Dedicated AES-256-GCM key for communication provider secrets. Falls back to PAYROLL_BANK_KEY if not set.
+  COMM_SECRET: z.string().min(16).optional(),
   // Enables mock-token demo bypass. Must NOT be "true" in production.
   INTERNAL_DEMO_BYPASS: z.string().optional().default("false"),
   SMTP_HOST:   z.string().default("smtp.gmail.com"),

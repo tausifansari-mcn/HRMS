@@ -6,7 +6,7 @@ export class NodemailerProvider implements CommunicationProvider {
   private transporter: nodemailer.Transporter;
   private _from: string | undefined;
 
-  constructor(host?: string, port?: number, secure?: boolean, user?: string, pass?: string, from?: string) {
+  constructor(host?: string, port?: number, secure?: boolean, user?: string, pass?: string, from?: string, fromName?: string) {
     this.transporter = nodemailer.createTransport({
       host:   host   ?? process.env.SMTP_HOST,
       port:   port   ?? parseInt(process.env.SMTP_PORT ?? '587'),
@@ -16,7 +16,9 @@ export class NodemailerProvider implements CommunicationProvider {
         pass: pass ?? process.env.SMTP_PASS,
       },
     });
-    this._from = from ?? process.env.SMTP_FROM ?? process.env.SMTP_USER;
+    const fromAddress = from ?? process.env.SMTP_FROM ?? process.env.SMTP_USER ?? '';
+    const name = fromName ?? process.env.SMTP_FROM_NAME ?? '';
+    this._from = name ? `"${name}" <${fromAddress}>` : fromAddress;
   }
 
   async send(recipient: string, subject: string, body: string, attachments?: Attachment[]): Promise<ProviderResponse> {
