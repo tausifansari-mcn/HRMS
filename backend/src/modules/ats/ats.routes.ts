@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { requireAuth } from "../../middleware/authMiddleware.js";
 import { requireRole } from "../../middleware/requireRole.js";
+import { requireScopedRole } from "../../middleware/scopeMiddleware.js";
+import { buildScopeWhereClause } from "../../shared/scopeAccess.js";
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 import { atsController as c } from "./ats.controller.js";
@@ -22,8 +24,21 @@ atsRouter.post("/candidates",                    h(c.createCandidate.bind(c)));
 // ── PROTECTED — all remaining routes require a logged-in HR/recruiter ────────
 atsRouter.use(requireAuth);
 
-// Candidates (HR/recruiter facing)
-atsRouter.get("/candidates",                     requireRole("admin", "hr", "recruiter", "manager"), h(c.listCandidates.bind(c)));
+// Candidates (HR/recruiter facing) - Scoped
+atsRouter.get("/candidates", requireRole("admin", "hr", "recruiter", "manager"), h(async (req, res) => {
+  // Apply scope filtering
+  const scoped = await buildScopeWhereClause(
+    req.authUser!.id,
+    ["hr", "recruiter"],
+    {
+      branchId: "c.branch_id",
+      processId: "c.process_id"
+    },
+    { allowCeoAllRead: true }
+  );
+  (req as any).scopeFilter = scoped;
+  return c.listCandidates.bind(c)(req, res);
+}));
 atsRouter.get("/candidates/:id",                 requireRole("admin", "hr", "recruiter", "manager"), h(c.getCandidate.bind(c)));
 atsRouter.put("/candidates/:id",                 requireRole("admin", "recruiter"), h(c.updateCandidate.bind(c)));
 atsRouter.post("/candidates/:id/move-stage",     requireRole("admin", "recruiter", "manager"), h(c.moveStage.bind(c)));
