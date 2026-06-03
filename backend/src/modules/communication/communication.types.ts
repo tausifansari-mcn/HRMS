@@ -101,6 +101,7 @@ export interface EmailConfig {
 export interface SMSConfig {
   twilio_messaging_service_sid?: string;
   msg91_sender_id?: string;
+  msg91_template_id?: string;
   local_api_url?: string;
   local_sender_id?: string;
 }

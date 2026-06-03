@@ -6,6 +6,7 @@ export class MSG91Provider implements CommunicationProvider {
   constructor(
     private readonly authKey: string,
     private readonly senderId: string,
+    private readonly templateId: string = '',
   ) {}
 
   async send(recipient: string, _subject: string, body: string): Promise<ProviderResponse> {
@@ -18,7 +19,7 @@ export class MSG91Provider implements CommunicationProvider {
       const res = await axios.post(
         'https://api.msg91.com/api/v5/flow/',
         {
-          template_id: '',
+          template_id: this.templateId,
           short_url: '0',
           realTimeResponse: '1',
           sender: this.senderId,

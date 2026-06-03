@@ -51,5 +51,5 @@ export class MetaWhatsAppProvider implements CommunicationProvider {
     return /^\+?[1-9]\d{6,14}$/.test(contact.replace(/\s/g, ''));
   }
 
-  getName(): string { return 'meta-whatsapp'; }
+  getName(): string { return 'meta'; }
 }

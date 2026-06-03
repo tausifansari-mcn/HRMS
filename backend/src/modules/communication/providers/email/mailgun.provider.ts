@@ -16,13 +16,19 @@ export class MailgunProvider implements CommunicationProvider {
       : `https://api.mailgun.net/v3/${domain}`;
   }
 
-  async send(recipient: string, subject: string, body: string, _attachments?: Attachment[]): Promise<ProviderResponse> {
+  async send(recipient: string, subject: string, body: string, attachments?: Attachment[]): Promise<ProviderResponse> {
     try {
       const params = new URLSearchParams();
       params.append('from', this.from);
       params.append('to', recipient);
       params.append('subject', subject);
       params.append('html', body);
+      // Note: URLSearchParams cannot handle binary file attachments.
+      // For attachments, Mailgun requires multipart/form-data.
+      // If attachments are provided, log a warning and send without them.
+      if (attachments?.length) {
+        console.warn(`[MailgunProvider] ${attachments.length} attachment(s) provided but Mailgun provider does not support attachments via URL-encoded form. Use SendGrid for attachment support.`);
+      }
 
       const res = await axios.post(`${this.baseUrl}/messages`, params, {
         auth: { username: 'api', password: this.apiKey },
