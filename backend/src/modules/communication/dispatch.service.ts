@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { db } from '../../db/mysql.js';
 import type { RowDataPacket } from 'mysql2';
 import { providerFactory } from './providers/provider.factory.js';
+import { providerConfigService } from './provider-config.service.js';
 import { templateService } from './template.service.js';
 import { notificationPreferencesService } from './notification-preferences.service.js';
 import type {
@@ -87,7 +88,9 @@ class DispatchService {
     contact: string,
     rendered: { html: string; text?: string }
   ): Promise<void> {
-    const provider = providerFactory.getProvider(channel);
+    // Load DB config so admin panel changes take effect immediately
+    const dbConfig = await providerConfigService.loadActiveConfig(channel);
+    const provider = await providerFactory.getProviderAsync(channel, dbConfig);
 
     if (!provider.validateRecipient(contact)) {
       await db.execute(
