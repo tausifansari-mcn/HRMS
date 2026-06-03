@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { hrmsApi } from "@/lib/hrmsApi";
+import { hrmsApi, getAuthToken } from "@/lib/hrmsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
@@ -723,8 +723,7 @@ export default function BulkUploadHub() {
       const batchNo = `BATCH-${Date.now()}`;
 
       const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055";
-      const token = localStorage.getItem("hrms_access_token") ||
-        (() => { try { return JSON.parse(localStorage.getItem("hrms_demo_session") || "{}").access_token; } catch { return null; } })();
+      const token = getAuthToken();
 
       // Upload file to local storage
       const formData = new FormData();

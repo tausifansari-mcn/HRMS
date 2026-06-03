@@ -94,10 +94,10 @@ leaveRouter.post("/balance/seed", requireRole("admin", "hr"), h(async (req: Auth
   for (const row of rows) {
     if (!row.employee_id || !row.leave_type_id || !row.year || row.allocated_days === undefined) continue;
     await db.execute(
-      `INSERT INTO leave_balance_ledger (id, employee_id, leave_type_id, balance_year, allocated_days, used_days, balance_days)
-       VALUES (?, ?, ?, ?, ?, 0, ?)
-       ON DUPLICATE KEY UPDATE allocated_days = VALUES(allocated_days), balance_days = VALUES(allocated_days) - used_days`,
-      [randomUUID(), row.employee_id, row.leave_type_id, row.year, row.allocated_days, row.allocated_days]
+      `INSERT INTO leave_balance_ledger (id, employee_id, leave_type_id, balance_year, allocated_days, used_days, adjusted_days)
+       VALUES (?, ?, ?, ?, ?, 0, 0)
+       ON DUPLICATE KEY UPDATE allocated_days = VALUES(allocated_days)`,
+      [randomUUID(), row.employee_id, row.leave_type_id, row.year, row.allocated_days]
     );
   }
   res.json({ success: true, count: rows.length });

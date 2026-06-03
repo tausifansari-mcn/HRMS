@@ -29,7 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDepartments } from "@/hooks/useEmployees";
 import { useNextEmployeeCode, isValidEmployeeCode } from "@/hooks/useNextEmployeeCode";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { hrmsApi } from "@/lib/hrmsApi";
+import { hrmsApi, getAuthToken } from "@/lib/hrmsApi";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
 import { useOnboardingRequests, OnboardingRequest } from "@/hooks/useOnboardingRequests";
 import { useAuth } from "@/contexts/AuthContext";
@@ -299,8 +299,7 @@ const Onboarding = () => {
   // Upload a single document
   const uploadDocument = async (employeeId: string, docType: string, file: File) => {
     const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055";
-    const token = localStorage.getItem("hrms_access_token") ||
-      (() => { try { return JSON.parse(localStorage.getItem("hrms_demo_session") || "{}").access_token; } catch { return null; } })();
+    const token = getAuthToken();
 
     // Step 1: upload file to local storage
     const formData = new FormData();
@@ -359,8 +358,7 @@ const Onboarding = () => {
       // Get department name for notification
       const selectedDept = departments.find(d => d.id === data.departmentId);
       const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055";
-      const token = localStorage.getItem("hrms_access_token") ||
-        (() => { try { return JSON.parse(localStorage.getItem("hrms_demo_session") || "{}").access_token; } catch { return null; } })();
+      const token = getAuthToken();
 
       let linkedUserId = data.linkedUserId;
       let inviteSent = false;
@@ -392,21 +390,23 @@ const Onboarding = () => {
         }
       }
 
-      // Create employee
+      // Create employee — field names must match backend Zod schema (camelCase)
       const createRes = await hrmsApi.post<{ data: any }>("/api/employees", {
-        employee_code: data.employeeCode.trim().toUpperCase(),
-        first_name: data.firstName.trim(),
-        last_name: data.lastName.trim(),
+        employeeCode: data.employeeCode.trim().toUpperCase(),
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
         email: data.email.trim(),
-        phone: data.phone.trim() || null,
-        designation: data.designation.trim(),
-        date_of_joining: data.joinDate,
-        employment_status: "Onboarding",
-        department_id: data.departmentId || null,
-        manager_id: data.managerId || null,
-        user_id: linkedUserId || null,
+        mobile: data.phone.trim() || null,
+        dateOfJoining: data.joinDate,
+        departmentId: data.departmentId || null,
+        reportingManagerId: data.managerId || null,
+        // designationId requires a UUID; free-text designation is not accepted by the schema
+        // employmentStatus is not in createEmployeeSchema; we set it via PATCH after creation
       });
       const employee = createRes.data;
+
+      // Set employment status to Onboarding via PATCH (updateEmployeeSchema accepts employmentStatus)
+      await hrmsApi.patch(`/api/employees/${employee.id}`, { employmentStatus: "Onboarding" }).catch(() => {});
 
       // Upload documents
       const docsToUpload = Object.entries(documents).filter(([_, doc]) => doc.file);
@@ -470,8 +470,8 @@ const Onboarding = () => {
 
   const activateEmployeeMutation = useMutation({
     mutationFn: async (employeeId: string) => {
-      // Update employee status to active
-      await hrmsApi.patch(`/api/employees/${employeeId}`, { employment_status: "Active" });
+      // Update employee status to active (camelCase field name per updateEmployeeSchema)
+      await hrmsApi.patch(`/api/employees/${employeeId}`, { employmentStatus: "Active" });
 
       // Initialize leave balances for the current year
       const currentYear = new Date().getFullYear();
@@ -514,14 +514,14 @@ const Onboarding = () => {
   const updateEmployeeMutation = useMutation({
     mutationFn: async (data: typeof editFormData & { id: string }) => {
       await hrmsApi.patch(`/api/employees/${data.id}`, {
-        first_name: data.firstName.trim(),
-        last_name: data.lastName.trim(),
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
         email: data.email.trim(),
-        phone: data.phone.trim() || null,
-        designation: data.designation.trim(),
-        department_id: data.departmentId || null,
-        manager_id: data.managerId || null,
-        date_of_joining: data.joinDate,
+        mobile: data.phone.trim() || null,
+        departmentId: data.departmentId || null,
+        reportingManagerId: data.managerId || null,
+        dateOfJoining: data.joinDate,
+        // designationId requires UUID; free-text designation skipped
       });
       return data.id;
     },
@@ -549,8 +549,7 @@ const Onboarding = () => {
     setResendingInvite(employee.id);
     try {
       const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055";
-      const token = localStorage.getItem("hrms_access_token") ||
-        (() => { try { return JSON.parse(localStorage.getItem("hrms_demo_session") || "{}").access_token; } catch { return null; } })();
+      const token = getAuthToken();
 
       const registerRes = await fetch(
         `${HRMS_API}/api/auth/register`,
@@ -573,9 +572,9 @@ const Onboarding = () => {
 
       const userId = registerData.userId || null;
 
-      // Update employee user_id if not already linked
+      // Link user account to employee record
       if (userId && !employee.user_id) {
-        await hrmsApi.patch(`/api/employees/${employee.id}`, { user_id: userId });
+        await hrmsApi.patch(`/api/employees/${employee.id}`, { userId }).catch(() => {});
         queryClient.invalidateQueries({ queryKey: ['onboarding-employees'] });
       }
 

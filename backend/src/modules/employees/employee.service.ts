@@ -118,6 +118,7 @@ export const employeeService = {
     if (input.designationId     !== undefined) { sets.push("designation_id = ?");       params.push(input.designationId ?? null); }
     if (input.reportingManagerId !== undefined) { sets.push("reporting_manager_id = ?"); params.push(input.reportingManagerId ?? null); }
     if (input.photoUrl          !== undefined) { sets.push("photo_url = ?");            params.push(input.photoUrl ?? null); }
+    if (input.userId            !== undefined) { sets.push("user_id = ?");              params.push(input.userId ?? null); }
 
     if (sets.length > 0) {
       params.push(id);

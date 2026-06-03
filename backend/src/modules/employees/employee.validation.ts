@@ -34,13 +34,14 @@ export const updateEmployeeSchema = z.object({
   salaryStartDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD").nullable().optional(),
   dateOfExit: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD").nullable().optional(),
   employmentType: z.string().trim().optional(),
-  employmentStatus: z.enum(["Active", "Inactive", "On Notice", "Absconded", "Terminated"]).optional(),
+  employmentStatus: z.enum(["Active", "Inactive", "On Notice", "Absconded", "Terminated", "Onboarding"]).optional(),
   branchId: z.string().uuid().nullable().optional(),
   departmentId: z.string().uuid().nullable().optional(),
   processId: z.string().uuid().nullable().optional(),
   designationId: z.string().uuid().nullable().optional(),
   reportingManagerId: z.string().uuid().nullable().optional(),
   photoUrl: z.string().trim().url().nullable().optional(),
+  userId: z.string().uuid().nullable().optional(),
 });
 
 export const employeeFiltersSchema = z.object({

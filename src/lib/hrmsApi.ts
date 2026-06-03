@@ -50,6 +50,23 @@ async function requestRaw(method: string, path: string): Promise<string> {
   return res.text();
 }
 
+/**
+ * Returns the current auth token string (demo session first, then hrms_access_token).
+ * Matches the priority order used internally by hrmsApi.
+ */
+export function getAuthToken(): string | null {
+  // Demo session first (matches hrmsApi priority)
+  const demoRaw = localStorage.getItem('hrms_demo_session');
+  if (demoRaw) {
+    try {
+      const demo = JSON.parse(demoRaw);
+      const token = demo?.access_token;
+      if (token) return token;
+    } catch { /* fall through */ }
+  }
+  return localStorage.getItem('hrms_access_token');
+}
+
 export const hrmsApi = {
   get:    <T>(path: string)                => request<T>('GET',    path),
   post:   <T>(path: string, body: unknown) => request<T>('POST',   path, body),
