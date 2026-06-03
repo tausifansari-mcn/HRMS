@@ -33,6 +33,7 @@ import {
   ShieldCheck,
   Search,
   Settings,
+  Settings2,
   Sparkles,
   Target,
   Trophy,
@@ -195,6 +196,7 @@ const navGroups: NavGroup[] = [
       { label: "Dispatch Center",   href: "/communication/dispatch",  icon: <MessageSquare className="h-4 w-4" />,                   description: "Send messages to employees" },
       { label: "Dispatch History",  href: "/communication/history",   icon: <MessageSquare className="h-4 w-4" />, adminOnly: true,  description: "View and retry dispatch logs" },
       { label: "Notification Prefs", href: "/communication/preferences", icon: <Bell className="h-4 w-4" />,                      description: "Manage notification preferences" },
+      { label: "Comm. Config",       href: "/settings/communication-config", icon: <Settings2 className="h-4 w-4" />, adminOnly: true, description: "Configure email, SMS, WhatsApp providers" },
     ],
   },
   {

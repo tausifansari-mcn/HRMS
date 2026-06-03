@@ -136,6 +136,7 @@ const NativeTemplateManager         = lazy(() => import("./pages/NativeTemplateM
 const NativeDispatchCenter          = lazy(() => import("./pages/NativeDispatchCenter"));
 const NativeDispatchHistory         = lazy(() => import("./pages/NativeDispatchHistory"));
 const NativeNotificationPreferences = lazy(() => import("./pages/NativeNotificationPreferences"));
+const NativeCommunicationConfig     = lazy(() => import("./pages/NativeCommunicationConfig"));
 
 // Call Centre Config
 const NativeCallCentreConfig        = lazy(() => import("./pages/NativeCallCentreConfig"));
@@ -333,6 +334,16 @@ const App = () => (
               <Route path="/communication/dispatch"  element={<ProtectedRoute><NativeDispatchCenter /></ProtectedRoute>} />
               <Route path="/communication/history"   element={<ProtectedRoute><NativeDispatchHistory /></ProtectedRoute>} />
               <Route path="/communication/preferences" element={<ProtectedRoute><NativeNotificationPreferences /></ProtectedRoute>} />
+              <Route
+                path="/settings/communication-config"
+                element={
+                  <ProtectedRoute>
+                    <Suspense fallback={<PageLoader />}>
+                      <NativeCommunicationConfig />
+                    </Suspense>
+                  </ProtectedRoute>
+                }
+              />
 
               {/* System */}
               <Route path="/migration-console" element={<ProtectedRoute><NativeMigrationConsole /></ProtectedRoute>} />
