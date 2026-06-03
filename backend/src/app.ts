@@ -60,6 +60,7 @@ import { authRouter } from "./modules/auth/auth.routes.js";
 import { roleAssignmentRouter } from "./modules/admin/role-assignment.routes.js";
 import { clientRouter } from "./modules/portal/client.routes.js";
 import { autoRosterSyncedRouter } from "./modules/wfm/auto-roster-synced.routes.js";
+import { controlTowerRouter } from "./modules/control-tower/control-tower.routes.js";
 
 export const app = express();
 
@@ -149,6 +150,7 @@ app.use("/api/customization", customizationRouter);
 app.use("/api/roster-master", rosterMasterRouter);
 app.use("/api/roster-capacity", rosterCapacityRouter);
 app.use('/api/reports', reportingRouter);
+app.use('/api/control-tower', controlTowerRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
