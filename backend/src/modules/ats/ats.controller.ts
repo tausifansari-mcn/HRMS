@@ -13,7 +13,9 @@ import {
 export const atsController = {
   async listCandidates(req: AuthenticatedRequest, res: Response) {
     const filters = candidateFiltersSchema.parse(req.query);
-    const result  = await atsService.listCandidates(filters);
+    // Pass scopeFilter from middleware
+    const filtersWithScope = { ...filters, scopeFilter: (req as any).scopeFilter };
+    const result  = await atsService.listCandidates(filtersWithScope);
     return res.json({ success: true, ...result });
   },
 

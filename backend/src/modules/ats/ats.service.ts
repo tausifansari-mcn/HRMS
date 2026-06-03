@@ -50,6 +50,13 @@ export const atsService = {
     }
     if (filters.fromDate) { conds.push("walk_in_date >= ?"); params.push(filters.fromDate); }
     if (filters.toDate)   { conds.push("walk_in_date <= ?"); params.push(filters.toDate); }
+
+    // Apply scope filter from middleware
+    if ((filters as any).scopeFilter) {
+      const scopeClause = String((filters as any).scopeFilter).replace(/^WHERE\s+/i, '').trim();
+      if (scopeClause) conds.push(`(${scopeClause})`);
+    }
+
     const where = `WHERE ${conds.join(" AND ")}`;
     const offset = (filters.page - 1) * filters.limit;
 
