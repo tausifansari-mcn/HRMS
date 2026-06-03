@@ -37,24 +37,27 @@ export function useUploadDocument() {
       file: File;
       documentType: string;
     }) => {
-      // Phase 1: binary still goes to Supabase Storage; metadata persisted to MySQL
-      const { supabase: sb } = await import("@/integrations/supabase/client");
-      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-      const fileName = `${employeeId}/${Date.now()}-${safeName}`;
-      const { error: uploadError } = await (sb as any).storage
-        .from("employee-documents")
-        .upload(fileName, file);
-      if (uploadError) throw uploadError;
-      const publicUrl = (sb as any).storage
-        .from("employee-documents")
-        .getPublicUrl(fileName).data.publicUrl;
+      // Upload via multipart form to the backend; backend stores binary to configured storage
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("document_type", documentType);
+      formData.append("document_name", file.name);
 
-      const res = await hrmsApi.post<{ data: EmployeeDocument }>(`/api/employee-docs/${employeeId}`, {
-        document_type: documentType,
-        document_name: file.name,
-        file_url: publicUrl,
-      });
-      return res.data;
+      const token = localStorage.getItem("hrms_access_token");
+      const uploadRes = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL ?? ""}/api/employee-docs/${employeeId}/upload`,
+        {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        }
+      );
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => ({}));
+        throw new Error((err as any).message ?? "Upload failed");
+      }
+      const json = await uploadRes.json();
+      return (json as any).data as EmployeeDocument;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["employee-documents", variables.employeeId] });
@@ -72,24 +75,15 @@ export function useDeleteDocument() {
   return useMutation({
     mutationFn: async ({
       documentId,
-      fileUrl,
+      fileUrl: _fileUrl,
       employeeId,
     }: {
       documentId: string;
       fileUrl: string;
       employeeId: string;
     }) => {
+      // Backend handles both metadata deletion and storage cleanup
       await hrmsApi.delete(`/api/employee-docs/${employeeId}/${documentId}`);
-      // Phase 1: also clean up Supabase Storage binary if it is a Supabase URL
-      if (fileUrl && fileUrl.includes("supabase")) {
-        try {
-          const { supabase: sb } = await import("@/integrations/supabase/client");
-          const path = fileUrl.split("/employee-documents/")[1];
-          if (path) await (sb as any).storage.from("employee-documents").remove([path]);
-        } catch {
-          // non-fatal — metadata is deleted, storage cleanup best-effort
-        }
-      }
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["employee-documents", variables.employeeId] });

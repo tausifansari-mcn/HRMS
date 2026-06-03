@@ -2,10 +2,8 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { hrmsApi } from "@/lib/hrmsApi";
 import { useAuth } from "@/contexts/AuthContext";
-import { Database } from "@/integrations/supabase/types";
+import type { AppRole } from "@/types/roles";
 import { DEMO_CREDENTIALS } from "@/lib/demoCreds";
-
-type AppRole = Database["public"]["Enums"]["app_role"];
 
 export type WorkforcePageAccess = {
   page_code: string;

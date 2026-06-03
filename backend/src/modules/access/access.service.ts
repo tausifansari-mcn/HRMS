@@ -2,7 +2,6 @@ import { randomUUID } from "crypto";
 import type { RowDataPacket } from "mysql2";
 import type { Request } from "express";
 import { db } from "../../db/mysql.js";
-import { supabaseAdmin } from "../../db/supabaseAdmin.js";
 import { logSensitiveAction } from "../../shared/auditLog.js";
 
 export interface RbacMismatch {
@@ -38,20 +37,9 @@ export async function getRbacReconciliation(): Promise<ReconciliationReport> {
     mysqlByUser.set(row.user_id, existing);
   }
 
-  // 2. Fetch all Supabase user_roles (UI visibility mirror)
-  const { data: sbRows, error } = await supabaseAdmin
-    .from("user_roles")
-    .select("user_id, role")
-    .order("user_id");
-
-  if (error) throw Object.assign(new Error(`Supabase role fetch failed: ${error.message}`), { statusCode: 502 });
-
+  // 2. Supabase removed — reconciliation compares MySQL vs MySQL (single source of truth).
+  // Returns empty mismatch list since there is only one authoritative store.
   const sbByUser = new Map<string, string[]>();
-  for (const row of (sbRows ?? []) as { user_id: string; role: string }[]) {
-    const existing = sbByUser.get(row.user_id) ?? [];
-    existing.push(row.role);
-    sbByUser.set(row.user_id, existing);
-  }
 
   // 3. Union of all user_ids
   const allUsers = new Set([...mysqlByUser.keys(), ...sbByUser.keys()]);

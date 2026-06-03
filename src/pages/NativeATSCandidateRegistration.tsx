@@ -537,14 +537,22 @@ export default function NativeATSCandidateRegistration() {
   };
 
   const uploadFile = async (candidateId: string, file: File, type: "resume" | "selfie") => {
-    // Use Supabase storage for file uploads (MySQL has no file storage)
-    const { supabase: sb } = await import("@/integrations/supabase/client");
-    const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
-    const path = `${candidateId}/${type}_${Date.now()}_${safeName}`;
-    const { error } = await (sb as any).storage.from("ats-candidate-documents").upload(path, file, { upsert: true });
-    if (error) throw error;
-    const publicUrl = (sb as any).storage.from("ats-candidate-documents").getPublicUrl(path).data.publicUrl;
-    return { path, publicUrl };
+    // Upload via multipart POST to backend; backend handles storage
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("type", type);
+
+    const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
+    const res = await fetch(`${apiBase}/api/ats/candidates/${candidateId}/upload`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as any).message ?? `File upload failed (${res.status})`);
+    }
+    const json = await res.json();
+    return { path: (json as any).path ?? "", publicUrl: (json as any).url ?? "" };
   };
 
   const submitForm = async () => {

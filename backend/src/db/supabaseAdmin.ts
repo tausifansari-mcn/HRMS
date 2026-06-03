@@ -1,32 +1,41 @@
-// @ts-expect-error no bundled types for ws; polyfilling globalThis for Supabase realtime
-import WS from "ws";
+/**
+ * Supabase has been removed from this project.
+ * This file is kept as a tombstone so existing import statements compile
+ * without errors while the codebase is cleaned up.
+ * All callers should be migrated to MySQL — delete this file once confirmed.
+ */
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const WebSocket = WS as any;
-(globalThis as any).WebSocket = WebSocket;
+export const supabaseAdmin: any = {
+  from: () => ({
+    select: async () => ({ data: [], error: null }),
+    insert: async () => ({ data: null, error: null }),
+    update: async () => ({ data: null, error: null }),
+    delete: async () => ({ data: null, error: null }),
+    upsert: async () => ({ data: null, error: null }),
+  }),
+  auth: {
+    getUser: async () => ({ data: { user: null }, error: null }),
+    admin: {
+      createUser: async () => ({ data: { user: null }, error: null }),
+    },
+  },
+  storage: {
+    from: () => ({
+      upload: async () => ({ data: null, error: null }),
+      download: async () => ({ data: null, error: null }),
+      getPublicUrl: () => ({ data: { publicUrl: "" } }),
+      remove: async () => ({ data: null, error: null }),
+    }),
+  },
+  functions: {
+    invoke: async () => ({ data: null, error: null }),
+  },
+};
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { env } from "../config/env.js";
-
-// Supabase is no longer used for auth — MySQL JWT is the authority.
-// These clients are retained only for non-auth usage (storage, native-table pages).
-// When SUPABASE_SERVICE_ROLE_KEY / SUPABASE_ANON_KEY are not set, return a no-op stub
-// so the backend starts without Supabase credentials.
-
-function makeStubClient(): SupabaseClient {
-  const stub = { auth: { getUser: async () => ({ data: { user: null }, error: { message: "Supabase not configured" } }) } };
-  return stub as unknown as SupabaseClient;
-}
-
-const hasCredentials = !!(env.SUPABASE_SERVICE_ROLE_KEY && env.SUPABASE_ANON_KEY);
-
-export const supabaseAdmin: SupabaseClient = hasCredentials
-  ? createClient(env.SUPABASE_URL!, env.SUPABASE_SERVICE_ROLE_KEY!, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    })
-  : makeStubClient();
-
-export const supabaseAuthClient: SupabaseClient = hasCredentials
-  ? createClient(env.SUPABASE_URL!, env.SUPABASE_ANON_KEY!, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    })
-  : makeStubClient();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const supabaseAuthClient: any = {
+  auth: {
+    getUser: async () => ({ data: { user: null }, error: null }),
+  },
+};
