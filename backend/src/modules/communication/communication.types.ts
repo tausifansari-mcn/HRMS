@@ -76,3 +76,85 @@ export interface DispatchStats {
   by_channel: { email: number; sms: number; whatsapp: number };
 }
 export interface PaginatedDispatchLogs { logs: DispatchLog[]; total: number; page: number; limit: number; }
+
+// ========== Provider config types ==========
+
+export type EmailProviderType = 'nodemailer' | 'sendgrid' | 'mailgun' | 'local-email-tool';
+export type SMSProviderType   = 'twilio' | 'msg91' | 'local-sms-tool';
+export type WAProviderType    = 'twilio' | 'meta' | 'local-whatsapp-tool';
+export type AnyProviderType   = EmailProviderType | SMSProviderType | WAProviderType;
+
+export interface EmailConfig {
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_secure?: boolean;
+  smtp_from?: string;
+  smtp_from_name?: string;
+  sendgrid_from?: string;
+  sendgrid_from_name?: string;
+  mailgun_domain?: string;
+  mailgun_region?: 'us' | 'eu';
+  mailgun_from?: string;
+  local_api_url?: string;
+}
+
+export interface SMSConfig {
+  twilio_messaging_service_sid?: string;
+  msg91_sender_id?: string;
+  local_api_url?: string;
+  local_sender_id?: string;
+}
+
+export interface WAConfig {
+  twilio_whatsapp_number?: string;
+  meta_phone_number_id?: string;
+  meta_waba_id?: string;
+  local_api_url?: string;
+  local_business_number?: string;
+}
+
+export interface EmailSecrets {
+  smtp_user?: string;
+  smtp_pass?: string;
+  sendgrid_api_key?: string;
+  mailgun_api_key?: string;
+  local_api_key?: string;
+}
+
+export interface SMSSecrets {
+  twilio_account_sid?: string;
+  twilio_auth_token?: string;
+  msg91_auth_key?: string;
+  local_api_key?: string;
+}
+
+export interface WASecrets {
+  twilio_account_sid?: string;
+  twilio_auth_token?: string;
+  meta_access_token?: string;
+  local_api_key?: string;
+}
+
+export interface ProviderConfig {
+  id: string;
+  channel: Channel;
+  provider_type: AnyProviderType;
+  config_json: EmailConfig | SMSConfig | WAConfig;
+  is_enabled: boolean;
+  test_ok: boolean | null;
+  test_error: string | null;
+  test_at: string | null;
+}
+
+export interface SaveProviderConfigDTO {
+  provider_type: AnyProviderType;
+  config: EmailConfig | SMSConfig | WAConfig;
+  secrets: EmailSecrets | SMSSecrets | WASecrets;
+}
+
+export interface TestResult {
+  success: boolean;
+  error?: string;
+  provider: string;
+  channel: Channel;
+}
