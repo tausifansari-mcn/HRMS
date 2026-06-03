@@ -2,6 +2,8 @@ import { Router } from "express";
 import type { RowDataPacket } from "mysql2";
 import { requireAuth } from "../../middleware/authMiddleware.js";
 import { requireRole } from "../../middleware/requireRole.js";
+import { requireScopedRole } from "../../middleware/scopeMiddleware.js";
+import { buildScopeWhereClause } from "../../shared/scopeAccess.js";
 import { db } from "../../db/mysql.js";
 import { employeeController as c } from "./employee.controller.js";
 import { appendJourneyEvent, listJourneyEvents } from "./journeyLog.service.js";
@@ -38,10 +40,51 @@ router.get("/stats", requireRole("admin", "hr", "manager", "ceo"), h(async (_req
   res.json({ data: rows[0] });
 }));
 
-router.get("/", requireRole("admin", "hr", "manager"), h(c.listEmployees));
-router.post("/", requireRole("admin", "hr"), h(c.createEmployee));
+router.get("/", requireRole("admin", "hr", "manager"), h(async (req, res) => {
+  // Apply scope filtering
+  const scoped = await buildScopeWhereClause(
+    req.authUser!.id,
+    ["hr", "manager"],
+    {
+      branchId: "e.branch_id",
+      processId: "e.process_id",
+      departmentId: "e.department_id",
+      managerEmployeeId: "e.manager_id"
+    },
+    { allowCeoAllRead: true }
+  );
+
+  // Pass scope SQL to controller (will need service update for proper integration)
+  (req as any).scopeFilter = scoped;
+  return c.listEmployees(req, res);
+}));
+router.post("/",
+  requireRole("admin", "hr"),
+  requireScopedRole(["hr"], async (req) => ({
+    branchId: req.body.branch_id,
+    processId: req.body.process_id,
+    departmentId: req.body.department_id
+  })),
+  h(c.createEmployee)
+);
 router.get("/:id", requireRole("admin", "hr", "manager"), h(c.getEmployee));  // TODO: Add self-scope check
-router.patch("/:id", requireRole("admin", "hr"), h(c.updateEmployee));
+router.patch("/:id",
+  requireRole("admin", "hr"),
+  requireScopedRole(["hr"], async (req) => {
+    // Resolve employee's branch/process from DB
+    const [rows] = await db.execute(
+      'SELECT branch_id, process_id, department_id FROM employees WHERE id = ? LIMIT 1',
+      [req.params.id]
+    ) as any[];
+    const emp = rows[0];
+    return {
+      branchId: emp?.branch_id,
+      processId: emp?.process_id,
+      departmentId: emp?.department_id
+    };
+  }),
+  h(c.updateEmployee)
+);
 router.delete("/:id", requireRole("admin"), h(c.deactivateEmployee));
 
 // Journey log
