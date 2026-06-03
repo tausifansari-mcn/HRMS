@@ -104,10 +104,12 @@ export default function PortalLogin() {
                   </div>
                 )}
 
-                {/* Info Tips for Demo Mode */}
-                <div className="p-3 bg-blue-950/30 border border-blue-900/30 rounded-lg text-xs text-blue-400 leading-relaxed">
-                  💡 <strong>Demo Mode Enabled</strong>: Use <code className="bg-blue-900/40 px-1 rounded text-white">demo@mascallnet.com</code> to log in instantly without database dependency or actual OTP requirements.
-                </div>
+                {/* Info Tips for Demo Mode - Only show in development */}
+                {import.meta.env.DEV && (
+                  <div className="p-3 bg-blue-950/30 border border-blue-900/30 rounded-lg text-xs text-blue-400 leading-relaxed">
+                    💡 <strong>Demo Mode Enabled</strong>: Use <code className="bg-blue-900/40 px-1 rounded text-white">demo@mascallnet.com</code> to log in instantly without database dependency or actual OTP requirements.
+                  </div>
+                )}
 
                 <Button
                   type="submit"
@@ -152,10 +154,12 @@ export default function PortalLogin() {
                   </div>
                 )}
 
-                {/* Info Tips for Demo OTP */}
-                <div className="p-3 bg-emerald-950/30 border border-emerald-900/30 rounded-lg text-xs text-emerald-400">
-                  💡 <strong>Demo Key</strong>: Enter any 6 digits (e.g., <code className="bg-emerald-900/40 px-1 rounded text-white">123456</code>) to verify.
-                </div>
+                {/* Info Tips for Demo OTP - Only show in development */}
+                {import.meta.env.DEV && (
+                  <div className="p-3 bg-emerald-950/30 border border-emerald-900/30 rounded-lg text-xs text-emerald-400">
+                    💡 <strong>Demo Key</strong>: Enter any 6 digits (e.g., <code className="bg-emerald-900/40 px-1 rounded text-white">123456</code>) to verify.
+                  </div>
+                )}
 
                 <Button
                   type="submit"

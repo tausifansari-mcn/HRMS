@@ -42,7 +42,13 @@ export const wfmController = {
 
   async clockIn(req: AuthenticatedRequest, res: Response) {
     const input = clockInSchema.parse(req.body);
-    const data = await wfmService.clockIn(input, req.authUser!.id);
+    // Derive employeeId from authenticated user (security: prevent spoofing)
+    const { getEmployeeForUser } = await import("../../shared/accessGuard.js");
+    const employee = await getEmployeeForUser(req.authUser!.id);
+    if (!employee) {
+      return res.status(403).json({ success: false, message: "No employee record for authenticated user" });
+    }
+    const data = await wfmService.clockIn({ ...input, employeeId: employee.id }, req.authUser!.id);
     return res.status(201).json({ success: true, data, message: "Clocked in" });
   },
 
@@ -66,7 +72,13 @@ export const wfmController = {
 
   async submitRegularization(req: AuthenticatedRequest, res: Response) {
     const input = regularizationSchema.parse(req.body);
-    const data = await wfmService.submitRegularization(input, req.authUser!.id);
+    // Derive employeeId from authenticated user (security: prevent spoofing)
+    const { getEmployeeForUser } = await import("../../shared/accessGuard.js");
+    const employee = await getEmployeeForUser(req.authUser!.id);
+    if (!employee) {
+      return res.status(403).json({ success: false, message: "No employee record for authenticated user" });
+    }
+    const data = await wfmService.submitRegularization({ ...input, employeeId: employee.id }, req.authUser!.id);
     return res.status(201).json({ success: true, data, message: "Regularization submitted" });
   },
 

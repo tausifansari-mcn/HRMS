@@ -56,7 +56,7 @@ export const attendanceSessionFiltersSchema = z.object({
 });
 
 export const clockInSchema = z.object({
-  employeeId: z.string().uuid(),
+  // employeeId removed - derived from auth token for security (prevents spoofing)
   sessionDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
   punchSource: z.enum(["MANUAL", "BIOMETRIC", "DIALER"]).default("MANUAL"),
   branchName: z.string().trim().max(255).nullable().optional(),
@@ -73,7 +73,7 @@ export const breakSchema = z.object({
 });
 
 export const regularizationSchema = z.object({
-  employeeId: z.string().uuid(),
+  // employeeId removed - derived from auth token for security
   sessionDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
   reason: z.string().trim().min(1).max(500),
   supportingNote: z.string().trim().nullable().optional(),
