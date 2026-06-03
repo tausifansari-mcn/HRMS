@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { Building2, Plus, Pencil, Trash2, Users, Loader2, ShieldAlert } from "lucide-react";
 import { useDepartments, useCreateDepartment, useUpdateDepartment, useDeleteDepartment, Department } from "@/hooks/useDepartments";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -34,11 +34,7 @@ const Departments = () => {
   const { data: employees = [] } = useQuery({
     queryKey: ["employees-for-manager"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employees")
-        .select("id, first_name, last_name")
-        .eq("status", "active")
-        .order("first_name");
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data || [];
     },

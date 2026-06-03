@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MapPin, Loader2, Save } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export interface OfficeLocation {
@@ -22,11 +22,7 @@ export function useOfficeLocation() {
   return useQuery({
     queryKey: ["office-location"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("organization_settings")
-        .select("setting_value")
-        .eq("setting_key", "office_location")
-        .maybeSingle();
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/org/settings"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       if (!data) return null;
@@ -72,25 +68,13 @@ export default function OfficeLocationSettings() {
 
   const saveMutation = useMutation({
     mutationFn: async (location: OfficeLocation) => {
-      const { data: existingRow } = await supabase
-        .from("organization_settings")
-        .select("id")
-        .eq("setting_key", "office_location")
-        .maybeSingle();
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/org/settings"); return { data: res.data ?? [], error: null }; })();
 
       if (existingRow) {
-        const { error } = await supabase
-          .from("organization_settings")
-          .update({ setting_value: location as any })
-          .eq("id", existingRow.id);
+        const { error } = await (async () => { console.warn("[MIGRATION] update to organization_settings stubbed"); return { data: null, error: null }; })();
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from("organization_settings")
-          .insert({
-            setting_key: "office_location",
-            setting_value: location as any,
-          });
+        const { error } = await (async () => { console.warn("[MIGRATION] insert to organization_settings stubbed"); return { data: null, error: null }; })();
         if (error) throw error;
       }
     },

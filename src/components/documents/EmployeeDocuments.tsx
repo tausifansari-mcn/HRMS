@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, Trash2, Download, Loader2, Eye } from "lucide-react";
 import { useEmployeeDocuments, useUploadDocument, useDeleteDocument } from "@/hooks/useEmployeeDocuments";
-import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { DocumentViewerDialog } from "./DocumentViewerDialog";
 import {
@@ -75,9 +75,7 @@ export function EmployeeDocuments({ employeeId, canUpload = true, canDelete = tr
   };
 
   const handleDownload = async (fileUrl: string, fileName: string) => {
-    const { data, error } = await supabase.storage
-      .from("employee-documents")
-      .download(fileUrl);
+    const { data, error } = (async () => { const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055"; const url = fileUrl?.startsWith("https://") ? fileUrl : `${HRMS_API}/api/files/documents/${fileUrl}`; const resp = await fetch(url); const blob = await resp.blob(); return { data: blob, error: null }; })();
 
     if (error) {
       console.error("Download error:", error);

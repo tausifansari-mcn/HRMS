@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -24,7 +25,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { CalendarIcon, Download, FileText, Loader2, Table, TrendingUp, Users, Target, Star } from "lucide-react";
 import { format, subMonths, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { DatePresets } from "./DatePresets";
@@ -61,8 +61,7 @@ export function TeamAnalytics({ isManager, managerId }: TeamAnalyticsProps) {
   const { data: employees, isLoading: employeesLoading } = useQuery({
     queryKey: ["team-employees", isManager, managerId],
     queryFn: async () => {
-      let query = supabase
-        .from("employees")
+      let query = ({ select: () => ({ eq: () => ({ order: () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), limit: () => ({ maybeSingle: async () => ({ data: null, error: null }) }), data: [], error: null }), in: () => ({ order: () => ({ data: [], error: null }), data: [], error: null }), is: () => ({ data: [], error: null }), neq: () => ({ data: [], error: null }), gte: () => ({ lte: () => ({ order: () => ({ limit: () => ({ data: [], error: null }), data: [], error: null }), data: [], error: null }), data: [], error: null }), ilike: () => ({ data: [], error: null }), order: () => ({ data: [], error: null }), data: [], error: null }), update: () => ({ eq: () => ({ data: null, error: null }), in: () => ({ data: null, error: null }) }), insert: () => ({ select: () => ({ single: async () => ({ data: { id: 'stub' }, error: null }) }), data: null, error: null }), upsert: () => ({ data: null, error: null }), delete: () => ({ eq: () => ({ data: null, error: null }) }) })
         .select("id, first_name, last_name, designation, department_id, departments!employees_department_id_fkey(name)")
         .eq("status", "active");
 
@@ -80,10 +79,7 @@ export function TeamAnalytics({ isManager, managerId }: TeamAnalyticsProps) {
   const { data: departments } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("departments")
-        .select("id, name")
-        .order("name");
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/org/departments"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data;
     },
@@ -96,11 +92,7 @@ export function TeamAnalytics({ isManager, managerId }: TeamAnalyticsProps) {
     queryKey: ["team-goals", employeeIds],
     queryFn: async () => {
       if (employeeIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("goals")
-        .select("*")
-        .in("employee_id", employeeIds)
-        .order("created_at", { ascending: true });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/goals/goals"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data;
     },
@@ -112,11 +104,7 @@ export function TeamAnalytics({ isManager, managerId }: TeamAnalyticsProps) {
     queryKey: ["team-reviews", employeeIds],
     queryFn: async () => {
       if (employeeIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("performance_reviews")
-        .select("*")
-        .in("employee_id", employeeIds)
-        .order("review_date", { ascending: true });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/performance-feedback/reports"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data;
     },

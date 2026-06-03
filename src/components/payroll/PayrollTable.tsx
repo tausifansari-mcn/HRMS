@@ -1,4 +1,5 @@
 import {
+import { hrmsApi } from "@/lib/hrmsApi";
   Table,
   TableBody,
   TableCell,
@@ -25,7 +26,6 @@ import {
 import { Download, Eye, MoreVertical, CheckCircle, Clock, CreditCard, CalendarCheck, Loader2, X } from "lucide-react";
 import { useState } from "react";
 import { downloadPayslip } from "@/lib/payslipPdfGenerator";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export interface PayrollRecord {
@@ -160,13 +160,7 @@ export function PayrollTable({
     
     try {
       // Fetch salary structure for detailed breakdown
-      const { data: salaryStructure } = await supabase
-        .from("salary_structures")
-        .select("*")
-        .eq("employee_id", record.employeeId)
-        .order("effective_from", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/payroll/structures"); return { data: res.data ?? [], error: null }; })();
 
       const monthName = MONTH_NAMES[record.monthNum - 1] || "";
 

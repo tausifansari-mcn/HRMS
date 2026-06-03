@@ -1,11 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
 
@@ -19,24 +19,7 @@ export function LeaveCalendar() {
   const { data: leaves, isLoading } = useQuery({
     queryKey: ["leave-calendar", format(monthStart, "yyyy-MM-dd")],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("leave_requests")
-        .select(`
-          id,
-          start_date,
-          end_date,
-          employee:employees!leave_requests_employee_id_fkey(
-            first_name,
-            last_name,
-            avatar_url
-          ),
-          leave_type:leave_types!leave_requests_leave_type_id_fkey(name)
-        `)
-        .eq("status", "approved")
-        .lte("start_date", format(monthEnd, "yyyy-MM-dd"))
-        .gte("end_date", format(monthStart, "yyyy-MM-dd"))
-        .order("start_date", { ascending: true })
-        .limit(5);
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/leave/requests"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data;

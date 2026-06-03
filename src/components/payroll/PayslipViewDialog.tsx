@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
 import {
   Dialog,
   DialogContent,
@@ -61,13 +61,7 @@ export function PayslipViewDialog({ open, onOpenChange, record }: PayslipViewDia
     queryKey: ["salary-structure-view", record?.employeeId],
     queryFn: async () => {
       if (!record?.employeeId) return null;
-      const { data, error } = await supabase
-        .from("salary_structures")
-        .select("*")
-        .eq("employee_id", record.employeeId)
-        .order("effective_from", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/payroll/structures"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data;

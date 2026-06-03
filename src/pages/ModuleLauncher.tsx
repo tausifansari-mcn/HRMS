@@ -1,9 +1,9 @@
 import { useMemo } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Briefcase, GraduationCap, ShieldCheck, Users, BarChart3, Clock, Settings } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { supabase } from "@/integrations/supabase/client";
 import { useWorkforceAccess } from "@/hooks/useUserRole";
 
 const iconMap: Record<string, JSX.Element> = {
@@ -35,13 +35,7 @@ export default function ModuleLauncher() {
     queryKey: ["workforce-module-launcher", access.visiblePageCodes],
     queryFn: async () => {
       if (!access.visiblePageCodes.length) return [] as PageRow[];
-      const { data, error } = await supabase
-        .from("page_master")
-        .select("page_code,module_code,page_name,page_description,route_path,display_order,is_base_hrms_page,module_master(module_name,module_group)")
-        .eq("active_status", true)
-        .in("page_code", access.visiblePageCodes)
-        .order("module_code")
-        .order("display_order");
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return (data ?? []) as PageRow[];
     },

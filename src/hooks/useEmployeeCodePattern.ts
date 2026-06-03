@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-
+import { hrmsApi } from "@/lib/hrmsApi";
 export interface EmployeeCodePattern {
   prefix: string;
   min_digits: number;
@@ -29,20 +28,13 @@ export function useEmployeeCodePattern() {
   return useQuery({
     queryKey: ["employee-code-pattern"],
     queryFn: async (): Promise<EmployeeCodePattern> => {
-      // Use raw SQL query since the table isn't in generated types
-      const { data, error } = await supabase
-        .from("system_settings" as "profiles") // Type cast to bypass type check
-        .select("setting_value")
-        .eq("setting_key" as "id", "employee_code_pattern")
-        .maybeSingle();
-
-      if (error) throw error;
-      
-      if (data) {
-        const row = data as unknown as { setting_value: EmployeeCodePattern };
-        return row.setting_value;
-      }
-      
+      try {
+        const res = await hrmsApi.get<{ success: boolean; data: any }>("/api/org/settings/employee_code_pattern");
+        if (res.data?.setting_value) {
+          const val = typeof res.data.setting_value === 'string' ? JSON.parse(res.data.setting_value) : res.data.setting_value;
+          return val as EmployeeCodePattern;
+        }
+      } catch { /* use default */ }
       return DEFAULT_PATTERN;
     },
   });
@@ -53,15 +45,9 @@ export function useEmployeeCodePattern() {
  */
 export function useUpdateEmployeeCodePattern() {
   const queryClient = useQueryClient();
-  
   return useMutation({
     mutationFn: async (pattern: EmployeeCodePattern) => {
-      const { error } = await supabase
-        .from("system_settings" as "profiles") // Type cast to bypass type check
-        .update({ setting_value: pattern } as Record<string, unknown>)
-        .eq("setting_key" as "id", "employee_code_pattern");
-
-      if (error) throw error;
+      await hrmsApi.put("/api/org/settings/employee_code_pattern", { setting_value: JSON.stringify(pattern) });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employee-code-pattern"] });

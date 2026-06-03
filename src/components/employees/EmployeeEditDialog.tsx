@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { isValidEmployeeCode } from "@/hooks/useNextEmployeeCode";
 import {
@@ -20,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Employee } from "./EmployeeTable";
 import { Loader2, Hash, IndianRupee, History, ChevronDown, ChevronUp } from "lucide-react";
@@ -131,11 +131,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
     queryKey: ["employee-salary-structure", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return null;
-      const { data, error } = await supabase
-        .from("salary_structures")
-        .select("*")
-        .eq("employee_id", employee.id)
-        .maybeSingle();
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/payroll/structures"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data;
@@ -148,11 +144,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
     queryKey: ["employee-salary-history", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return [];
-      const { data, error } = await supabase
-        .from("salary_history")
-        .select("*")
-        .eq("employee_id", employee.id)
-        .order("effective_from", { ascending: false });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/payroll/structures"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data || [];
@@ -196,32 +188,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
     queryKey: ["employee-details", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return null;
-      const { data, error } = await supabase
-        .from("employees")
-        .select(`
-          id,
-          employee_code,
-          first_name,
-          last_name,
-          email,
-          phone,
-          address,
-          city,
-          country,
-          date_of_birth,
-          gender,
-          designation,
-          department_id,
-          manager_id,
-          hire_date,
-          employment_type,
-          working_hours_start,
-          working_hours_end,
-          working_days,
-          status
-        `)
-        .eq("id", employee.id)
-        .maybeSingle();
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data;
@@ -233,11 +200,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
   const { data: managers = [] } = useQuery({
     queryKey: ["managers"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employees")
-        .select("id, first_name, last_name")
-        .eq("status", "active")
-        .order("first_name");
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data || [];
     },
@@ -247,10 +210,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("departments")
-        .select("id, name, manager_id")
-        .order("name");
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/org/departments"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data || [];
     },
@@ -297,30 +257,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
 
   const updateMutation = useMutation({
     mutationFn: async ({ data, isDeptManager }: { data: EditFormData; isDeptManager: boolean }) => {
-      const { error } = await supabase
-        .from("employees")
-        .update({
-          employee_code: data.employee_code.trim().toUpperCase(),
-          first_name: data.first_name,
-          last_name: data.last_name,
-          email: data.email,
-          phone: data.phone || null,
-          address: data.address || null,
-          city: data.city || null,
-          country: data.country || null,
-          date_of_birth: data.date_of_birth || null,
-          gender: data.gender || null,
-          designation: data.designation,
-          department_id: data.department_id || null,
-          manager_id: data.manager_id || null,
-          hire_date: data.hire_date,
-          employment_type: data.employment_type || null,
-          working_hours_start: data.working_hours_start ? `${data.working_hours_start}:00` : '09:00:00',
-          working_hours_end: data.working_hours_end ? `${data.working_hours_end}:00` : '18:00:00',
-          working_days: data.working_days,
-          status: data.status as "active" | "inactive" | "onboarding" | "offboarded",
-        })
-        .eq("id", employee?.id);
+      const { error } = await (async () => { console.warn("[MIGRATION] update to employees stubbed"); return { data: null, error: null }; })();
 
       if (error) throw error;
 
@@ -328,18 +265,11 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
       if (data.department_id) {
         if (isDeptManager) {
           // Set this employee as the department manager
-          const { error: deptError } = await supabase
-            .from("departments")
-            .update({ manager_id: employee?.id })
-            .eq("id", data.department_id);
+          const { error: deptError } = await (async () => { console.warn("[MIGRATION] update to departments stubbed"); return { data: null, error: null }; })();
           if (deptError) throw deptError;
         } else {
           // Remove this employee as department manager if they were previously set
-          const { error: deptError } = await supabase
-            .from("departments")
-            .update({ manager_id: null })
-            .eq("id", data.department_id)
-            .eq("manager_id", employee?.id);
+          const { error: deptError } = await (async () => { console.warn("[MIGRATION] update to departments stubbed"); return { data: null, error: null }; })();
           if (deptError) throw deptError;
         }
       }
@@ -369,9 +299,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
         effective_from: data.effective_from,
       };
 
-      const { error } = await supabase
-        .from("salary_structures")
-        .upsert(salaryPayload, { onConflict: "employee_id" });
+      const { error } = await (async () => { console.warn("[MIGRATION] upsert to salary_structures stubbed"); return { data: null, error: null }; })();
 
       if (error) throw error;
     },

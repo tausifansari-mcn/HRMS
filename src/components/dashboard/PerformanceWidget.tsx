@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Target, Calendar, Star } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, parseISO, isFuture, isWithinInterval, addDays } from "date-fns";
@@ -15,11 +15,7 @@ export function PerformanceWidget() {
     queryKey: ["employee-for-performance", user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from("employees")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data;
     },
@@ -30,11 +26,7 @@ export function PerformanceWidget() {
     queryKey: ["dashboard-goals", employeeData?.id],
     queryFn: async () => {
       if (!employeeData?.id) return [];
-      const { data, error } = await supabase
-        .from("goals")
-        .select("*")
-        .eq("employee_id", employeeData.id)
-        .neq("status", "completed");
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/goals/goals"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data;
     },
@@ -45,12 +37,7 @@ export function PerformanceWidget() {
     queryKey: ["dashboard-reviews", employeeData?.id],
     queryFn: async () => {
       if (!employeeData?.id) return [];
-      const { data, error } = await supabase
-        .from("performance_reviews")
-        .select("*")
-        .eq("employee_id", employeeData.id)
-        .order("review_date", { ascending: false })
-        .limit(3);
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/performance-feedback/reports"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data;
     },

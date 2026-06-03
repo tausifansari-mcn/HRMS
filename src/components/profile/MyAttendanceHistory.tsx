@@ -1,10 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Clock, MapPin, CalendarDays, Coffee } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { calculateTotalBreakHours, AttendanceBreak } from "@/hooks/useAttendanceBreaks";
@@ -36,12 +36,7 @@ export function MyAttendanceHistory({ employeeId }: MyAttendanceHistoryProps) {
   const { data: records, isLoading } = useQuery({
     queryKey: ["my-attendance-history", employeeId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("attendance_records")
-        .select("id, date, clock_in, clock_out, total_hours, status, work_mode, clock_in_location_name, clock_out_location_name")
-        .eq("employee_id", employeeId)
-        .order("date", { ascending: false })
-        .limit(30);
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/wfm/attendance/daily"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data as AttendanceRecord[];
@@ -55,10 +50,7 @@ export function MyAttendanceHistory({ employeeId }: MyAttendanceHistoryProps) {
     queryKey: ["my-attendance-breaks", recordIds],
     queryFn: async () => {
       if (recordIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("attendance_breaks" as any)
-        .select("*")
-        .in("attendance_record_id", recordIds);
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/wfm/attendance/daily"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return (data || []) as unknown as AttendanceBreak[];
     },

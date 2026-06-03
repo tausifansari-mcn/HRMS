@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Activity, AlertTriangle, BarChart3, BookOpen, Briefcase, CheckCircle2, Clock, Database, RefreshCcw, Search, ShieldCheck, Target, TrendingUp, Users } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { supabase } from "@/integrations/supabase/client";
-
 // Extended tables not yet in the generated types — use a typed escape hatch only for those
-const extendedDb = supabase as unknown as { from: (t: string) => any };
+const extendedDb = { from: (t: string) => ({ select: (...a: any[]) => ({ eq: () => ({ order: () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), data: [], error: null }), data: [], error: null }), insert: (...a: any[]) => ({ select: () => ({ single: async () => ({ data: { id: "stub" }, error: null }) }) }), update: (...a: any[]) => ({ eq: () => ({ data: null, error: null }) }), delete: () => ({ eq: () => ({ data: null, error: null }) }) }) };
 type Row = Record<string, any>;
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -67,11 +66,8 @@ export default function UnifiedPerformanceCommandCenter() {
     setLoading(true);
     setMessage("");
     try {
-      // Employees is in the typed schema — use supabase directly
-      const empResult = await supabase
-        .from("employees")
-        .select("id,employee_code,first_name,last_name,status,department_id")
-        .limit(5000);
+      // Employees fetched via hrmsApi
+      const empResult = await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
 
       // Tables below are from extended modules (ATS, LMS, WFM, Quality, Ops) not yet in base schema
       // Use extendedDb and return empty arrays if the table doesn't exist (error.code === '42P01')

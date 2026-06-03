@@ -1,16 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { supabase } from "@/integrations/supabase/client";
-
 export default function NativeLMSMyLearning() {
   const { data: contents = [] } = useQuery({
     queryKey: ["native-lms-my-learning"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("lms_content_master")
-        .select("id,content_title,content_type,content_url,required_completion_percent,lms_module_master(module_name,day_no,lms_classroom_master(classroom_name))")
-        .eq("active_status", true)
-        .order("display_order");
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data ?? [];
     },

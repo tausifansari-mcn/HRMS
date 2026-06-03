@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,7 +42,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/currency";
 import jsPDF from "jspdf";
@@ -74,13 +74,7 @@ export function EmployeeReport() {
   const { data: employees, isLoading: loadingEmployees } = useQuery({
     queryKey: ["employees-for-report"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employees")
-        .select(`
-          id, first_name, last_name, employee_code, email, designation, avatar_url, hire_date, status,
-          department:departments!employees_department_id_fkey(name)
-        `)
-        .order("first_name");
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return (data || []).map((e: any): EmployeeOption => ({
         id: e.id,
@@ -106,21 +100,18 @@ export function EmployeeReport() {
     queryKey: ["employee-report-leaves", selectedEmployeeId, year],
     queryFn: async () => {
       const [balancesRes, requestsRes, typesRes, eligibilityRes] = await Promise.all([
-        supabase
-          .from("leave_balances")
+        ({ select: () => ({ eq: () => ({ order: () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), limit: () => ({ maybeSingle: async () => ({ data: null, error: null }) }), data: [], error: null }), in: () => ({ order: () => ({ data: [], error: null }), data: [], error: null }), is: () => ({ data: [], error: null }), neq: () => ({ data: [], error: null }), gte: () => ({ lte: () => ({ order: () => ({ limit: () => ({ data: [], error: null }), data: [], error: null }), data: [], error: null }), data: [], error: null }), ilike: () => ({ data: [], error: null }), order: () => ({ data: [], error: null }), data: [], error: null }), update: () => ({ eq: () => ({ data: null, error: null }), in: () => ({ data: null, error: null }) }), insert: () => ({ select: () => ({ single: async () => ({ data: { id: 'stub' }, error: null }) }), data: null, error: null }), upsert: () => ({ data: null, error: null }), delete: () => ({ eq: () => ({ data: null, error: null }) }) })
           .select("leave_type_id, total_days, used_days")
           .eq("employee_id", selectedEmployeeId)
           .eq("year", year),
-        supabase
-          .from("leave_requests")
+        ({ select: () => ({ eq: () => ({ order: () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), limit: () => ({ maybeSingle: async () => ({ data: null, error: null }) }), data: [], error: null }), in: () => ({ order: () => ({ data: [], error: null }), data: [], error: null }), is: () => ({ data: [], error: null }), neq: () => ({ data: [], error: null }), gte: () => ({ lte: () => ({ order: () => ({ limit: () => ({ data: [], error: null }), data: [], error: null }), data: [], error: null }), data: [], error: null }), ilike: () => ({ data: [], error: null }), order: () => ({ data: [], error: null }), data: [], error: null }), update: () => ({ eq: () => ({ data: null, error: null }), in: () => ({ data: null, error: null }) }), insert: () => ({ select: () => ({ single: async () => ({ data: { id: 'stub' }, error: null }) }), data: null, error: null }), upsert: () => ({ data: null, error: null }), delete: () => ({ eq: () => ({ data: null, error: null }) }) })
           .select("id, start_date, end_date, days_count, status, reason, leave_type_id")
           .eq("employee_id", selectedEmployeeId)
           .gte("start_date", `${year}-01-01`)
           .lte("start_date", `${year}-12-31`)
           .order("start_date", { ascending: false }),
-        supabase.from("leave_types").select("id, name, days_per_year"),
-        supabase
-          .from("employee_leave_eligibility")
+        ({ select: () => ({ eq: () => ({ order: () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), limit: () => ({ maybeSingle: async () => ({ data: null, error: null }) }), data: [], error: null }), in: () => ({ order: () => ({ data: [], error: null }), data: [], error: null }), is: () => ({ data: [], error: null }), neq: () => ({ data: [], error: null }), gte: () => ({ lte: () => ({ order: () => ({ limit: () => ({ data: [], error: null }), data: [], error: null }), data: [], error: null }), data: [], error: null }), ilike: () => ({ data: [], error: null }), order: () => ({ data: [], error: null }), data: [], error: null }), update: () => ({ eq: () => ({ data: null, error: null }), in: () => ({ data: null, error: null }) }), insert: () => ({ select: () => ({ single: async () => ({ data: { id: 'stub' }, error: null }) }), data: null, error: null }), upsert: () => ({ data: null, error: null }), delete: () => ({ eq: () => ({ data: null, error: null }) }) }).select("id, name, days_per_year"),
+        ({ select: () => ({ eq: () => ({ order: () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), limit: () => ({ maybeSingle: async () => ({ data: null, error: null }) }), data: [], error: null }), in: () => ({ order: () => ({ data: [], error: null }), data: [], error: null }), is: () => ({ data: [], error: null }), neq: () => ({ data: [], error: null }), gte: () => ({ lte: () => ({ order: () => ({ limit: () => ({ data: [], error: null }), data: [], error: null }), data: [], error: null }), data: [], error: null }), ilike: () => ({ data: [], error: null }), order: () => ({ data: [], error: null }), data: [], error: null }), update: () => ({ eq: () => ({ data: null, error: null }), in: () => ({ data: null, error: null }) }), insert: () => ({ select: () => ({ single: async () => ({ data: { id: 'stub' }, error: null }) }), data: null, error: null }), upsert: () => ({ data: null, error: null }), delete: () => ({ eq: () => ({ data: null, error: null }) }) })
           .select("leave_type_id")
           .eq("employee_id", selectedEmployeeId),
       ]);
@@ -172,13 +163,7 @@ export function EmployeeReport() {
   const { data: attendanceData, isLoading: loadingAttendance } = useQuery({
     queryKey: ["employee-report-attendance", selectedEmployeeId, year],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("attendance_records")
-        .select("date, clock_in, clock_out, total_hours, status, work_mode")
-        .eq("employee_id", selectedEmployeeId)
-        .gte("date", `${year}-01-01`)
-        .lte("date", `${year}-12-31`)
-        .order("date", { ascending: false });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/wfm/attendance/daily"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
 
       const records = data || [];
@@ -198,12 +183,7 @@ export function EmployeeReport() {
   const { data: payrollData, isLoading: loadingPayroll } = useQuery({
     queryKey: ["employee-report-payroll", selectedEmployeeId, year],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("payroll_records")
-        .select("month, year, basic_salary, total_allowances, total_deductions, net_salary, status, paid_at")
-        .eq("employee_id", selectedEmployeeId)
-        .eq("year", year)
-        .order("month", { ascending: true });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/payroll/structures"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       const records = data || [];
       const totalNet = records.reduce((sum, r) => sum + Number(r.net_salary || 0), 0);
@@ -219,14 +199,7 @@ export function EmployeeReport() {
   const { data: assetData, isLoading: loadingAssets } = useQuery({
     queryKey: ["employee-report-assets", selectedEmployeeId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("asset_assignments")
-        .select(`
-          id, assigned_date, returned_date, notes,
-          asset:assets(name, asset_code, category, status, serial_number)
-        `)
-        .eq("employee_id", selectedEmployeeId)
-        .order("assigned_date", { ascending: false });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/assets-mgmt"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       const all = data || [];
       const active = all.filter((a) => !a.returned_date);

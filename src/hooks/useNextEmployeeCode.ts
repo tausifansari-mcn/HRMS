@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
 import {
   useEmployeeCodePattern,
   formatEmployeeCodeWithPattern,
@@ -40,24 +40,15 @@ export function useNextEmployeeCode() {
   return useQuery({
     queryKey: ["next-employee-code", pattern],
     queryFn: async () => {
-      // Fetch all employee codes that start with the current prefix
-      const { data, error } = await supabase
-        .from("employees")
-        .select("employee_code")
-        .ilike("employee_code", `${pattern.prefix}${pattern.separator}%`);
-
-      if (error) throw error;
-
-      // Find the highest number
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/employees?limit=1000");
+      const employees = res.data ?? [];
       let maxNumber = 0;
-      for (const emp of data || []) {
-        const num = extractNumber(emp.employee_code, pattern);
-        if (num > maxNumber) {
-          maxNumber = num;
+      for (const emp of employees) {
+        if (emp.employee_code) {
+          const num = extractNumber(emp.employee_code, pattern);
+          if (num > maxNumber) maxNumber = num;
         }
       }
-
-      // Next code is max + 1
       return formatEmployeeCodeWithPattern(maxNumber + 1, pattern);
     },
   });

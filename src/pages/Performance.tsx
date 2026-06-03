@@ -1,10 +1,10 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Target, FileText, Loader2, User, BarChart3, Users, TrendingUp } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { GoalsManager } from "@/components/performance/GoalsManager";
 import { PerformanceReviews } from "@/components/performance/PerformanceReviews";
 import { PerformanceAnalytics } from "@/components/performance/PerformanceAnalytics";
@@ -21,22 +21,13 @@ const Performance = () => {
     queryFn: async () => {
       if (!user?.id) return null;
 
-      const { data: employee, error } = await supabase
-        .from("employees")
-        .select("id, first_name, last_name")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       if (!employee) return null;
 
       // Check if they manage anyone
-      const { data: managedEmployees } = await supabase
-        .from("employees")
-        .select("id")
-        .eq("manager_id", employee.id)
-        .eq("status", "active")
-        .limit(1);
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
 
       return {
         ...employee,

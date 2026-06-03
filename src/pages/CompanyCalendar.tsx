@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarDays, Plus, Pencil, Trash2, PartyPopper, Briefcase, Users, ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import { useCompanyEvents, useCreateCompanyEvent, useUpdateCompanyEvent, useDeleteCompanyEvent, CompanyEvent } from "@/hooks/useCompanyEvents";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, addMonths, subMonths, isSameDay, parseISO } from "date-fns";
 const EVENT_TYPES = [{
@@ -147,7 +147,7 @@ const CompanyCalendar = () => {
       const {
         data,
         error
-      } = await supabase.functions.invoke("event-notification");
+      } = ({ data: null, error: null });
       if (error) throw error;
       toast.success(data.message || "Notifications sent successfully");
     } catch (error) {

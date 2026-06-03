@@ -1,9 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Star, Calendar, MessageSquare, TrendingUp, AlertTriangle, CheckCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
 interface MyPerformanceReviewsProps {
@@ -44,26 +44,7 @@ export function MyPerformanceReviews({ employeeId }: MyPerformanceReviewsProps) 
   const { data: reviews, isLoading } = useQuery({
     queryKey: ["my-performance-reviews", employeeId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("performance_reviews")
-        .select(`
-          id,
-          review_period,
-          review_date,
-          overall_rating,
-          status,
-          strengths,
-          areas_for_improvement,
-          comments,
-          acknowledged_at,
-          reviewer:employees!performance_reviews_reviewer_id_fkey (
-            first_name,
-            last_name
-          )
-        `)
-        .eq("employee_id", employeeId)
-        .in("status", ["submitted", "acknowledged"])
-        .order("review_date", { ascending: false });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/performance-feedback/reports"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data as PerformanceReview[];

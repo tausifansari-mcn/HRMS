@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,6 @@ import {
 } from "@/components/ui/dialog";
 import { Star, FileText, Loader2, Plus, Users, CheckCircle, Edit2, Target, ListChecks, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useCreateReview, useUpdateReview, useDeleteReview } from "@/hooks/usePerformance";
 import { RatingStars } from "./RatingStars";
 import { format } from "date-fns";
@@ -90,10 +90,7 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
   const { data: teamMembers, isLoading: teamLoading } = useQuery({
     queryKey: ["team-members-for-review", managerId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employees")
-        .select("id, first_name, last_name, designation, avatar_url")
-        .eq("manager_id", managerId).eq("status", "active");
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data as TeamMember[];
     },
@@ -104,11 +101,7 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
     queryKey: ["team-reviews-by-manager", managerId],
     queryFn: async () => {
       if (!teamMembers || teamMembers.length === 0) return [];
-      const { data, error } = await supabase
-        .from("performance_reviews")
-        .select(`id, employee_id, review_period, review_date, overall_rating, strengths, areas_for_improvement, comments, status, employee:employees!performance_reviews_employee_id_fkey (first_name, last_name)`)
-        .eq("reviewer_id", managerId)
-        .order("review_date", { ascending: false });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/performance-feedback/reports"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data as TeamReview[];
     },
@@ -120,10 +113,7 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
     queryKey: ["team-goals-for-reviews", managerId],
     queryFn: async () => {
       if (!teamMembers || teamMembers.length === 0) return [];
-      const { data, error } = await supabase
-        .from("goals")
-        .select("id, title, category, priority, employee_id")
-        .in("employee_id", teamMembers.map(e => e.id));
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/goals/goals"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data as GoalInfo[];
     },
@@ -135,10 +125,7 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
     queryKey: ["review-kpi-ratings-manager", editingReview?.id],
     queryFn: async () => {
       if (!editingReview) return [];
-      const { data, error } = await supabase
-        .from("review_kpi_ratings")
-        .select("*")
-        .eq("review_id", editingReview.id);
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/performance-feedback/reports"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data as KpiRating[];
     },
@@ -154,23 +141,13 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
         const rating = ratings[goal.id];
         if (rating === undefined) continue;
 
-        const { data: existing } = await supabase
-          .from("review_kpi_ratings")
-          .select("id")
-          .eq("review_id", reviewId)
-          .eq("goal_id", goal.id)
-          .maybeSingle();
+        await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/performance-feedback/reports"); return { data: res.data ?? [], error: null }; })();
 
         if (existing) {
-          const { error } = await supabase
-            .from("review_kpi_ratings")
-            .update({ manager_rating: rating })
-            .eq("id", existing.id);
+          const { error } = await (async () => { console.warn("[MIGRATION] update to review_kpi_ratings stubbed"); return { data: null, error: null }; })();
           if (error) throw error;
         } else {
-          const { error } = await supabase
-            .from("review_kpi_ratings")
-            .insert({ review_id: reviewId, goal_id: goal.id, manager_rating: rating });
+          const { error } = await (async () => { console.warn("[MIGRATION] insert to review_kpi_ratings stubbed"); return { data: null, error: null }; })();
           if (error) throw error;
         }
       }

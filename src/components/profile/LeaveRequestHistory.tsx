@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ClipboardList, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
 interface LeaveRequestHistoryProps {
@@ -32,20 +32,7 @@ export function LeaveRequestHistory({ employeeId }: LeaveRequestHistoryProps) {
   const { data: requests, isLoading } = useQuery({
     queryKey: ["leave-requests", employeeId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("leave_requests")
-        .select(`
-          id,
-          start_date,
-          end_date,
-          days_count,
-          reason,
-          status,
-          created_at,
-          leave_types (name)
-        `)
-        .eq("employee_id", employeeId)
-        .order("created_at", { ascending: false });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/leave/requests"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data as LeaveRequest[];

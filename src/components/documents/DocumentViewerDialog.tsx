@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +9,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, Loader2, FileText, ExternalLink } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
 interface DocumentInfo {
@@ -81,9 +81,7 @@ export function DocumentViewerDialog({
       }
 
       // Get signed URL for the file
-      const { data, error } = await supabase.storage
-        .from(bucketName)
-        .createSignedUrl(documentInfo.file_url, 3600); // 1 hour expiry
+      const { data, error } = (() => { const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055"; const fileUrl = documentInfo.file_url?.startsWith("https://") ? documentInfo.file_url : `${HRMS_API}/api/files/documents/${documentInfo.file_url}`; return { data: { signedUrl: fileUrl }, error: null }; })(); // 1 hour expiry
 
       if (error) throw error;
 
@@ -100,9 +98,7 @@ export function DocumentViewerDialog({
     if (!documentInfo) return;
 
     try {
-      const { data, error } = await supabase.storage
-        .from(bucketName)
-        .download(documentInfo.file_url);
+      const { data, error } = (async () => { const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055"; const url = documentInfo.file_url?.startsWith("https://") ? documentInfo.file_url : `${HRMS_API}/api/files/documents/${documentInfo.file_url}`; const resp = await fetch(url); const blob = await resp.blob(); return { data: blob, error: null }; })();
 
       if (error) throw error;
 

@@ -1,9 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Package, Calendar, Tag, AlertCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
 interface MyAssetsProps {
@@ -28,23 +28,7 @@ export function MyAssets({ employeeId }: MyAssetsProps) {
   const { data: assignments, isLoading } = useQuery({
     queryKey: ["my-assets", employeeId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("asset_assignments")
-        .select(`
-          id,
-          assigned_date,
-          returned_date,
-          notes,
-          asset:assets!asset_assignments_asset_id_fkey (
-            id,
-            name,
-            asset_code,
-            category,
-            serial_number
-          )
-        `)
-        .eq("employee_id", employeeId)
-        .order("assigned_date", { ascending: false });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/assets-mgmt"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data as AssetAssignment[];

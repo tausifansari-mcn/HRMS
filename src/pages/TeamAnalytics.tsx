@@ -1,10 +1,10 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, ShieldX } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { TeamAnalytics as TeamAnalyticsComponent } from "@/components/performance/TeamAnalytics";
 
 const TeamAnalytics = () => {
@@ -18,20 +18,12 @@ const TeamAnalytics = () => {
       if (!user?.id) return null;
       
       // Get current user's employee ID
-      const { data: employee } = await supabase
-        .from("employees")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
 
       if (!employee) return null;
 
       // Check if they manage anyone
-      const { data: managedEmployees, error } = await supabase
-        .from("employees")
-        .select("id")
-        .eq("manager_id", employee.id)
-        .limit(1);
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
 

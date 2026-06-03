@@ -1,5 +1,3 @@
-import { supabase } from "@/integrations/supabase/client";
-
 // Current application version - update this when releasing new versions
 export const APP_VERSION = "1.0.5";
 
@@ -74,66 +72,5 @@ export function isAutoUpdatingEnvironment(): boolean {
 }
 
 export async function checkForUpdates(): Promise<VersionResponse | null> {
-  const isAutoUpdating = isAutoUpdatingEnvironment();
-
-  try {
-    // First try the local edge function (Lovable Cloud / connected Supabase)
-    const { data, error } = await supabase.functions.invoke("version-check", {
-      body: { version: APP_VERSION },
-    });
-
-    if (!error && data) {
-      const response = data as VersionResponse;
-      
-      // For auto-updating environments, never show update notification
-      // but still use the latest version info from GitHub for display
-      if (isAutoUpdating) {
-        return {
-          ...response,
-          currentVersion: response.currentVersion, // Use latest from GitHub
-          hasUpdate: false, // Never prompt for updates
-        };
-      }
-      
-      return response;
-    }
-
-    // Fallback for when edge function is unavailable
-    if (isAutoUpdating) {
-      // For cloud/production, try to fetch from production API for latest changelog
-      try {
-        const response = await fetch(`${VERSION_API_URL}?version=${APP_VERSION}`, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          return { ...data, hasUpdate: false };
-        }
-      } catch {
-        // Ignore fetch errors for cloud environments
-      }
-      return { ...FALLBACK_VERSION_RESPONSE, hasUpdate: false };
-    }
-
-    // Self-hosted / OSS instances: fetch from production API
-    const response = await fetch(`${VERSION_API_URL}?version=${APP_VERSION}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (response.ok) {
-      return await response.json();
-    }
-
-    return FALLBACK_VERSION_RESPONSE;
-  } catch (error) {
-    console.error("Error checking for updates:", error);
-    return isAutoUpdating 
-      ? { ...FALLBACK_VERSION_RESPONSE, hasUpdate: false }
-      : FALLBACK_VERSION_RESPONSE;
-  }
+  return { ...FALLBACK_VERSION_RESPONSE, hasUpdate: false };
 }

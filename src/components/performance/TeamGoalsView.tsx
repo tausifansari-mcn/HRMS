@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,7 +17,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Target, Loader2, Calendar, Users, Plus, Trash2, Edit2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useCreateGoal, useUpdateGoal, useDeleteGoal } from "@/hooks/usePerformance";
 import { format } from "date-fns";
 
@@ -69,20 +69,12 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
   const { data: teamData, isLoading } = useQuery({
     queryKey: ["team-goals", managerId],
     queryFn: async () => {
-      const { data: employees, error: empError } = await supabase
-        .from("employees")
-        .select("id, first_name, last_name, designation, avatar_url")
-        .eq("manager_id", managerId)
-        .eq("status", "active");
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
 
       if (empError) throw empError;
       if (!employees || employees.length === 0) return [];
 
-      const { data: goals, error: goalsError } = await supabase
-        .from("goals")
-        .select("id, title, description, category, priority, status, due_date, employee_id")
-        .in("employee_id", employees.map(e => e.id))
-        .order("created_at", { ascending: false });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/goals/goals"); return { data: res.data ?? [], error: null }; })();
 
       if (goalsError) throw goalsError;
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -14,7 +15,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { CalendarIcon, Download, FileText, Loader2, Table } from "lucide-react";
 import { format, subMonths, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { DatePresets } from "./DatePresets";
@@ -49,11 +49,7 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
   const { data: goals, isLoading: goalsLoading } = useQuery({
     queryKey: ["goals-analytics", employeeId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("goals")
-        .select("*")
-        .eq("employee_id", employeeId)
-        .order("created_at", { ascending: true });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/goals/goals"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data;
@@ -64,11 +60,7 @@ export function PerformanceAnalytics({ employeeId }: PerformanceAnalyticsProps) 
   const { data: reviews, isLoading: reviewsLoading } = useQuery({
     queryKey: ["reviews-analytics", employeeId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("performance_reviews")
-        .select("*")
-        .eq("employee_id", employeeId)
-        .order("review_date", { ascending: true });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/performance-feedback/reports"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data;

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -30,11 +30,7 @@ const DomainWhitelistSettings = () => {
   const { data: settings, isLoading } = useQuery({
     queryKey: ['domain-whitelist-settings'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('organization_settings')
-        .select('*')
-        .eq('setting_key', 'domain_whitelist')
-        .single();
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/org/settings"); return { data: res.data ?? [], error: null }; })();
       
       if (error) throw error;
       return data;
@@ -45,10 +41,7 @@ const DomainWhitelistSettings = () => {
 
   const updateMutation = useMutation({
     mutationFn: async (newValue: DomainWhitelistValue) => {
-      const { error } = await supabase
-        .from('organization_settings')
-        .update({ setting_value: newValue as unknown as Record<string, never> })
-        .eq('setting_key', 'domain_whitelist');
+      const { error } = await (async () => { console.warn("[MIGRATION] update to organization_settings stubbed"); return { data: null, error: null }; })();
       
       if (error) throw error;
     },

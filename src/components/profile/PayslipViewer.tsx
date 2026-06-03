@@ -1,6 +1,6 @@
 import { useState } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -94,12 +94,7 @@ export function PayslipViewer({ employeeId, employeeName, employeeCode }: Paysli
   const { data: payrollRecords, isLoading } = useQuery({
     queryKey: ["my-payslips", employeeId, selectedYear],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("payroll_records")
-        .select("*")
-        .eq("employee_id", employeeId)
-        .eq("year", parseInt(selectedYear))
-        .order("month", { ascending: false });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/payroll/structures"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data;
@@ -111,13 +106,7 @@ export function PayslipViewer({ employeeId, employeeName, employeeCode }: Paysli
   const { data: salaryStructure } = useQuery({
     queryKey: ["my-salary-structure", employeeId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("salary_structures")
-        .select("*")
-        .eq("employee_id", employeeId)
-        .order("effective_from", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/payroll/structures"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data as SalaryStructure | null;

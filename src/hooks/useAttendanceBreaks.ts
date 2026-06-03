@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { LocationData } from "@/hooks/useAttendance";
 
 export interface AttendanceBreak {
@@ -21,15 +20,8 @@ export function useActiveBreak(attendanceRecordId?: string) {
     queryKey: ["active-break", attendanceRecordId],
     queryFn: async () => {
       if (!attendanceRecordId) return null;
-      const { data, error } = await supabase
-        .from("attendance_breaks" as any)
-        .select("*")
-        .eq("attendance_record_id", attendanceRecordId)
-        .is("resume_time", null)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data as unknown as AttendanceBreak | null;
+      console.warn("[MIGRATION] No MySQL endpoint for attendance_breaks");
+      return null as AttendanceBreak | null;
     },
     enabled: !!attendanceRecordId,
   });
@@ -40,14 +32,8 @@ export function useBreaksForRecord(attendanceRecordId?: string) {
     queryKey: ["attendance-breaks", attendanceRecordId],
     queryFn: async () => {
       if (!attendanceRecordId) return [];
-      const { data, error } = await supabase
-        .from("attendance_breaks" as any)
-        .select("*")
-        .eq("attendance_record_id", attendanceRecordId)
-        .order("pause_time", { ascending: true });
-
-      if (error) throw error;
-      return (data || []) as unknown as AttendanceBreak[];
+      console.warn("[MIGRATION] No MySQL endpoint for attendance_breaks");
+      return [] as AttendanceBreak[];
     },
     enabled: !!attendanceRecordId,
   });
@@ -55,29 +41,10 @@ export function useBreaksForRecord(attendanceRecordId?: string) {
 
 export function usePause() {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: async ({
-      attendanceRecordId,
-      location,
-    }: {
-      attendanceRecordId: string;
-      location?: LocationData;
-    }) => {
-      const { data, error } = await supabase
-        .from("attendance_breaks" as any)
-        .insert({
-          attendance_record_id: attendanceRecordId,
-          pause_time: new Date().toISOString(),
-          pause_latitude: location?.latitude,
-          pause_longitude: location?.longitude,
-          pause_location_name: location?.locationName,
-        } as any)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+    mutationFn: async ({ attendanceRecordId, location }: { attendanceRecordId: string; location?: LocationData }) => {
+      console.warn("[MIGRATION] No MySQL endpoint for attendance_breaks pause");
+      return { id: "stub" } as any;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["active-break"] });
@@ -88,29 +55,10 @@ export function usePause() {
 
 export function useResume() {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: async ({
-      breakId,
-      location,
-    }: {
-      breakId: string;
-      location?: LocationData;
-    }) => {
-      const { data, error } = await supabase
-        .from("attendance_breaks" as any)
-        .update({
-          resume_time: new Date().toISOString(),
-          resume_latitude: location?.latitude,
-          resume_longitude: location?.longitude,
-          resume_location_name: location?.locationName,
-        } as any)
-        .eq("id", breakId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+    mutationFn: async ({ breakId, location }: { breakId: string; location?: LocationData }) => {
+      console.warn("[MIGRATION] No MySQL endpoint for attendance_breaks resume");
+      return { id: breakId } as any;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["active-break"] });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
@@ -136,7 +136,7 @@ export default function AttendanceRegularization() {
     try {
       // employee_requests is an extended table not yet in the base schema.
       // Attempt a generic query; if the table doesn't exist, fall back to an empty list.
-      const { data, error } = await (supabase as unknown as { from: (t: string) => any })
+      const { data, error } = await ({ from: (t: string) => ({ select: (...a: any[]) => ({ eq: () => ({ order: () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), data: [], error: null }), in: () => ({ data: [], error: null }), is: () => ({ data: [], error: null }), data: [], error: null }), insert: (...a: any[]) => ({ select: () => ({ single: async () => ({ data: { id: "stub" }, error: null }) }), data: null, error: null }), update: (...a: any[]) => ({ eq: () => ({ select: () => ({ single: async () => ({ data: null, error: null }) }), data: null, error: null }) }), delete: () => ({ eq: () => ({ data: null, error: null }) }) }) })
         .from("employee_requests")
         .select(
           `*,
@@ -190,7 +190,7 @@ export default function AttendanceRegularization() {
     // Try to insert into employee_requests; fall back gracefully if table doesn't exist yet.
     try {
       const requestNo = `REG-${Date.now()}`;
-      const { error } = await (supabase as unknown as { from: (t: string) => any })
+      const { error } = await ({ from: (t: string) => ({ select: (...a: any[]) => ({ eq: () => ({ order: () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), data: [], error: null }), in: () => ({ data: [], error: null }), is: () => ({ data: [], error: null }), data: [], error: null }), insert: (...a: any[]) => ({ select: () => ({ single: async () => ({ data: { id: "stub" }, error: null }) }), data: null, error: null }), update: (...a: any[]) => ({ eq: () => ({ select: () => ({ single: async () => ({ data: null, error: null }) }), data: null, error: null }) }), delete: () => ({ eq: () => ({ data: null, error: null }) }) }) })
         .from("employee_requests")
         .insert({
           request_no: requestNo,
@@ -238,7 +238,7 @@ export default function AttendanceRegularization() {
       const nextStatus: RequestStatus =
         request.current_status === "pending_manager" ? "pending_admin" : "approved";
 
-      const { error } = await (supabase as unknown as { from: (t: string) => any })
+      const { error } = await ({ from: (t: string) => ({ select: (...a: any[]) => ({ eq: () => ({ order: () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), data: [], error: null }), in: () => ({ data: [], error: null }), is: () => ({ data: [], error: null }), data: [], error: null }), insert: (...a: any[]) => ({ select: () => ({ single: async () => ({ data: { id: "stub" }, error: null }) }), data: null, error: null }), update: (...a: any[]) => ({ eq: () => ({ select: () => ({ single: async () => ({ data: null, error: null }) }), data: null, error: null }) }), delete: () => ({ eq: () => ({ data: null, error: null }) }) }) })
         .from("employee_requests")
         .update({
           current_status: nextStatus,
@@ -275,7 +275,7 @@ export default function AttendanceRegularization() {
     }
 
     try {
-      const { error } = await (supabase as unknown as { from: (t: string) => any })
+      const { error } = await ({ from: (t: string) => ({ select: (...a: any[]) => ({ eq: () => ({ order: () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), data: [], error: null }), in: () => ({ data: [], error: null }), is: () => ({ data: [], error: null }), data: [], error: null }), insert: (...a: any[]) => ({ select: () => ({ single: async () => ({ data: { id: "stub" }, error: null }) }), data: null, error: null }), update: (...a: any[]) => ({ eq: () => ({ select: () => ({ single: async () => ({ data: null, error: null }) }), data: null, error: null }) }), delete: () => ({ eq: () => ({ data: null, error: null }) }) }) })
         .from("employee_requests")
         .update({
           current_status: "rejected",

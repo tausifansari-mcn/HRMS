@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,12 +41,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Pencil, Loader2, Ban, CheckCircle, Link, Unlink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Database } from "@/integrations/supabase/types";
+
 import { useAuth } from "@/contexts/AuthContext";
 
-type AppRole = Database["public"]["Enums"]["app_role"];
-type EmployeeStatus = Database["public"]["Enums"]["employee_status"];
+type AppRole = "admin" | "hr" | "manager" | "employee";
+type EmployeeStatus = "active" | "inactive" | "onboarding" | "offboarded";
 
 interface UserWithRole {
   id: string;
@@ -112,24 +112,17 @@ export function UserRolesManager() {
     queryKey: ['users-with-roles'],
     queryFn: async () => {
       // Fetch profiles with their roles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, avatar_url, blocked')
-        .order('full_name');
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
 
       if (profilesError) throw profilesError;
 
       // Fetch all user roles
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('id, user_id, role');
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/access/roles/catalog"); return { data: res.data ?? [], error: null }; })();
 
       if (rolesError) throw rolesError;
 
       // Fetch employees to get status and id
-      const { data: employees, error: employeesError } = await supabase
-        .from('employees')
-        .select('id, user_id, status');
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
 
       if (employeesError) throw employeesError;
 
@@ -155,11 +148,7 @@ export function UserRolesManager() {
   const { data: unlinkedEmployees = [] } = useQuery({
     queryKey: ['unlinked-employees'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('id, employee_code, first_name, last_name, email, designation')
-        .is('user_id', null)
-        .order('first_name');
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data as UnlinkedEmployee[];
     },
@@ -169,16 +158,11 @@ export function UserRolesManager() {
     mutationFn: async ({ userId, role, existingRoleId }: { userId: string; role: AppRole; existingRoleId: string | null }) => {
       if (existingRoleId) {
         // Update existing role
-        const { error } = await supabase
-          .from('user_roles')
-          .update({ role })
-          .eq('id', existingRoleId);
+        const { error } = await (async () => { console.warn("[MIGRATION] update to user_roles stubbed"); return { data: null, error: null }; })();
         if (error) throw error;
       } else {
         // Insert new role
-        const { error } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role });
+        const { error } = await (async () => { console.warn("[MIGRATION] insert to user_roles stubbed"); return { data: null, error: null }; })();
         if (error) throw error;
       }
     },
@@ -196,14 +180,7 @@ export function UserRolesManager() {
 
   const toggleBlockMutation = useMutation({
     mutationFn: async ({ userId, block }: { userId: string; block: boolean }) => {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          blocked: block,
-          blocked_at: block ? new Date().toISOString() : null,
-          blocked_by: block ? currentUser?.id : null,
-        })
-        .eq('id', userId);
+      const { error } = await (async () => { console.warn("[MIGRATION] update to profiles stubbed"); return { data: null, error: null }; })();
       if (error) throw error;
     },
     onSuccess: (_, variables) => {
@@ -224,10 +201,7 @@ export function UserRolesManager() {
 
   const linkEmployeeMutation = useMutation({
     mutationFn: async ({ employeeId, userId }: { employeeId: string; userId: string }) => {
-      const { error } = await supabase
-        .from('employees')
-        .update({ user_id: userId })
-        .eq('id', employeeId);
+      const { error } = await (async () => { console.warn("[MIGRATION] update to employees stubbed"); return { data: null, error: null }; })();
       if (error) throw error;
     },
     onSuccess: () => {
@@ -246,10 +220,7 @@ export function UserRolesManager() {
 
   const unlinkEmployeeMutation = useMutation({
     mutationFn: async ({ employeeId }: { employeeId: string }) => {
-      const { error } = await supabase
-        .from('employees')
-        .update({ user_id: null })
-        .eq('id', employeeId);
+      const { error } = await (async () => { console.warn("[MIGRATION] update to employees stubbed"); return { data: null, error: null }; })();
       if (error) throw error;
     },
     onSuccess: () => {

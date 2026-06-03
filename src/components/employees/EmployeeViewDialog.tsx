@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { hrmsApi } from "@/lib/hrmsApi";
 import {
   Dialog,
   DialogContent,
@@ -10,8 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Mail, Phone, Building2, Briefcase, Calendar, UserCheck, Crown, Hash } from "lucide-react";
 import { Employee } from "./EmployeeTable";
-import { supabase } from "@/integrations/supabase/client";
-
 interface EmployeeViewDialogProps {
   employee: Employee | null;
   open: boolean;
@@ -31,21 +30,7 @@ export function EmployeeViewDialog({ employee, open, onOpenChange }: EmployeeVie
     queryKey: ["employee-extended-details", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return null;
-      const { data, error } = await supabase
-        .from("employees")
-        .select(`
-          id,
-          department_id,
-          manager_id,
-          manager:employees!employees_manager_id_fkey(first_name, last_name),
-          department:departments!employees_department_id_fkey(
-            name,
-            manager_id,
-            department_head:employees!departments_manager_id_fkey(first_name, last_name)
-          )
-        `)
-        .eq("id", employee.id)
-        .maybeSingle();
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data;

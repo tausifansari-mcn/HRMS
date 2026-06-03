@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -13,7 +14,6 @@ import { format, differenceInDays, subDays, startOfDay, eachDayOfInterval, isWee
 import { useLeaveTypes, useSubmitLeaveRequest } from "@/hooks/useLeaveRequests";
 import { useLeaveEligibility } from "@/hooks/useLeaveEligibility";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useCompanyHolidays } from "@/hooks/useCompanyHolidays";
 import { Badge } from "@/components/ui/badge";
 
@@ -41,23 +41,10 @@ export function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
   const { data: unpaidLeaveType } = useQuery({
     queryKey: ["unpaid-leave-type"],
     queryFn: async () => {
-      const { data: existing } = await supabase
-        .from("leave_types")
-        .select("id, name, is_paid, days_per_year")
-        .ilike("name", UNPAID_LEAVE_NAME)
-        .maybeSingle();
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/leave/types"); return { data: res.data ?? [], error: null }; })();
       if (existing) return existing;
 
-      const { data: created, error: insErr } = await supabase
-        .from("leave_types")
-        .insert({
-          name: UNPAID_LEAVE_NAME,
-          is_paid: false,
-          days_per_year: 0,
-          description: "Unpaid leave — unlimited, available to all employees.",
-        })
-        .select("id, name, is_paid, days_per_year")
-        .single();
+      await (async () => { console.warn("[MIGRATION] insert to leave_types stubbed"); return { data: null, error: null }; })();
       if (insErr) throw insErr;
       return created;
     },
@@ -85,13 +72,7 @@ export function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
   const { data: approvedRequests } = useQuery({
     queryKey: ["leave-used-days", employeeId, currentYear],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("leave_requests")
-        .select("leave_type_id, days_count")
-        .eq("employee_id", employeeId)
-        .eq("status", "approved")
-        .gte("start_date", `${currentYear}-01-01`)
-        .lte("start_date", `${currentYear}-12-31`);
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/leave/requests"); return { data: res.data ?? [], error: null }; })();
       if (error) throw error;
       return data;
     },

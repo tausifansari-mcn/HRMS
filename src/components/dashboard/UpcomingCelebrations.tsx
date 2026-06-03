@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Cake, Award, PartyPopper } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, parseISO, addDays, isSameDay, differenceInYears } from "date-fns";
 
@@ -23,10 +23,7 @@ export function UpcomingCelebrations() {
   const { data: celebrations = [], isLoading } = useQuery({
     queryKey: ["upcoming-celebrations"],
     queryFn: async () => {
-      const { data: employees, error } = await supabase
-        .from("employees")
-        .select("id, first_name, last_name, avatar_url, date_of_birth, hire_date")
-        .eq("status", "active");
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       if (!employees) return [];

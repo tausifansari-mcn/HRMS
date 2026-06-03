@@ -1,6 +1,6 @@
 import { useState } from "react";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,12 +36,7 @@ export function TaxDocumentsViewer({ employeeId }: TaxDocumentsViewerProps) {
   const { data: documents, isLoading } = useQuery({
     queryKey: ["my-tax-documents", employeeId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("employee_documents")
-        .select("*")
-        .eq("employee_id", employeeId)
-        .in("document_type", TAX_DOCUMENT_TYPES)
-        .order("uploaded_at", { ascending: false });
+      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employee-docs"); return { data: res.data ?? [], error: null }; })();
 
       if (error) throw error;
       return data;
@@ -55,9 +50,7 @@ export function TaxDocumentsViewer({ employeeId }: TaxDocumentsViewerProps) {
       const pathMatch = fileUrl.match(/employee-documents\/(.+)/);
       const filePath = pathMatch ? pathMatch[1] : fileUrl;
 
-      const { data, error } = await supabase.storage
-        .from("employee-documents")
-        .download(filePath);
+      const { data, error } = (async () => { const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055"; const url = filePath?.startsWith("https://") ? filePath : `${HRMS_API}/api/files/documents/${filePath}`; const resp = await fetch(url); const blob = await resp.blob(); return { data: blob, error: null }; })();
 
       if (error) throw error;
 
