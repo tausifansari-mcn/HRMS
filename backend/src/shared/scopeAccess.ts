@@ -288,3 +288,56 @@ export async function assertScopedAccessOrThrow(
     throw err;
   }
 }
+
+// ─── Custom Error Classes ─────────────────────────────────────────────────────
+
+export class AccessDeniedError extends Error {
+  statusCode = 403;
+  constructor(message = "Forbidden") {
+    super(message);
+  }
+}
+
+export class BadRequestAccessError extends Error {
+  statusCode = 400;
+  constructor(message = "Bad request") {
+    super(message);
+  }
+}
+
+// ─── Roster-Specific Scope Helpers ────────────────────────────────────────────
+
+export async function getRosterPlanScope(planId: string): Promise<ScopeTarget & { planStatus: string | null } | null> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT process_id, branch_id, plan_status
+       FROM wfm_roster_plan
+      WHERE id = ?
+      LIMIT 1`,
+    [planId]
+  );
+  const row = (rows as RowDataPacket[])[0] as AnyRow;
+  if (!row) return null;
+  return {
+    processId: row.process_id ?? null,
+    branchId: row.branch_id ?? null,
+    planStatus: row.plan_status ?? null,
+  };
+}
+
+export async function getRosterAssignmentScope(assignmentId: string): Promise<(ScopeTarget & { planStatus: string | null }) | null> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT rp.process_id, rp.branch_id, rp.plan_status
+       FROM wfm_roster_assignment ra
+       LEFT JOIN wfm_roster_plan rp ON rp.id = ra.plan_id
+      WHERE ra.id = ?
+      LIMIT 1`,
+    [assignmentId]
+  );
+  const row = (rows as RowDataPacket[])[0] as AnyRow;
+  if (!row) return null;
+  return {
+    processId: row.process_id ?? null,
+    branchId: row.branch_id ?? null,
+    planStatus: row.plan_status ?? null,
+  };
+}
