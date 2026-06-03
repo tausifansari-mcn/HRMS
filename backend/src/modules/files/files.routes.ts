@@ -17,8 +17,8 @@ fs.mkdirSync(UPLOADS_ROOT, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (req, _file, cb) => {
-    const category = ((req.query.category as string) || (req.body?.category as string) || "misc")
-      .replace(/[^a-zA-Z0-9_-]/g, "");
+    const category = ((req.query.category as string) || "misc")
+      .replace(/[^a-zA-Z0-9_-]/g, "") || "misc";
     const dir = path.join(UPLOADS_ROOT, category);
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
@@ -72,8 +72,8 @@ router.post(
   },
   h(async (req: AuthenticatedRequest, res: Response) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded or file type not allowed" });
-    const category = ((req.query.category as string) || (req.body as any)?.category || "misc")
-      .replace(/[^a-zA-Z0-9_-]/g, "");
+    const category = ((req.query.category as string) || req.body?.category || "misc")
+      .replace(/[^a-zA-Z0-9_-]/g, "") || "misc";
     const url = `/api/files/${category}/${req.file.filename}`;
     res.status(201).json({
       success: true,
@@ -90,7 +90,7 @@ router.post(
 router.get(
   "/:category/:filename",
   h(async (req: AuthenticatedRequest, res: Response) => {
-    const safe = req.params.category.replace(/[^a-zA-Z0-9_-]/g, "");
+    const safe = (req.params.category.replace(/[^a-zA-Z0-9_-]/g, "")) || "misc";
     const safeFile = path.basename(req.params.filename); // strip any path traversal
     const filePath = path.join(UPLOADS_ROOT, safe, safeFile);
     if (!fs.existsSync(filePath)) {
@@ -105,12 +105,13 @@ router.delete(
   "/:category/:filename",
   requireRole("admin", "hr"),
   h(async (req: AuthenticatedRequest, res: Response) => {
-    const safe = req.params.category.replace(/[^a-zA-Z0-9_-]/g, "");
+    const safe = (req.params.category.replace(/[^a-zA-Z0-9_-]/g, "")) || "misc";
     const safeFile = path.basename(req.params.filename);
     const filePath = path.join(UPLOADS_ROOT, safe, safeFile);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "File not found" });
     }
+    fs.unlinkSync(filePath);
     res.json({ success: true });
   })
 );
