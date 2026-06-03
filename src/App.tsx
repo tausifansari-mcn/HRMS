@@ -62,6 +62,7 @@ const NativeATSDashboardV2          = lazy(() => import("./pages/NativeATSDashbo
 const NativeATSSourcingAnalysis     = lazy(() => import("./pages/NativeATSSourcingAnalysis"));
 const NativeATSExtensions           = lazy(() => import("./pages/NativeATSExtensions"));
 const NativeATSFormConfig           = lazy(() => import("./pages/NativeATSFormConfig"));
+const NativeATSFullParityCommandCenter = lazy(() => import("./pages/NativeATSFullParityCommandCenter"));
 
 // LMS
 const NativeLMSMyLearning           = lazy(() => import("./pages/NativeLMSMyLearning"));
@@ -244,6 +245,7 @@ const App = () => (
               <Route path="/ats/sourcing-analysis" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativeATSSourcingAnalysis /></Gate></ProtectedRoute>} />
               <Route path="/ats/extensions" element={<ProtectedRoute><Gate pageCode="ATS_EXTENSIONS"><NativeATSExtensions /></Gate></ProtectedRoute>} />
               <Route path="/ats/form-config" element={<ProtectedRoute><NativeATSFormConfig /></ProtectedRoute>} />
+              <Route path="/ats/command-center" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativeATSFullParityCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/ats/onboarding-requests" element={<ProtectedRoute><NativeHROnboardingRequests /></ProtectedRoute>} />
               <Route path="/ats/offer-approvals" element={<ProtectedRoute><NativeBranchHeadApproval /></ProtectedRoute>} />
 

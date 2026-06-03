@@ -62,6 +62,7 @@ import { clientRouter } from "./modules/portal/client.routes.js";
 import { autoRosterSyncedRouter } from "./modules/wfm/auto-roster-synced.routes.js";
 import { controlTowerRouter } from "./modules/control-tower/control-tower.routes.js";
 import { payrollComplianceRouter } from "./modules/payroll-compliance/payrollCompliance.routes.js";
+import { atsFullParityRouter } from "./modules/ats-full-parity/atsFullParity.routes.js";
 
 export const app = express();
 
@@ -113,6 +114,7 @@ app.use("/api/portal", portalRouter);
 app.use("/api", clientRouter); // Client management + enhanced portal user routes
 app.use("/api/ats", atsFormConfigRouter);
 app.use("/api/ats", atsRouter);
+app.use("/api/ats-full-parity", atsFullParityRouter); // Google Sheets App Script parity
 app.use("/api/exit", exitRouter);
 app.use("/api/migration", migrationRouter);
 app.use("/api/access", accessRouter);
