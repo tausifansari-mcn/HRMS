@@ -1,7 +1,8 @@
 import { randomUUID } from "crypto";
 import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
-import { getEmployeeForUser, getUserRoles, getAssignmentScopes, scopeRecordMatches } from "../../shared/scopeAccess.js";
+import { getEmployeeForUser } from "../../shared/accessGuard.js";
+import { getUserRoleKeys, getUserAssignmentScopes } from "../../shared/scopeAccess.js";
 
 async function tableExists(tableName: string): Promise<boolean> {
   const [rows] = await db.execute<RowDataPacket[]>(
@@ -28,7 +29,7 @@ function escapeId(id: string): string {
 }
 
 async function scopedWhereForUser(userId: string, alias = "e"): Promise<{ where: string; params: unknown[]; roles: string[] }> {
-  const roles = await getUserRoles(userId);
+  const roles = await getUserRoleKeys(userId);
   if (roles.includes("admin") || roles.includes("hr") || roles.includes("ceo")) {
     return { where: "1=1", params: [], roles };
   }
@@ -40,8 +41,8 @@ async function scopedWhereForUser(userId: string, alias = "e"): Promise<{ where:
     return { where: `${alias}.id = ?`, params: [emp.id], roles };
   }
 
-  const scopes = await getAssignmentScopes(userId);
-  if (scopes.some((s) => String(s.scope_type).toLowerCase() === "all")) {
+  const scopes = await getUserAssignmentScopes(userId);
+  if (scopes.some((s: any) => String(s.scope_type).toLowerCase() === "all")) {
     return { where: "1=1", params: [], roles };
   }
 
@@ -77,7 +78,7 @@ async function scopedWhereForUser(userId: string, alias = "e"): Promise<{ where:
 }
 
 async function canSeeScope(userId: string, scope: { branch_id?: string | null; process_id?: string | null; assigned_employee_id?: string | null; assigned_user_id?: string | null; target_employee_id?: string | null; target_user_id?: string | null; target_role?: string | null; assigned_role?: string | null }): Promise<boolean> {
-  const roles = await getUserRoles(userId);
+  const roles = await getUserRoleKeys(userId);
   if (roles.includes("admin") || roles.includes("hr") || roles.includes("ceo")) return true;
   const emp = await getEmployeeForUser(userId);
   if (scope.assigned_user_id && scope.assigned_user_id === userId) return true;
@@ -86,8 +87,16 @@ async function canSeeScope(userId: string, scope: { branch_id?: string | null; p
   if (emp && scope.target_employee_id && scope.target_employee_id === emp.id) return true;
   const targetRole = scope.assigned_role ?? scope.target_role ?? null;
   if (targetRole && !roles.includes(targetRole)) return false;
-  const scopes = await getAssignmentScopes(userId, targetRole ? [targetRole] : roles);
-  return scopes.some((s) => scopeRecordMatches(s, { branchId: scope.branch_id ?? null, processId: scope.process_id ?? null }));
+  const scopes = await getUserAssignmentScopes(userId, targetRole ? [targetRole] : roles);
+  // TODO: implement scope record matching
+  return scopes.some((s: any) => {
+    const type = String(s.scope_type ?? "").toLowerCase();
+    if (type === "all") return true;
+    if (type === "branch" && s.branch_id && scope.branch_id) return s.branch_id === scope.branch_id;
+    if (type === "process" && s.process_id && scope.process_id) return s.process_id === scope.process_id;
+    if (type === "branch_process" && s.branch_id && s.process_id) return s.branch_id === scope.branch_id && s.process_id === scope.process_id;
+    return false;
+  });
 }
 
 export const controlTowerService = {

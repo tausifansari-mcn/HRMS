@@ -40,7 +40,7 @@ const upload = multer({
   fileFilter: (_req, file, cb) => {
     const allowed = [".pdf", ".jpg", ".jpeg", ".png", ".webp"];
     const ext = path.extname(file.originalname).toLowerCase();
-    cb(allowed.includes(ext) ? null : new Error("Invalid file type. Allowed: PDF, JPG, PNG, WEBP"), allowed.includes(ext));
+    if (allowed.includes(ext)) { cb(null, true); } else { cb(new Error("Invalid file type. Allowed: PDF, JPG, PNG, WEBP")); }
   },
 });
 

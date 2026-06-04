@@ -113,7 +113,7 @@ export const wfmService = {
 
   // ─── Attendance Sessions ───────────────────────────────────────────────────
 
-  async clockIn(input: ClockInInput, _userId: string): Promise<WfmAttendanceSession> {
+  async clockIn(input: ClockInInput & { employeeId: string }, _userId: string): Promise<WfmAttendanceSession> {
     const [existing] = await db.execute<RowDataPacket[]>(
       "SELECT id FROM wfm_attendance_session WHERE employee_id = ? AND session_date = ? LIMIT 1",
       [input.employeeId, input.sessionDate]
@@ -188,7 +188,7 @@ export const wfmService = {
   // ─── Regularization ───────────────────────────────────────────────────────
 
   async submitRegularization(
-    input: RegularizationInput,
+    input: RegularizationInput & { employeeId: string },
     _userId: string
   ): Promise<AttendanceRegularization> {
     const id = randomUUID();

@@ -1,7 +1,7 @@
 import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
-import { payrollService } from "./payroll.service.js";
-import type { SalaryPrepRun } from "./payroll.types.js";
+import { payrollService } from "../payroll/payroll.service.js";
+import type { SalaryPrepRun } from "../payroll/payroll.types.js";
 import { maternityService } from "../compliance/maternity.service.js";
 import { taxEngineService } from "./taxEngine.service.js";
 import { payrollComplianceService, type ComponentLine } from "./payrollCompliance.service.js";

@@ -208,6 +208,6 @@ export const exitService = {
       pending,
       completed,
       active_notice: (detailed.accepted ?? 0) + (detailed.notice_serving ?? 0),
-    } as ExitStats & Record<string, number>;
+    } as unknown as ExitStats & Record<string, number>;
   },
 };

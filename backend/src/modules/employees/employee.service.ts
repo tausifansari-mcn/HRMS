@@ -72,7 +72,7 @@ export const employeeService = {
     return rec;
   },
 
-  async listEmployees(filters: EmployeeFilters): Promise<PaginatedResult<Employee>> {
+  async listEmployees(filters: EmployeeFilters & { scopeFilter?: string }): Promise<PaginatedResult<Employee>> {
     const { page, limit, status, processId, branchId, search, scopeFilter } = filters;
     const offset = (page - 1) * limit;
     const conds: string[] = ["active_status = 1"];

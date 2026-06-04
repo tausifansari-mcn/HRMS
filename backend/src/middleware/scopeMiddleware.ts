@@ -11,7 +11,7 @@ import {
 
 export function requireScopedRole(
   allowedRoles: string[],
-  targetResolver: (req: AuthenticatedRequest) => ScopeTarget,
+  targetResolver: (req: AuthenticatedRequest) => ScopeTarget | Promise<ScopeTarget>,
   options: { allowAdminBypass?: boolean; requireScopeForNonAdmin?: boolean } = {}
 ) {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -21,7 +21,7 @@ export function requireScopedRole(
         return res.status(401).json({ success: false, message: "Unauthorized" });
       }
 
-      const target = targetResolver(req);
+      const target = await Promise.resolve(targetResolver(req));
       const ok = await hasScopedAccess(userId, allowedRoles, target, options);
 
       if (!ok) {
@@ -80,7 +80,7 @@ export function requireScopedAccess(options: {
       if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
       const globalRoles = options.globalRoles ?? ["admin"];
-      if (await hasAnyRole(userId, globalRoles)) return next();
+      if (await hasAnyRole(userId, ...globalRoles)) return next();
 
       const scope = await options.extractScope(req);
       const hasAnyScopeValue = Boolean(scope.branchId || scope.processId || scope.lobId || scope.departmentId || scope.managerEmployeeId);
@@ -155,7 +155,7 @@ export function requireRosterPlanScope(options: {
       if (!planScope) return res.status(404).json({ success: false, message: "Roster plan not found" });
 
       const globalRoles = options.globalRoles ?? ["admin"];
-      if (await hasAnyRole(userId, globalRoles)) return next();
+      if (await hasAnyRole(userId, ...globalRoles)) return next();
 
       const isPublished = String(planScope.planStatus ?? "").toLowerCase() === "published";
       if (options.requireDraft && isPublished) {
@@ -163,7 +163,7 @@ export function requireRosterPlanScope(options: {
       }
 
       if (isPublished && options.publishedChangeRoles?.length) {
-        if (!(await hasAnyRole(userId, options.publishedChangeRoles))) {
+        if (!(await hasAnyRole(userId, ...options.publishedChangeRoles))) {
           throw new AccessDeniedError("Published roster changes are restricted to Process Manager.");
         }
       }

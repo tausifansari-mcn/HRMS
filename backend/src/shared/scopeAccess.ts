@@ -315,12 +315,12 @@ export async function getRosterPlanScope(planId: string): Promise<ScopeTarget & 
       LIMIT 1`,
     [planId]
   );
-  const row = (rows as RowDataPacket[])[0] as AnyRow;
+  const row = (rows as RowDataPacket[])[0] as Record<string, unknown>;
   if (!row) return null;
   return {
-    processId: row.process_id ?? null,
-    branchId: row.branch_id ?? null,
-    planStatus: row.plan_status ?? null,
+    processId: (row.process_id as string) ?? null,
+    branchId: (row.branch_id as string) ?? null,
+    planStatus: (row.plan_status as string) ?? null,
   };
 }
 
@@ -333,11 +333,11 @@ export async function getRosterAssignmentScope(assignmentId: string): Promise<(S
       LIMIT 1`,
     [assignmentId]
   );
-  const row = (rows as RowDataPacket[])[0] as AnyRow;
+  const row = (rows as RowDataPacket[])[0] as Record<string, unknown>;
   if (!row) return null;
   return {
-    processId: row.process_id ?? null,
-    branchId: row.branch_id ?? null,
-    planStatus: row.plan_status ?? null,
+    processId: (row.process_id as string) ?? null,
+    branchId: (row.branch_id as string) ?? null,
+    planStatus: (row.plan_status as string) ?? null,
   };
 }
