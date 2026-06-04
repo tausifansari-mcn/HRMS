@@ -26,11 +26,11 @@ import { getNcosecPool, closeNcosecPool, testNcosecConnection } from '../src/db/
 import { db } from '../src/db/mysql.js';
 
 interface NcosecRow {
-  UserID:          string;
-  Name:            string;
+  UserID:          string;   // nvarchar — employee name/code in Cosec
+  Name:            string;   // from Mx_UserMst (may be same as UserID)
   punch_date:      Date | string;
-  first_punch_in:  number;   // Unix timestamp seconds
-  last_punch_out:  number;   // Unix timestamp seconds
+  first_punch_in:  Date;     // IDateTime (actual datetime, not Unix timestamp)
+  last_punch_out:  Date;     // IDateTime
 }
 
 interface EmployeeMap {
@@ -45,25 +45,47 @@ interface Summary {
   errors:                Array<{ userId: string; date: string; error: string }>;
 }
 
-async function fetchNcosecPunches(pool: sql.ConnectionPool): Promise<NcosecRow[]> {
-  console.log('[NCOSEC] Querying last 3 months of punch data...');
-  const result = await pool.request().query<NcosecRow>(`
-    SELECT
-        u.UserID,
-        u.Name,
-        CAST(e.EDateTime AS DATE)   AS punch_date,
-        MIN(e.lDateTime)             AS first_punch_in,
-        MAX(e.lDateTime)             AS last_punch_out
-    FROM Mx_ATDEventTrn e
-    INNER JOIN Mx_UserMst u ON u.UserID = e.UserID
-    WHERE e.EDateTime >= DATEADD(MONTH, -3, GETDATE())
-      AND e.lDateTime > 0
-    GROUP BY u.UserID, u.Name, CAST(e.EDateTime AS DATE)
-    HAVING COUNT(*) >= 1
-    ORDER BY punch_date ASC, u.UserID ASC
-  `);
-  console.log(`[NCOSEC] ${result.recordset.length} punch-day records found`);
+/**
+ * Fetch one single day's punch data from NCOSEC.
+ * Querying day-by-day avoids timeout on the 3M-row table.
+ * Each day query touches ~8,000 rows and completes in <1s.
+ */
+async function fetchNcosecPunchesForDay(
+  pool: sql.ConnectionPool,
+  dateStr: string  // 'YYYY-MM-DD'
+): Promise<NcosecRow[]> {
+  const result = await pool.request()
+    .input('d', sql.Date, new Date(dateStr))
+    .query<NcosecRow>(`
+      SELECT
+          e.UserID,
+          e.UserID                    AS Name,
+          CAST(e.Edatetime AS DATE)   AS punch_date,
+          MIN(e.IDateTime)            AS first_punch_in,
+          MAX(e.IDateTime)            AS last_punch_out
+      FROM Mx_ATDEventTrn e WITH (NOLOCK)
+      WHERE CAST(e.Edatetime AS DATE) = @d
+        AND e.IDateTime IS NOT NULL
+        AND e.UserID    IS NOT NULL
+        AND LEN(LTRIM(RTRIM(e.UserID))) > 0
+      GROUP BY e.UserID, CAST(e.Edatetime AS DATE)
+      HAVING COUNT(*) >= 1
+    `);
   return result.recordset;
+}
+
+/** Generate array of date strings YYYY-MM-DD from startDate to today (inclusive) */
+function dateRange(startDate: Date): string[] {
+  const dates: string[] = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cur = new Date(startDate);
+  cur.setHours(0, 0, 0, 0);
+  while (cur <= today) {
+    dates.push(cur.toISOString().slice(0, 10));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
 }
 
 async function buildEmployeeMap(): Promise<EmployeeMap> {
@@ -186,27 +208,45 @@ async function main() {
   };
 
   try {
-    console.log('[2/5] Fetching punch data from NCOSEC...');
+    console.log('[2/5] Connecting to NCOSEC...');
     const ncPool = await getNcosecPool();
-    const rows = await fetchNcosecPunches(ncPool);
-    summary.total_ncosec_rows = rows.length;
+
+    // Generate list of dates: last 3 months → today
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - 3);
+    const dates = dateRange(startDate);
+    console.log(`[NCOSEC] Will process ${dates.length} days (${dates[0]} → ${dates[dates.length - 1]})`);
 
     console.log('[3/5] Building employee map...');
     const empMap = await buildEmployeeMap();
 
-    console.log('[4/5] Importing records...');
+    console.log('[4/5] Importing records day-by-day...');
     let processed = 0;
+    let skippedDays = 0;
     const notFound = new Set<string>();
 
-    for (const row of rows) {
+    for (const dateStr of dates) {
+      let dayRows: NcosecRow[];
+      try {
+        dayRows = await fetchNcosecPunchesForDay(ncPool, dateStr);
+      } catch (err: any) {
+        console.error(`  [WARN] Failed to fetch ${dateStr}: ${err.message}`);
+        skippedDays++;
+        continue;
+      }
+
+      if (dayRows.length === 0) continue;
+      summary.total_ncosec_rows += dayRows.length;
+
+      for (const row of dayRows) {
       try {
         const cosecId = String(row.UserID).trim();
         const match = empMap[cosecId];
         if (!match) { notFound.add(cosecId); continue; }
 
-        // lDateTime is Unix seconds → JS Date (milliseconds)
-        const punchIn  = new Date(Number(row.first_punch_in)  * 1000);
-        const punchOut = new Date(Number(row.last_punch_out)   * 1000);
+        // IDateTime is already a JS Date from mssql (datetime column)
+        const punchIn  = new Date(row.first_punch_in);
+        const punchOut = new Date(row.last_punch_out);
 
         // Convert punch_date to YYYY-MM-DD string
         const pd = row.punch_date;
@@ -227,7 +267,6 @@ async function main() {
         else summary.attendance_updated++;
 
         processed++;
-        if (processed % 200 === 0) process.stdout.write(`   ... ${processed}/${rows.length}\r`);
 
       } catch (err: any) {
         summary.errors.push({
@@ -236,7 +275,11 @@ async function main() {
           error:  err.message,
         });
       }
-    }
+      } // end inner for (row of dayRows)
+
+      // Progress per day
+      process.stdout.write(`   [${dateStr}] ${dayRows.length} users → ${processed} imported\r`);
+    } // end for (dateStr of dates)
     summary.employees_not_found = Array.from(notFound);
 
   } finally {
