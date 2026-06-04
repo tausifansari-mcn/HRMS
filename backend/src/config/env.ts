@@ -21,6 +21,15 @@ const envSchema = z.object({
   DB_PASSWORD: z.string().default(""),
   DB_NAME:     z.string().default("mas_hrms"),
   DB_POOL_MAX: z.coerce.number().default(10),
+
+  // NCOSEC Biometric DB (Matrix Cosec SQL Server)
+  NCOSEC_DB_HOST:     z.string().default("172.10.10.146"),
+  NCOSEC_DB_PORT:     z.coerce.number().default(1433),
+  NCOSEC_DB_USER:     z.string().default("shivamg"),
+  NCOSEC_DB_PASSWORD: z.string().default(""),
+  NCOSEC_DB_NAME:     z.string().default("NCOSEC"),
+  NCOSEC_DB_ENCRYPT:  z.string().default("false"),
+
   PORTAL_JWT_SECRET: z.string().min(32).default("change-me-in-production-portal-secret-32ch"),
   JWT_SECRET: z.string().min(32).default('change-me-jwt-secret-32characters!!'),
   // Must be explicitly "true" to enable demo bypass. Production default is disabled.

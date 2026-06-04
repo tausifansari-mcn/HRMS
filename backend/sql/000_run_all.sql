@@ -76,6 +76,7 @@ SOURCE sql/068_upload_batch.sql;
 SOURCE sql/069_upload_batch_row_unique.sql;
 SOURCE sql/070_attendance_clock_columns.sql;
 SOURCE sql/071_communication_provider_config.sql;
+SOURCE sql/102_biometric_tables.sql;
 
 SELECT 'mas_hrms schema complete' AS status;
 SHOW TABLES;
