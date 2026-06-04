@@ -52,6 +52,7 @@ import { performanceFeedbackRouter } from "./modules/performance-feedback/perfor
 import { engagementRouter } from "./modules/engagement/engagement.routes.js";
 import { communicationRouter } from "./modules/communication/communication.routes.js";
 import { attendanceEngineRouter } from "./modules/wfm/attendance-engine.routes.js";
+import { biometricPunchRouter } from "./modules/wfm/biometric-punch.routes.js";
 import customizationRouter from "./modules/customization/customization.routes.js";
 import { rosterMasterRouter } from "./modules/roster/roster-master.routes.js";
 import rosterCapacityRouter from "./modules/roster/roster-capacity.routes.js";
@@ -152,6 +153,7 @@ app.use("/api/engagement", engagementRouter);
 app.use("/api/engagement-intelligence", engagementIntelligenceRouter); // Health scoring + command center
 app.use("/api/communication", communicationRouter);
 app.use('/api/wfm/attendance', attendanceEngineRouter);
+app.use('/api/wfm/biometric-punch', biometricPunchRouter);
 app.use("/api/customization", customizationRouter);
 app.use("/api/roster-master", rosterMasterRouter);
 app.use("/api/roster-capacity", rosterCapacityRouter);
