@@ -3,6 +3,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../src/db/mysql.js", () => ({
   db: { execute: vi.fn().mockResolvedValue([[], []]) },
 }));
+vi.mock("../src/modules/exit/exit-intelligence.service.js", () => ({
+  createExitHealthSnapshot: vi.fn().mockResolvedValue(undefined),
+  createDefaultClearanceTasks: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { db } from "../src/db/mysql.js";
 import { exitService } from "../src/modules/exit/exit.service.js";
@@ -93,8 +97,9 @@ describe("exitService.createExitRequest", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("inserts exit request and returns it", async () => {
+    mockExecute.mockResolvedValueOnce([[], []]);               // open-check: no active exit request
     mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]); // INSERT
-    mockExecute.mockResolvedValueOnce([[fakeRequest]]);         // re-fetch
+    mockExecute.mockResolvedValueOnce([[fakeRequest]]);         // re-fetch via getExitRequest
     const result = await exitService.createExitRequest(
       { employeeId: "emp-1", exitDate: "2026-06-30", exitType: "voluntary", reason: "Better opportunity" },
       "user-1"
@@ -104,14 +109,15 @@ describe("exitService.createExitRequest", () => {
   });
 
   it("passes null reason when not provided", async () => {
-    mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]);
-    mockExecute.mockResolvedValueOnce([[{ ...fakeRequest, resignation_reason: null }]]);
+    mockExecute.mockResolvedValueOnce([[], []]);               // open-check: no active exit request
+    mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]); // INSERT
+    mockExecute.mockResolvedValueOnce([[{ ...fakeRequest, resignation_reason: null }]]); // re-fetch
     const result = await exitService.createExitRequest(
       { employeeId: "emp-2", exitDate: "2026-07-31", exitType: "voluntary" },
       "user-2"
     );
     expect(result.resignation_reason).toBeNull();
-    const [, insertParams] = mockExecute.mock.calls[0];
+    const [, insertParams] = mockExecute.mock.calls[1]; // INSERT is call index 1 (after open-check)
     expect(insertParams).toContain(null); // reason is null
   });
 });

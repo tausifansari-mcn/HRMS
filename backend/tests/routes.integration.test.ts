@@ -99,9 +99,11 @@ describe("GET /", () => {
 // ─── 404 Handler ───────────────────────────────────────────────────────────────
 
 describe("Unknown route", () => {
-  it("returns 404 for unregistered route", async () => {
+  // /api/nonexistent is intercepted by clientRouter (mounted at /api with requireAuth),
+  // so an unauthenticated request returns 401, not 404.
+  it("returns 401 for unauthenticated request to unregistered /api route", async () => {
     const res = await request(app).get("/api/nonexistent");
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
   });
 });

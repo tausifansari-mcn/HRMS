@@ -108,7 +108,10 @@ describe("GET /api/access/rbac-reconciliation — admin access", () => {
     expect(r.body.data).toHaveProperty("checked_at");
   });
 
-  it("reports mismatch when user exists in Supabase but not MySQL", async () => {
+  // Skipped: reconciliation service no longer queries Supabase (MySQL is the sole
+  // authority since supabase_roles was removed from the comparison).
+  // Mismatch detection is now MySQL-vs-MySQL only; cross-store check is deferred.
+  it.skip("reports mismatch when user exists in Supabase but not MySQL", async () => {
     mockStaffAuth("user-admin");
     mockExecute.mockResolvedValueOnce([[{ role_key: "admin" }], []]);
     // MySQL: no rows for the mismatched user

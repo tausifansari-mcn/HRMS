@@ -24,6 +24,36 @@ vi.mock("../src/modules/wfm/wfm.service.js", () => ({
     listRegularizations: vi.fn(),
   },
 }));
+vi.mock("../src/middleware/requireRole.js", () => ({
+  requireRole: (..._roles: string[]) => (_req: any, _res: any, next: any) => next(),
+}));
+vi.mock("../src/shared/accessGuard.js", () => ({
+  getEmployeeForUser: vi.fn().mockResolvedValue({ id: "emp-1", employee_code: "EMP001" }),
+  hasRole: vi.fn().mockResolvedValue(true),
+  hasProcessScope: vi.fn().mockResolvedValue(true),
+  selfOrAdminHr: () => (_req: any, _res: any, next: any) => next(),
+}));
+vi.mock("../src/shared/scopeAccess.js", () => ({
+  hasScopedAccess: vi.fn().mockResolvedValue(true),
+  hasAnyRole: vi.fn().mockResolvedValue(true),
+  getUserRoleKeys: vi.fn().mockResolvedValue(["admin", "hr"]),
+  getUserAssignmentScopes: vi.fn().mockResolvedValue([]),
+  getRosterPlanScope: vi.fn().mockResolvedValue({ branchId: null, processId: null }),
+  getEmployeeForUser: vi.fn().mockResolvedValue({ id: "emp-1", employee_code: "EMP001" }),
+  getUserRoles: vi.fn().mockResolvedValue([{ role_key: "admin" }]),
+  hasRole: vi.fn().mockResolvedValue(true),
+  buildScopeWhereClause: vi.fn().mockReturnValue({ where: "", params: [] }),
+  AccessDeniedError: class AccessDeniedError extends Error {},
+  BadRequestAccessError: class BadRequestAccessError extends Error {},
+}));
+vi.mock("../src/middleware/scopeMiddleware.js", () => ({
+  requireScopedRole: () => (_req: any, _res: any, next: any) => next(),
+  requireScopedAccess: () => (_req: any, _res: any, next: any) => next(),
+  requireQueryScope: () => (_req: any, _res: any, next: any) => next(),
+  requireBodyScope: () => (_req: any, _res: any, next: any) => next(),
+  requireRosterPlanScope: () => (_req: any, _res: any, next: any) => next(),
+  getTargetFromBodyOrQuery: () => ({}),
+}));
 
 import { supabaseAuthClient } from "../src/db/supabaseAdmin.js";
 import { wfmService } from "../src/modules/wfm/wfm.service.js";
