@@ -5,7 +5,7 @@
  * Run with: npm test -- client-services.test.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { db } from '../src/db/mysql.js';
 import {
   listClients,
