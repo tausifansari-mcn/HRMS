@@ -17,9 +17,9 @@ function smtpSecure(): boolean {
 }
 
 function fromAddress(): string {
-  const name = String(process.env.SMTP_FROM_NAME || "MAS Callnet HRMS").trim();
+  const name = String(process.env.SMTP_FROM_NAME || "MAS Callnet HRMS").trim().replace(/"/g, "");
   const from = String(env.SMTP_FROM || env.SMTP_USER || "noreply@mascallnet.com").trim();
-  return name ? `"${name.replace(/"/g, "")}\" <${from}>`.replace('\\"', '"') : from;
+  return name ? `"${name}" <${from}>` : from;
 }
 
 function createTransporter() {
@@ -55,6 +55,13 @@ export const emailService = {
       from: env.SMTP_FROM,
       fromName: process.env.SMTP_FROM_NAME || "MAS Callnet HRMS",
     };
+  },
+
+  async verify(): Promise<boolean> {
+    if (!this.isConfigured()) return false;
+    const transporter = createTransporter();
+    await transporter.verify();
+    return true;
   },
 
   async send(input: EmailSendInput): Promise<{ messageId?: string }> {
