@@ -10,11 +10,16 @@ import { env } from '../../config/env.js';
 const JWT_SECRET = (process.env.JWT_SECRET || env.PORTAL_JWT_SECRET || 'change-me-jwt-secret-32characters!!');
 const JWT_EXPIRES_IN = '15m';
 const REFRESH_EXPIRES_DAYS = 7;
+const RESET_EXPIRES_HOURS = 24;
 
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
-  user: { id: string; email: string; isBlocked: boolean };
+  user: { id: string; email: string; isBlocked: boolean; mustChangePassword?: boolean };
+}
+
+function mysqlDateTime(date: Date): string {
+  return date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
 export const authService = {
@@ -22,11 +27,11 @@ export const authService = {
     // identifier can be email OR employee_code — try both
     const trimmed = identifier.trim();
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT au.id, au.email, au.password_hash, au.is_blocked
+      `SELECT au.id, au.email, au.password_hash, au.is_blocked, COALESCE(au.must_change_password, 0) AS must_change_password
          FROM auth_user au
         WHERE au.email = ?
         UNION
-       SELECT au.id, au.email, au.password_hash, au.is_blocked
+       SELECT au.id, au.email, au.password_hash, au.is_blocked, COALESCE(au.must_change_password, 0) AS must_change_password
          FROM auth_user au
          JOIN employees e ON e.user_id = au.id
         WHERE e.employee_code = ?
@@ -54,13 +59,13 @@ export const authService = {
 
     await db.execute<ResultSetHeader>(
       'INSERT INTO auth_refresh_token (id, user_id, token_hash, expires_at) VALUES (UUID(), ?, ?, ?)',
-      [user.id, tokenHash, expiresAt.toISOString().slice(0, 19).replace('T', ' ')]
+      [user.id, tokenHash, mysqlDateTime(expiresAt)]
     );
 
     return {
       accessToken,
       refreshToken: rawRefresh,
-      user: { id: user.id, email: user.email, isBlocked: user.is_blocked === 1 },
+      user: { id: user.id, email: user.email, isBlocked: user.is_blocked === 1, mustChangePassword: Number(user.must_change_password ?? 0) === 1 },
     };
   },
 
@@ -141,20 +146,24 @@ export const authService = {
     return userId;
   },
 
+  async createPasswordResetTokenByUserId(userId: string, hours = RESET_EXPIRES_HOURS): Promise<string> {
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+    await db.execute(
+      'INSERT INTO auth_password_reset (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
+      [userId, tokenHash, mysqlDateTime(expiresAt)]
+    );
+    return rawToken;
+  },
+
   async forgotPassword(email: string): Promise<string | null> {
     const [rows] = await db.execute<RowDataPacket[]>(
       'SELECT id FROM auth_user WHERE email = ? AND is_blocked = 0 LIMIT 1',
       [email.toLowerCase().trim()]
     );
     if (!rows[0]) return null; // silent — don't leak whether email exists
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-    await db.execute(
-      'INSERT INTO auth_password_reset (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
-      [rows[0].id, tokenHash, expiresAt.toISOString().slice(0, 19).replace('T', ' ')]
-    );
-    return rawToken;
+    return this.createPasswordResetTokenByUserId(rows[0].id, 1);
   },
 
   async resetPassword(rawToken: string, newPassword: string): Promise<void> {
@@ -165,7 +174,7 @@ export const authService = {
     );
     if (!rows[0]) throw new Error('Invalid or expired reset token');
     const hash = await bcrypt.hash(newPassword, 10);
-    await db.execute('UPDATE auth_user SET password_hash = ? WHERE id = ?', [hash, rows[0].user_id]);
+    await db.execute('UPDATE auth_user SET password_hash = ?, must_change_password = 0 WHERE id = ?', [hash, rows[0].user_id]);
     await db.execute('UPDATE auth_password_reset SET used = 1 WHERE token_hash = ?', [tokenHash]);
   },
 };
