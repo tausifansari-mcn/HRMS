@@ -3,8 +3,11 @@ import bcrypt from "bcryptjs";
 import crypto, { randomUUID } from "crypto";
 import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
+import { env } from "../../config/env.js";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 import { requireRole } from "../../middleware/requireRole.js";
+import { authService } from "./auth.service.js";
+import { emailService } from "../communication/email.service.js";
 
 const router = Router();
 const h = (fn: (req: AuthenticatedRequest, res: Response) => Promise<unknown>) =>
@@ -16,6 +19,8 @@ router.use(requireRole("admin"));
 type EmployeeRow = RowDataPacket & {
   id: string;
   employee_code?: string;
+  first_name?: string | null;
+  last_name?: string | null;
   email?: string | null;
   official_email?: string | null;
   user_id?: string | null;
@@ -26,6 +31,16 @@ type EmployeeRow = RowDataPacket & {
   department_name?: string | null;
 };
 
+type InviteRow = RowDataPacket & {
+  id: string;
+  employee_id: string;
+  user_id: string;
+  email: string;
+  employee_code?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+};
+
 function tempPassword(): string {
   return crypto.randomBytes(12).toString("base64url") + "A1!";
 }
@@ -33,6 +48,38 @@ function tempPassword(): string {
 function normalizeEmail(value: unknown): string | null {
   const email = String(value ?? "").trim().toLowerCase();
   return email.includes("@") ? email : null;
+}
+
+function employeeName(row: Partial<EmployeeRow | InviteRow>): string {
+  const name = `${row.first_name ?? ""} ${row.last_name ?? ""}`.trim();
+  return name || "Team Member";
+}
+
+function resetUrl(token: string): string {
+  return `${env.FRONTEND_URL.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}`;
+}
+
+function inviteEmailHtml(input: { name: string; employeeCode?: string | null; link: string }) {
+  return `
+  <div style="font-family:Arial,sans-serif;background:#f6f8fc;padding:24px;color:#0f172a">
+    <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden">
+      <div style="background:#0f172a;color:#ffffff;padding:22px 26px">
+        <h2 style="margin:0;font-size:22px">Welcome to MAS Callnet HRMS</h2>
+        <p style="margin:6px 0 0;color:#cbd5e1;font-size:13px">Your HRMS portal account is ready.</p>
+      </div>
+      <div style="padding:26px">
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px">Dear ${input.name},</p>
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px">Your MAS Callnet HRMS login has been created. Please set your password using the secure link below.</p>
+        ${input.employeeCode ? `<p style="font-size:14px;margin:0 0 18px"><b>Employee Code:</b> ${input.employeeCode}</p>` : ""}
+        <p style="margin:24px 0"><a href="${input.link}" style="background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:700;display:inline-block">Set HRMS Password</a></p>
+        <p style="font-size:13px;line-height:1.6;color:#64748b;margin:0">This link is valid for 24 hours. After setting your password, you can login using your Employee Code or official email ID.</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+function inviteEmailText(input: { name: string; employeeCode?: string | null; link: string }) {
+  return `Dear ${input.name},\n\nYour MAS Callnet HRMS login has been created.\n${input.employeeCode ? `Employee Code: ${input.employeeCode}\n` : ""}\nSet your password here: ${input.link}\n\nThis link is valid for 24 hours. After setting your password, you can login using your Employee Code or official email ID.\n\nMAS Callnet HRMS`;
 }
 
 async function tableExists(tableName: string): Promise<boolean> {
@@ -97,6 +144,24 @@ async function addJourney(employeeId: string, eventType: string, description: st
   }
 }
 
+router.get("/email-config", h(async (_req, res) => {
+  res.json({ success: true, data: emailService.safeConfig() });
+}));
+
+router.post("/email-config/test", h(async (req, res) => {
+  const to = normalizeEmail(req.body?.to);
+  if (!to) return res.status(400).json({ success: false, error: "Valid test email is required" });
+
+  const link = env.FRONTEND_URL;
+  const result = await emailService.send({
+    to,
+    subject: "MAS HRMS email configuration test",
+    html: inviteEmailHtml({ name: "Admin", employeeCode: "TEST", link }),
+    text: inviteEmailText({ name: "Admin", employeeCode: "TEST", link }),
+  });
+  res.json({ success: true, data: result });
+}));
+
 router.get("/launch-readiness", h(async (_req, res) => {
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT
@@ -124,7 +189,7 @@ router.post("/bootstrap-existing-users", h(async (req, res) => {
       ORDER BY e.employee_code`
   );
 
-  const result = { runId, created: 0, updated: 0, skipped: 0, failed: 0, kpiAssigned: 0, kpiMissing: 0 };
+  const result = { runId, created: 0, updated: 0, skipped: 0, failed: 0, kpiAssigned: 0, kpiMissing: 0, invitesQueued: 0 };
   const hasKpiTables = await tableExists("kpi_employee_assignment") && await tableExists("kpi_role_template");
 
   for (const emp of employees) {
@@ -155,7 +220,8 @@ router.post("/bootstrap-existing-users", h(async (req, res) => {
       if (!dryRun) {
         await db.execute("UPDATE employees SET user_id=? WHERE id=?", [userId, employeeId]);
         for (const role of inferRoles(emp)) await assignRole(userId, role, req.authUser!.id);
-        await db.execute("INSERT INTO hrms_launch_invite_log (id, employee_id, user_id, email, invite_status, message) VALUES (?, ?, ?, ?, 'pending', ?)", [randomUUID(), employeeId, userId, email, "Account prepared. Connect communication module for invite dispatch."]);
+        await db.execute("INSERT INTO hrms_launch_invite_log (id, employee_id, user_id, email, invite_status, message) VALUES (?, ?, ?, ?, 'pending', ?)", [randomUUID(), employeeId, userId, email, "Account prepared. Invite email pending."]);
+        result.invitesQueued++;
         await addJourney(employeeId, "login_account_prepared", "HRMS login account prepared", req.authUser!.id);
 
         if (hasKpiTables && emp.process_id) {
@@ -188,9 +254,56 @@ router.post("/bootstrap-existing-users", h(async (req, res) => {
   res.json({ success: true, data: result, dryRun });
 }));
 
-router.post("/send-invites", h(async (_req, res) => {
-  const [pending] = await db.execute<RowDataPacket[]>("SELECT COUNT(*) AS total FROM hrms_launch_invite_log WHERE invite_status='pending'");
-  res.json({ success: true, data: { pending: Number(pending[0]?.total ?? 0), status: "communication_gateway_pending", message: "Invite records are prepared. Connect communication module before production email/SMS dispatch." } });
+router.post("/send-invites", h(async (req, res) => {
+  if (!emailService.isConfigured()) {
+    return res.status(400).json({ success: false, error: "SMTP is not configured", data: emailService.safeConfig() });
+  }
+
+  const limit = Math.min(Number(req.body?.limit ?? 100), 500);
+  const resend = req.body?.resend === true;
+  const whereStatus = resend ? "invite_status IN ('pending','failed','sent')" : "invite_status IN ('pending','failed')";
+
+  const [pendingRows] = await db.execute<InviteRow[]>(
+    `SELECT il.id, il.employee_id, il.user_id, il.email, e.employee_code, e.first_name, e.last_name
+       FROM hrms_launch_invite_log il
+       LEFT JOIN employees e ON e.id = il.employee_id
+      WHERE ${whereStatus}
+      ORDER BY il.created_at ASC
+      LIMIT ?`,
+    [limit]
+  );
+
+  const result = { attempted: pendingRows.length, sent: 0, failed: 0, skipped: 0 };
+
+  for (const invite of pendingRows) {
+    try {
+      const email = normalizeEmail(invite.email);
+      if (!email || !invite.user_id) {
+        result.skipped++;
+        await db.execute("UPDATE hrms_launch_invite_log SET invite_status='skipped', message=? WHERE id=?", ["Missing email or user_id", invite.id]);
+        continue;
+      }
+
+      const token = await authService.createPasswordResetTokenByUserId(invite.user_id, 24);
+      const link = resetUrl(token);
+      const name = employeeName(invite);
+      await emailService.send({
+        to: email,
+        subject: "Set your MAS Callnet HRMS password",
+        html: inviteEmailHtml({ name, employeeCode: invite.employee_code, link }),
+        text: inviteEmailText({ name, employeeCode: invite.employee_code, link }),
+      });
+
+      await db.execute("UPDATE hrms_launch_invite_log SET invite_status='sent', message=? WHERE id=?", ["Invite email sent with 24-hour reset link", invite.id]);
+      await addJourney(invite.employee_id, "login_invite_sent", "HRMS login invite email sent", req.authUser!.id);
+      result.sent++;
+    } catch (error) {
+      result.failed++;
+      await db.execute("UPDATE hrms_launch_invite_log SET invite_status='failed', message=? WHERE id=?", [error instanceof Error ? error.message : String(error), invite.id]);
+    }
+  }
+
+  res.json({ success: true, data: result });
 }));
 
 export { router as authLaunchRouter };
