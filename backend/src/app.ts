@@ -60,6 +60,7 @@ import rosterCapacityRouter from "./modules/roster/roster-capacity.routes.js";
 import { reportingRouter } from "./modules/reporting/reporting.routes.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { authLaunchRouter } from "./modules/auth/auth-launch.routes.js";
+import { authDiagnosticsRouter } from "./modules/auth/auth-diagnostics.routes.js";
 import { roleAssignmentRouter } from "./modules/admin/role-assignment.routes.js";
 import { clientRouter } from "./modules/portal/client.routes.js";
 import { autoRosterSyncedRouter } from "./modules/wfm/auto-roster-synced.routes.js";
@@ -117,6 +118,7 @@ app.get("/", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/auth/launch", authLaunchRouter);
+app.use("/api/auth/diagnostics", authDiagnosticsRouter);
 app.use("/api/health", healthRouter);
 app.use("/api/admin", roleAssignmentRouter);
 app.use("/api/processes", processRouter);
