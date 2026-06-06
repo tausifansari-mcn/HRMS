@@ -18,8 +18,15 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const DEMO_LOGIN_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
 
-const API_URL = import.meta.env.VITE_HRMS_API_URL || 'http://localhost:5055';
+function apiBaseUrl(): string {
+  const configured = import.meta.env.VITE_HRMS_API_URL;
+  if (configured !== undefined) return String(configured).replace(/\/$/, '');
+  return import.meta.env.DEV ? 'http://localhost:5055' : '';
+}
+
+const API_URL = apiBaseUrl();
 
 function decodeJwtUser(token: string): HrmsUser | null {
   try {
@@ -65,7 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshTimerRef.current = setInterval(async () => {
       const refreshed = await tryRefresh();
       if (!refreshed) {
-        // Refresh failed — clear session
         localStorage.removeItem('hrms_access_token');
         localStorage.removeItem('hrms_refresh_token');
         setUser(null);
@@ -77,22 +83,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const init = async () => {
-      // 1. Demo session
-      const demoRaw = localStorage.getItem('hrms_demo_session');
-      if (demoRaw) {
-        try {
-          const demo = JSON.parse(demoRaw);
-          if (demo?.user?.id) {
-            setUser({ id: demo.user.id, email: demo.user.email ?? '' });
-            setIsLoading(false);
-            return;
+      // Demo sessions are allowed only in local development or when explicitly enabled.
+      if (DEMO_LOGIN_ENABLED) {
+        const demoRaw = localStorage.getItem('hrms_demo_session');
+        if (demoRaw) {
+          try {
+            const demo = JSON.parse(demoRaw);
+            if (demo?.user?.id) {
+              setUser({ id: demo.user.id, email: demo.user.email ?? '' });
+              setIsLoading(false);
+              return;
+            }
+          } catch {
+            localStorage.removeItem('hrms_demo_session');
           }
-        } catch {
-          localStorage.removeItem('hrms_demo_session');
         }
+      } else {
+        localStorage.removeItem('hrms_demo_session');
       }
 
-      // 2. MySQL JWT access token
       const token = localStorage.getItem('hrms_access_token');
       if (token) {
         const decoded = decodeJwtUser(token);
@@ -102,7 +111,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           scheduleRefresh();
           return;
         }
-        // Access token expired — try refresh
         localStorage.removeItem('hrms_access_token');
         const refreshed = await tryRefresh();
         if (refreshed) {
@@ -126,20 +134,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (identifier: string, password: string): Promise<{ error: Error | null }> => {
-    // Demo bypass — local only, no server call
-    const demoCred = getDemoCred(identifier);
-    if (demoCred) {
-      if (password !== demoCred.password) {
-        return { error: new Error('Incorrect password for demo account') };
+    if (DEMO_LOGIN_ENABLED) {
+      const demoCred = getDemoCred(identifier);
+      if (demoCred) {
+        if (password !== demoCred.password) {
+          return { error: new Error('Incorrect password for demo account') };
+        }
+        const mockSession = buildDemoSession(demoCred);
+        localStorage.setItem('hrms_demo_session', JSON.stringify(mockSession));
+        setUser({ id: mockSession.user.id, email: mockSession.user.email });
+        queryClient.invalidateQueries();
+        return { error: null };
       }
-      const mockSession = buildDemoSession(demoCred);
-      localStorage.setItem('hrms_demo_session', JSON.stringify(mockSession));
-      setUser({ id: mockSession.user.id, email: mockSession.user.email });
-      queryClient.invalidateQueries();
-      return { error: null };
     }
 
-    // MySQL JWT login
     try {
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
@@ -149,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const json = await res.json();
       if (!res.ok) return { error: new Error(json.error || 'Authentication failed') };
       const { accessToken, refreshToken, user: authUser } = json.data;
+      localStorage.removeItem('hrms_demo_session');
       localStorage.setItem('hrms_access_token', accessToken);
       localStorage.setItem('hrms_refresh_token', refreshToken);
       setUser({ id: authUser.id, email: authUser.email });
