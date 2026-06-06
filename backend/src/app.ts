@@ -70,6 +70,20 @@ import { engagementIntelligenceRouter } from "./modules/engagement/engagement-in
 
 export const app = express();
 
+function allowedOrigins(): string[] {
+  const configured = String(process.env.CORS_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  return Array.from(new Set([env.FRONTEND_URL, ...configured]));
+}
+
+function isAllowedOrigin(origin: string): boolean {
+  if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) return true;
+  if (allowedOrigins().includes(origin)) return true;
+  return /^https:\/\/([a-z0-9-]+\.)*vercel\.app$/i.test(origin) && allowedOrigins().some((allowed) => allowed.endsWith(".vercel.app"));
+}
+
 app.use(
   helmet({
     crossOriginResourcePolicy: false
@@ -79,7 +93,7 @@ app.use(
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:") || origin === env.FRONTEND_URL) {
+      if (!origin || isAllowedOrigin(origin)) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
