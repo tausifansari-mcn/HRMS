@@ -7,12 +7,17 @@ import type { RowDataPacket } from "mysql2";
 import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 import type { Response } from "express";
 import { leaveController } from "./leave.controller.js";
+import { getEmployeeForUser, hasRole } from "../../shared/accessGuard.js";
 
 export const leaveRouter = Router();
 leaveRouter.use(requireAuth);
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any, next: any) => fn(req, res).catch(next);
+
+async function isLeavePrivileged(userId: string): Promise<boolean> {
+  return hasRole(userId, "admin", "hr", "manager");
+}
 
 leaveRouter.get("/types",                         h(leaveController.listLeaveTypes.bind(leaveController)));  // All can view
 leaveRouter.post("/types", requireRole("admin", "hr"), h(leaveController.createLeaveType.bind(leaveController)));
@@ -80,10 +85,46 @@ leaveRouter.delete(
     return res.json({ success: true, message: "Leave type deactivated" });
   })
 );
-leaveRouter.post("/requests",                     h(leaveController.submitRequest.bind(leaveController)));  // Employee can submit own
-leaveRouter.get("/requests",                      requireRole("admin", "hr", "manager"), h(leaveController.listRequests.bind(leaveController)));  // TODO: Add self-scope
+
+// Employee self-scope: employees can submit only their own leave request.
+leaveRouter.post("/requests", h(async (req: AuthenticatedRequest, res: Response) => {
+  const privileged = await isLeavePrivileged(req.authUser!.id);
+  if (!privileged) {
+    const callerEmp = await getEmployeeForUser(req.authUser!.id);
+    if (!callerEmp) return res.status(403).json({ success: false, message: "No employee record linked to your login" });
+    if (!req.body.employeeId) req.body.employeeId = callerEmp.id;
+    if (req.body.employeeId !== callerEmp.id) {
+      return res.status(403).json({ success: false, message: "Forbidden: you may submit leave only for yourself" });
+    }
+  }
+  return leaveController.submitRequest(req, res);
+}));
+
+// Employee self-scope: employees see only their own leave requests; privileged roles can filter/list.
+leaveRouter.get("/requests", h(async (req: AuthenticatedRequest, res: Response) => {
+  const privileged = await isLeavePrivileged(req.authUser!.id);
+  if (!privileged) {
+    const callerEmp = await getEmployeeForUser(req.authUser!.id);
+    if (!callerEmp) return res.status(403).json({ success: false, message: "No employee record linked to your login" });
+    (req.query as Record<string, unknown>).employeeId = callerEmp.id;
+  }
+  return leaveController.listRequests(req, res);
+}));
+
 leaveRouter.patch("/requests/:id/review",         requireRole("admin", "hr", "manager"), h(leaveController.reviewRequest.bind(leaveController)));
-leaveRouter.get("/balance/:employeeId",           requireRole("admin", "hr", "manager"), h(leaveController.getBalance.bind(leaveController)));  // TODO: Add self-scope
+
+// Employee self-scope: employees can view only their own leave balance.
+leaveRouter.get("/balance/:employeeId", h(async (req: AuthenticatedRequest, res: Response) => {
+  const privileged = await isLeavePrivileged(req.authUser!.id);
+  if (!privileged) {
+    const callerEmp = await getEmployeeForUser(req.authUser!.id);
+    if (!callerEmp || callerEmp.id !== req.params.employeeId) {
+      return res.status(403).json({ success: false, message: "Forbidden: you may view only your own leave balance" });
+    }
+  }
+  return leaveController.getBalance(req, res);
+}));
+
 leaveRouter.get("/holidays",                      h(leaveController.listHolidays.bind(leaveController)));  // All can view
 leaveRouter.post("/holidays",                     requireRole("admin", "hr"), h(leaveController.createHoliday.bind(leaveController)));
 
