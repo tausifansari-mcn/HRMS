@@ -39,6 +39,24 @@ router.get("/me", h(async (req: AuthenticatedRequest, res: Response) => {
 }));
 
 /**
+ * GET /api/access/pages/my-catalog
+ * User-safe page catalog for module launcher and role-based navigation.
+ * Unlike /pages/catalog, this does not expose pages the current user cannot view.
+ */
+router.get("/pages/my-catalog", h(async (req: AuthenticatedRequest, res: Response) => {
+  const access = await getAccessMe(req.authUser!.id);
+  const allowedCodes = new Set(access.pages.filter((page) => page.can_view).map((page) => page.page_code));
+
+  if (allowedCodes.size === 0) {
+    return res.json({ success: true, data: [] });
+  }
+
+  const catalog = await listPageCatalog();
+  const data = catalog.filter((page: { page_code: string }) => allowedCodes.has(page.page_code));
+  return res.json({ success: true, data });
+}));
+
+/**
  * GET /api/access/rbac-reconciliation
  * Read-only mismatch report between MySQL user_roles (authority) and Supabase user_roles (UI mirror).
  * Admin only. No writes, no auto-fix, no backfill.
@@ -169,7 +187,7 @@ router.get("/user-page-access-audit", requireRole("admin"), h(async (req: Authen
   res.json({ success: true, data: auditLog });
 }));
 
-// GET /api/access/user-page-access/all — list all user page access assignments
+// GET /api/access/user-page-access-all — list all user page access assignments
 router.get("/user-page-access-all", requireRole("admin"), h(async (_req: AuthenticatedRequest, res: Response) => {
   const assignments = await listAllUserPageAccess();
   res.json({ success: true, data: assignments });
