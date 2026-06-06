@@ -1,10 +1,37 @@
 import { Router } from 'express';
 import { authService } from './auth.service.js';
 import { requireAuth } from '../../middleware/authMiddleware.js';
+import { emailService } from '../communication/email.service.js';
+import { env } from '../../config/env.js';
 
 const router = Router();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const h = (fn: any) => (req: any, res: any, next: any) => fn(req, res).catch(next);
+
+function resetLink(token: string): string {
+  return `${env.FRONTEND_URL.replace(/\/$/, '')}/reset-password?token=${encodeURIComponent(token)}`;
+}
+
+function resetEmailHtml(link: string) {
+  return `
+  <div style="font-family:Arial,sans-serif;background:#f6f8fc;padding:24px;color:#0f172a">
+    <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden">
+      <div style="background:#0f172a;color:#ffffff;padding:22px 26px">
+        <h2 style="margin:0;font-size:22px">Reset your MAS Callnet HRMS password</h2>
+        <p style="margin:6px 0 0;color:#cbd5e1;font-size:13px">Use the secure link below to create a new password.</p>
+      </div>
+      <div style="padding:26px">
+        <p style="font-size:15px;line-height:1.6;margin:0 0 16px">We received a request to reset your HRMS password.</p>
+        <p style="margin:24px 0"><a href="${link}" style="background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:700;display:inline-block">Reset Password</a></p>
+        <p style="font-size:13px;line-height:1.6;color:#64748b;margin:0">This link is valid for 1 hour. If you did not request this, you can safely ignore this email.</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+function resetEmailText(link: string) {
+  return `Reset your MAS Callnet HRMS password\n\nUse this secure link to reset your password: ${link}\n\nThis link is valid for 1 hour. If you did not request this, ignore this email.`;
+}
 
 // POST /api/auth/login — public
 // Accepts: { identifier: "email or employee code", password } OR legacy { email, password }
@@ -64,12 +91,23 @@ router.post('/logout', requireAuth, h(async (req: any, res: any) => {
 router.post('/forgot-password', h(async (req: any, res: any) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'email required' });
-  const token = await authService.forgotPassword(email);
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const token = await authService.forgotPassword(normalizedEmail);
+
   if (token) {
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
-    // TODO: replace console.log with nodemailer in production
-    console.log('[DEV] Password reset URL:', resetUrl);
+    const link = resetLink(token);
+    if (emailService.isConfigured()) {
+      await emailService.send({
+        to: normalizedEmail,
+        subject: 'Reset your MAS Callnet HRMS password',
+        html: resetEmailHtml(link),
+        text: resetEmailText(link),
+      });
+    } else {
+      console.warn('[HRMS] SMTP not configured; password reset email not sent. Reset URL:', link);
+    }
   }
+
   // Always return success to prevent email enumeration
   res.json({ success: true, message: 'If that email exists, a reset link has been sent.' });
 }));
