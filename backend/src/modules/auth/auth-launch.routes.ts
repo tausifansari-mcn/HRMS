@@ -167,7 +167,7 @@ router.get("/launch-readiness", h(async (_req, res) => {
     `SELECT
        COUNT(*) AS active_employees,
        SUM(CASE WHEN e.user_id IS NULL THEN 1 ELSE 0 END) AS employees_without_user,
-       SUM(CASE WHEN e.email IS NULL OR e.email='' THEN 1 ELSE 0 END) AS employees_without_email,
+       SUM(CASE WHEN (COALESCE(e.email, '') = '' AND COALESCE(e.official_email, '') = '') THEN 1 ELSE 0 END) AS employees_without_email,
        SUM(CASE WHEN e.reporting_manager_id IS NULL THEN 1 ELSE 0 END) AS missing_manager,
        SUM(CASE WHEN e.branch_id IS NULL THEN 1 ELSE 0 END) AS missing_branch,
        SUM(CASE WHEN e.process_id IS NULL THEN 1 ELSE 0 END) AS missing_process
@@ -181,10 +181,10 @@ router.post("/bootstrap-existing-users", h(async (req, res) => {
   const dryRun = req.body?.dryRun === true;
   const runId = randomUUID();
   const [employees] = await db.execute<EmployeeRow[]>(
-    `SELECT e.*, d.designation_name, dep.department_name
+    `SELECT e.*, d.designation_name, dep.dept_name AS department_name
        FROM employees e
-       LEFT JOIN designations d ON d.id = e.designation_id
-       LEFT JOIN departments dep ON dep.id = e.department_id
+       LEFT JOIN designation_master d ON d.id = e.designation_id
+       LEFT JOIN department_master dep ON dep.id = e.department_id
       WHERE e.active_status = 1
       ORDER BY e.employee_code`
   );
