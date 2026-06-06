@@ -90,14 +90,12 @@ async function tableExists(tableName: string): Promise<boolean> {
   return Number(rows[0]?.total ?? 0) > 0;
 }
 
-async function assignRole(userId: string, roleKey: string, actorUserId: string) {
-  const [roleRows] = await db.execute<RowDataPacket[]>("SELECT id FROM roles WHERE role_key=? AND active_status=1 LIMIT 1", [roleKey]);
+async function assignRole(userId: string, roleKey: string, _actorUserId: string) {
+  const [roleRows] = await db.execute<RowDataPacket[]>("SELECT role_key FROM workforce_role_catalog WHERE role_key=? AND active_status=1 LIMIT 1", [roleKey]);
   if (!roleRows[0]) return;
   await db.execute(
-    `INSERT INTO user_roles (id, user_id, role_key, assigned_by, active_status, assigned_at)
-     VALUES (?, ?, ?, ?, 1, NOW())
-     ON DUPLICATE KEY UPDATE active_status=1, assigned_by=VALUES(assigned_by), assigned_at=NOW(), revoked_by=NULL, revoked_at=NULL`,
-    [randomUUID(), userId, roleKey, actorUserId]
+    "INSERT INTO user_roles (id, user_id, role_key, active_status) VALUES (?, ?, ?, 1) ON DUPLICATE KEY UPDATE active_status=1",
+    [randomUUID(), userId, roleKey]
   );
 }
 
