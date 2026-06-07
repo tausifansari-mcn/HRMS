@@ -68,6 +68,7 @@ import { controlTowerRouter } from "./modules/control-tower/control-tower.routes
 import { payrollComplianceRouter } from "./modules/payroll-compliance/payrollCompliance.routes.js";
 import { atsFullParityRouter } from "./modules/ats-full-parity/atsFullParity.routes.js";
 import { engagementIntelligenceRouter } from "./modules/engagement/engagement-intelligence.routes.js";
+import legacyRouter from "./modules/legacy/legacy.routes.js";
 
 export const app = express();
 
@@ -179,6 +180,7 @@ app.use("/api/roster-master", rosterMasterRouter);
 app.use("/api/roster-capacity", rosterCapacityRouter);
 app.use('/api/reports', reportingRouter);
 app.use('/api/control-tower', controlTowerRouter);
+app.use("/api/legacy", legacyRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
