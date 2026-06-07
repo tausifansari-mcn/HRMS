@@ -69,6 +69,7 @@ const NativeATSFullParityCommandCenter = lazy(() => import("./pages/NativeATSFul
 // LMS
 const NativeLMSMyLearning           = lazy(() => import("./pages/NativeLMSMyLearning"));
 const NativeLMSCoordinator         = lazy(() => import("./pages/NativeLMSCoordinator"));
+const LMSIntegrationAdmin           = lazy(() => import("./pages/LMSIntegrationAdmin"));
 const NativePlaceholderPage         = lazy(() => import("./pages/NativePlaceholderPage"));
 const NativeLMSIntegration          = lazy(() => import("./pages/NativeLMSIntegration"));
 
@@ -260,8 +261,8 @@ const App = () => (
               {/* LMS */}
               <Route path="/lms/my-learning" element={<ProtectedRoute><Gate pageCode="LMS_MY_LEARNING"><NativeLMSMyLearning /></Gate></ProtectedRoute>} />
               <Route path="/lms/coordinator" element={<ProtectedRoute><Gate pageCode="LMS_COORDINATOR"><NativeLMSCoordinator /></Gate></ProtectedRoute>} />
-              <Route path="/lms/admin" element={<ProtectedRoute><Gate pageCode="LMS_ADMIN"><NativePlaceholderPage title="LMS Admin" module="LMS" /></Gate></ProtectedRoute>} />
-              <Route path="/lms/management-dashboard" element={<ProtectedRoute><Gate pageCode="LMS_MANAGEMENT_DASHBOARD"><NativePlaceholderPage title="LMS Management Dashboard" module="LMS" /></Gate></ProtectedRoute>} />
+              <Route path="/lms/admin" element={<ProtectedRoute><Gate pageCode="LMS_ADMIN"><LMSIntegrationAdmin /></Gate></ProtectedRoute>} />
+              <Route path="/lms/management-dashboard" element={<ProtectedRoute><Gate pageCode="LMS_MANAGEMENT_DASHBOARD"><LMSIntegrationAdmin /></Gate></ProtectedRoute>} />
               <Route path="/lms/integration" element={<ProtectedRoute><Gate pageCode="LMS_INTEGRATION"><NativeLMSIntegration /></Gate></ProtectedRoute>} />
 
               {/* WFM */}

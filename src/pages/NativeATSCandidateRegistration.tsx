@@ -574,7 +574,7 @@ export default function NativeATSCandidateRegistration() {
         gender:                   coreData.gender || null,
         appliedForProcess:        coreData.roleApplied || null,
         appliedForBranch:         coreData.branch || null,
-        sourcingChannel:          'walk-in',
+        sourcingChannel:          'Walk-In', // Canonical format - backend normalizes this
         walkInDate:               new Date().toISOString().slice(0, 10),
         // New fields from migration 054:
         address:                  coreData.address || null,

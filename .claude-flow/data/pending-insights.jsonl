@@ -255,3 +255,17 @@
 {"type":"edit","file":"/home/shuvam/hrms-audit/src/App.tsx","timestamp":1780520352215,"sessionId":null}
 {"type":"edit","file":"/home/shuvam/hrms-audit/src/App.tsx","timestamp":1780520374823,"sessionId":null}
 {"type":"edit","file":"/home/shuvam/hrms-audit/INTEGRATION_ROADMAP_UPDATED.md","timestamp":1780520912980,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/backend/.env.production","timestamp":1780686082730,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/EMAIL_CONFIGURATION.md","timestamp":1780686134575,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/DEPLOYMENT_READY.md","timestamp":1780686321390,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/docs/superpowers/plans/2026-06-07-legacy-database-sync.md","timestamp":1780799101576,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/backend/src/db/legacyDb.ts","timestamp":1780799654290,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/backend/scripts/test-legacy-connection.ts","timestamp":1780799656878,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/backend/src/db/legacyDb.ts","timestamp":1780799793845,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/backend/sql/060_legacy_sync_schema.sql","timestamp":1780799905465,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/backend/sql/059_ats_file_uploads.sql","timestamp":1780800236281,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/backend/src/modules/ats/ats.controller.ts","timestamp":1780800266640,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/backend/src/modules/ats/ats.controller.ts","timestamp":1780800280243,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/src/pages/NativeATSCandidateRegistration.tsx","timestamp":1780800296858,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/src/App.tsx","timestamp":1780800389056,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/src/App.tsx","timestamp":1780800397555,"sessionId":null}
