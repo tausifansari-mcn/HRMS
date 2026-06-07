@@ -1,78 +1,127 @@
-// Empty string = use Vercel proxy (same origin, /api/* rewritten to Railway)
-// Local dev = http://localhost:5055
-const HRMS_API_URL = import.meta.env.VITE_HRMS_API_URL || 'http://localhost:5055';
+function apiBaseUrl(): string {
+  const configured = import.meta.env.VITE_HRMS_API_URL;
+  if (configured !== undefined) return String(configured).replace(/\/$/, "");
+  return import.meta.env.DEV ? "http://localhost:5055" : "";
+}
+
+// Production uses the same-origin Vercel /api proxy when VITE_HRMS_API_URL is not set.
+const HRMS_API_URL = apiBaseUrl();
+
+const LEGACY_DOUBLE_DATA_PATHS = [
+  "/api/clients",
+  "/api/clients-stats",
+  "/api/portal-users",
+  "/api/clients-usage",
+];
 
 function getAuthHeader(): Record<string, string> {
-  // Demo session stored in localStorage by AuthContext
-  const demoRaw = localStorage.getItem('hrms_demo_session');
+  const demoRaw = localStorage.getItem("hrms_demo_session");
   if (demoRaw) {
     try {
       const demo = JSON.parse(demoRaw);
       const token = demo?.access_token;
       if (token) return { Authorization: `Bearer ${token}` };
-    } catch { /* fall through */ }
+    } catch {
+      // Fall through to the normal MySQL JWT session.
+    }
   }
 
-  // MySQL JWT token
-  const mysqlToken = localStorage.getItem('hrms_access_token');
-  if (mysqlToken) {
-    return { Authorization: `Bearer ${mysqlToken}` };
-  }
+  const mysqlToken = localStorage.getItem("hrms_access_token");
+  if (mysqlToken) return { Authorization: `Bearer ${mysqlToken}` };
 
-  // No session — return empty headers so public endpoints (e.g. candidate registration)
-  // still reach the backend. Protected routes enforce auth server-side via requireAuth.
   return {};
+}
+
+function addLegacyDataAlias(path: string, payload: unknown): void {
+  if (!LEGACY_DOUBLE_DATA_PATHS.some((prefix) => path.startsWith(prefix))) return;
+  if (!payload || typeof payload !== "object" || !("data" in payload)) return;
+
+  const data = (payload as { data?: unknown }).data;
+  if (!data || typeof data !== "object" || "data" in data) return;
+
+  // One older Client Master page used Axios-style res.data.data while hrmsApi
+  // returns the parsed JSON directly. Keep a non-enumerable compatibility alias
+  // until that legacy page is fully migrated, without changing normal callers.
+  Object.defineProperty(data, "data", {
+    value: data,
+    enumerable: false,
+    configurable: true,
+  });
+}
+
+async function parseResponse(res: Response): Promise<unknown> {
+  if (res.status === 204) return null;
+
+  const text = await res.text();
+  if (!text) return null;
+
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error("Backend returned invalid JSON");
+    }
+  }
+
+  return text;
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers = getAuthHeader();
   const res = await fetch(`${HRMS_API_URL}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body: body ? JSON.stringify(body) : undefined,
+    headers: { "Content-Type": "application/json", ...headers },
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-  return json;
+
+  const payload = await parseResponse(res);
+
+  if (!res.ok) {
+    const errorPayload = payload as { error?: string; message?: string } | null;
+    const message = errorPayload?.error ?? errorPayload?.message ?? (typeof payload === "string" ? payload : `HTTP ${res.status}`);
+    throw new Error(message);
+  }
+
+  addLegacyDataAlias(path, payload);
+  return payload as T;
 }
 
-/** Returns raw response text (for file downloads such as CSV exports). */
 async function requestRaw(method: string, path: string): Promise<string> {
   const headers = getAuthHeader();
   const res = await fetch(`${HRMS_API_URL}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: { "Content-Type": "application/json", ...headers },
   });
+
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `HTTP ${res.status}`);
   }
+
   return res.text();
 }
 
-/**
- * Returns the current auth token string (demo session first, then hrms_access_token).
- * Matches the priority order used internally by hrmsApi.
- */
 export function getAuthToken(): string | null {
-  // Demo session first (matches hrmsApi priority)
-  const demoRaw = localStorage.getItem('hrms_demo_session');
+  const demoRaw = localStorage.getItem("hrms_demo_session");
   if (demoRaw) {
     try {
       const demo = JSON.parse(demoRaw);
       const token = demo?.access_token;
       if (token) return token;
-    } catch { /* fall through */ }
+    } catch {
+      // Fall through to the normal MySQL JWT token.
+    }
   }
-  return localStorage.getItem('hrms_access_token');
+
+  return localStorage.getItem("hrms_access_token");
 }
 
 export const hrmsApi = {
-  get:    <T>(path: string)                => request<T>('GET',    path),
-  post:   <T>(path: string, body: unknown) => request<T>('POST',   path, body),
-  put:    <T>(path: string, body: unknown) => request<T>('PUT',    path, body),
-  patch:  <T>(path: string, body: unknown) => request<T>('PATCH',  path, body),
-  delete: <T>(path: string)               => request<T>('DELETE', path),
-  /** Download a raw text response (e.g. CSV export). */
-  getRaw: (path: string)                  => requestRaw('GET', path),
+  get: <T>(path: string) => request<T>("GET", path),
+  post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
+  put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
+  patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),
+  delete: <T>(path: string) => request<T>("DELETE", path),
+  getRaw: (path: string) => requestRaw("GET", path),
 };
