@@ -45,6 +45,24 @@ const envSchema = z.object({
   SMTP_USER:   z.string().default(""),
   SMTP_PASS:   z.string().default(""),
   SMTP_FROM:   z.string().default("noreply@mascallnet.com"),
+
+  // Legacy SQL Server
+  LEGACY_MSSQL_HOST: z.string().default(""),
+  LEGACY_MSSQL_PORT: z.coerce.number().default(1433),
+  LEGACY_MSSQL_DATABASE: z.string().default(""),
+  LEGACY_MSSQL_USER: z.string().default(""),
+  LEGACY_MSSQL_PASSWORD: z.string().default(""),
+  LEGACY_MSSQL_ENCRYPT: z.string().default("false"),
+  LEGACY_MSSQL_TRUST_CERT: z.string().default("true"),
+
+  // Sync configuration
+  LEGACY_SYNC_ENABLED: z.string().default("false"),
+  LEGACY_SYNC_INTERVAL_MS: z.coerce.number().default(60000),
+  LEGACY_SYNC_BATCH_SIZE: z.coerce.number().default(1000),
+  LEGACY_SYNC_PARALLEL_DOMAINS: z.string().default("true"),
+  LEGACY_SYNC_MAX_RETRIES: z.coerce.number().default(3),
+  LEGACY_SYNC_RETRY_DELAY_MS: z.coerce.number().default(5000),
+  LEGACY_CT_RETENTION_DAYS: z.coerce.number().default(2),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -83,4 +101,11 @@ if (parsed.data.NODE_ENV === "production") {
   }
 }
 
-export const env = parsed.data;
+export const env = {
+  ...parsed.data,
+  // Convert string boolean env vars to actual booleans
+  LEGACY_MSSQL_ENCRYPT: parsed.data.LEGACY_MSSQL_ENCRYPT === 'true',
+  LEGACY_MSSQL_TRUST_CERT: parsed.data.LEGACY_MSSQL_TRUST_CERT !== 'false',
+  LEGACY_SYNC_ENABLED: parsed.data.LEGACY_SYNC_ENABLED === 'true',
+  LEGACY_SYNC_PARALLEL_DOMAINS: parsed.data.LEGACY_SYNC_PARALLEL_DOMAINS !== 'false',
+};
