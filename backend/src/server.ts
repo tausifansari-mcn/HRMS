@@ -4,6 +4,7 @@ import { runPendingMigrations } from "./db/runPendingMigrations.js";
 import { startTenureBadgeScheduler } from "./modules/engagement/tenure.cron.js";
 import { startCommunicationCleanup } from "./modules/communication/cleanup.cron.js";
 import { startAttendanceEngineScheduler } from "./modules/wfm/attendance-engine.cron.js";
+import { legacySyncWorker } from "./workers/legacy-sync-worker.js";
 
 runPendingMigrations()
   .then(() => {
@@ -11,6 +12,7 @@ runPendingMigrations()
       startTenureBadgeScheduler();
       startCommunicationCleanup();
       startAttendanceEngineScheduler();
+      legacySyncWorker.start();
       console.log(`MCN HRMS backend running on http://localhost:${env.PORT}`);
     });
   })
@@ -20,6 +22,7 @@ runPendingMigrations()
       startTenureBadgeScheduler();
       startCommunicationCleanup();
       startAttendanceEngineScheduler();
+      legacySyncWorker.start();
       console.log(`MCN HRMS backend running on http://localhost:${env.PORT}`);
     });
   });
