@@ -23,7 +23,7 @@ runPendingMigrations()
 
     if (env.NODE_ENV === "production") {
       console.error("[startup] production server was not started because the database schema is incomplete.");
-      return;
+      throw error;
     }
 
     console.warn("[startup] development mode: starting with degraded migration health.");
