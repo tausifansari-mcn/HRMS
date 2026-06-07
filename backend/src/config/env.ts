@@ -46,14 +46,12 @@ const envSchema = z.object({
   SMTP_PASS:   z.string().default(""),
   SMTP_FROM:   z.string().default("noreply@mascallnet.com"),
 
-  // Legacy SQL Server
-  LEGACY_MSSQL_HOST: z.string().default(""),
-  LEGACY_MSSQL_PORT: z.coerce.number().default(1433),
-  LEGACY_MSSQL_DATABASE: z.string().default(""),
-  LEGACY_MSSQL_USER: z.string().default(""),
-  LEGACY_MSSQL_PASSWORD: z.string().default(""),
-  LEGACY_MSSQL_ENCRYPT: z.string().default("false"),
-  LEGACY_MSSQL_TRUST_CERT: z.string().default("true"),
+  // Legacy MySQL Database
+  LEGACY_MYSQL_HOST: z.string().default(""),
+  LEGACY_MYSQL_PORT: z.coerce.number().default(3306),
+  LEGACY_MYSQL_DATABASE: z.string().default(""),
+  LEGACY_MYSQL_USER: z.string().default(""),
+  LEGACY_MYSQL_PASSWORD: z.string().default(""),
 
   // Sync configuration
   LEGACY_SYNC_ENABLED: z.string().default("false"),
@@ -104,8 +102,6 @@ if (parsed.data.NODE_ENV === "production") {
 export const env = {
   ...parsed.data,
   // Convert string boolean env vars to actual booleans
-  LEGACY_MSSQL_ENCRYPT: parsed.data.LEGACY_MSSQL_ENCRYPT === 'true',
-  LEGACY_MSSQL_TRUST_CERT: parsed.data.LEGACY_MSSQL_TRUST_CERT !== 'false',
   LEGACY_SYNC_ENABLED: parsed.data.LEGACY_SYNC_ENABLED === 'true',
   LEGACY_SYNC_PARALLEL_DOMAINS: parsed.data.LEGACY_SYNC_PARALLEL_DOMAINS !== 'false',
 };

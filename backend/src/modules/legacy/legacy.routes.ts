@@ -4,6 +4,7 @@ import type { AuthenticatedRequest } from '../../middleware/authMiddleware.js';
 import { requireAuth } from '../../middleware/authMiddleware.js';
 import { requireRole } from '../../middleware/requireRole.js';
 import { legacyService } from './legacy.service.js';
+import { legacySyncWorker } from '../../workers/legacy-sync-worker.js';
 
 const router = Router();
 
@@ -91,6 +92,15 @@ router.get('/sync-maps', h(async (_req: AuthenticatedRequest, res: Response) => 
 router.get('/sync/status', h(async (_req: AuthenticatedRequest, res: Response) => {
   const status = await legacyService.getSyncStatus();
   return res.json({ success: true, data: status });
+}));
+
+/**
+ * Trigger manual sync (for testing)
+ * POST /api/legacy/sync/trigger
+ */
+router.post('/sync/trigger', h(async (_req: AuthenticatedRequest, res: Response) => {
+  const result = await legacySyncWorker.triggerManualSync();
+  return res.json(result);
 }));
 
 export default router;

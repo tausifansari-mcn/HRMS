@@ -87,13 +87,18 @@ export const authService = {
     // identifier can be email OR employee_code — try both
     const trimmed = identifier.trim();
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT au.id, au.email, au.password_hash, au.is_blocked, COALESCE(au.must_change_password, 0) AS must_change_password
+      `SELECT au.id, au.email, au.password_hash, au.is_blocked,
+              COALESCE(au.must_change_password, 0) AS must_change_password,
+              e.active_status
          FROM auth_user au
+         LEFT JOIN employees e ON e.id = au.id
         WHERE LOWER(au.email) = LOWER(?)
         UNION
-       SELECT au.id, au.email, au.password_hash, au.is_blocked, COALESCE(au.must_change_password, 0) AS must_change_password
+       SELECT au.id, au.email, au.password_hash, au.is_blocked,
+              COALESCE(au.must_change_password, 0) AS must_change_password,
+              e.active_status
          FROM auth_user au
-         JOIN employees e ON e.user_id = au.id
+         JOIN employees e ON e.id = au.id
         WHERE UPPER(e.employee_code) = UPPER(?)
         LIMIT 1`,
       [trimmed, trimmed]
@@ -101,6 +106,11 @@ export const authService = {
     const user = rows[0];
     if (!user) throw new Error('Invalid credentials');
     if (user.is_blocked) throw new Error('Account is blocked');
+
+    // CRITICAL: Block inactive employees from logging in
+    if (user.active_status === 0 || user.active_status === false) {
+      throw new Error('Account is inactive. Please contact HR for assistance.');
+    }
 
     const valid = await bcrypt.compare(password, user.password_hash as string);
     if (!valid) throw new Error('Invalid credentials');

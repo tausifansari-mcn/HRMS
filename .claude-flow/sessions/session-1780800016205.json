@@ -4,9 +4,11 @@
   "cwd": "/home/shuvam/hrms-audit",
   "context": {},
   "metrics": {
-    "edits": 8,
+    "edits": 7,
     "commands": 0,
     "tasks": 0,
     "errors": 0
-  }
+  },
+  "endedAt": "2026-06-07T03:59:29.113Z",
+  "duration": 4752908
 }

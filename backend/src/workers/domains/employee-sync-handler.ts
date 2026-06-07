@@ -1,215 +1,358 @@
-import { BaseSyncHandler } from './base-sync-handler.js';
+import { getLegacyPool } from '../../db/legacyDb.js';
 import { db as mysqlDb } from '../../db/mysql.js';
-import type { LegacyChange, TransformedRecord, ValidationResult, StagingResult, MergeResult } from '../../modules/legacy/types.js';
 import { randomUUID } from 'crypto';
 
-/**
- * Employee Domain Sync Handler
- * Syncs legacy employee master → HRMS employees table
- */
-export class EmployeeSyncHandler extends BaseSyncHandler {
-  
-  constructor() {
-    super('Employee', 'stg_legacy_employee_master');
-  }
-  
+interface LegacyEmployee {
+  id: number;
+  EmpCode: string;
+  BioCode: string | null;
+  EmpName: string | null;
+  Title: string | null;
+  Gendar: string | null;
+  DOB: Date | null;
+  DOJ: Date | null;
+  DOL: Date | null;
+  Mobile: string | null;
+  EmailId: string | null;
+  OfficeEmailId: string | null;
+  PanNo: string | null;
+  AdharId: string | null;
+  PassportNo: string | null;
+  EPFNo: string | null;
+  ESICNo: string | null;
+  UAN: string | null;
+  Dept: string | null;
+  Desgination: string | null;
+  BranchName: string | null;
+  ClientName: string | null;
+  Process: string | null;
+  CostCenter: string | null;
+  AcNo: string | null;
+  AcBank: string | null;
+  AcBranch: string | null;
+  IFSCCode: string | null;
+  AccHolder: string | null;
+  MaritalStatus: string | null;
+  BloodGruop: string | null;
+  Qualification: string | null;
+  Adrress1: string | null;
+  Adrress2: string | null;
+  City: string | null;
+  State: string | null;
+  PinCode: string | null;
+  Status: string;
+  lastUpdated: Date | null;
+  EntryDate: Date | null;
+  CreateDate: Date | null;
+}
+
+interface TransformedEmployee {
+  employee_code: string;
+  biometric_code: string | null;
+  first_name: string;
+  last_name: string | null;
+  title: string | null;
+  gender: string | null;
+  date_of_birth: Date | null;
+  date_of_joining: Date | null;
+  date_of_leaving: Date | null;
+  mobile: string | null;
+  email: string | null;
+  official_email: string | null;
+  pan_number: string | null;
+  aadhaar_last4: string | null;
+  passport_number: string | null;
+  epf_number: string | null;
+  esic_number: string | null;
+  uan: string | null;
+  department: string | null;
+  designation: string | null;
+  branch: string | null;
+  client_name: string | null;
+  process: string | null;
+  cost_center: string | null;
+  bank_account_number: string | null;
+  bank_name: string | null;
+  bank_branch: string | null;
+  ifsc_code: string | null;
+  account_holder_name: string | null;
+  marital_status: string | null;
+  blood_group: string | null;
+  qualification: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+  active_status: boolean;
+  legacy_last_updated: Date | null;
+  legacy_emp_id: number;
+  created_at: Date | null;
+}
+
+export class EmployeeSyncHandler {
+  private domain = 'employee';
+
   /**
-   * Transform legacy employee record to HRMS format
+   * Fetch changed employees from legacy database
+   * Uses timestamp-based incremental sync (MySQL doesn't have Change Tracking)
    */
-  protected transform(change: LegacyChange): TransformedRecord {
-    // Example transformation (adjust based on actual legacy schema)
-    const data: Record<string, any> = {
-      employee_code: change.emp_code || change.employee_id || change.empcode,
-      full_name: change.emp_name || change.employee_name || change.name,
-      first_name: this.extractFirstName(change.emp_name || change.name),
-      last_name: this.extractLastName(change.emp_name || change.name),
-      official_email: change.email || change.official_email,
-      personal_email: change.personal_email || null,
-      mobile: change.mobile || change.phone || change.contact,
-      date_of_joining: this.parseDate(change.join_date || change.doj),
-      date_of_exit: this.parseDate(change.exit_date || change.doe),
-      branch_code: change.branch_code || change.branch,
-      process_code: change.process_code || change.process,
-      department_code: change.dept_code || change.department,
-      designation_code: change.designation_code || change.designation,
-      reporting_manager_code: change.manager_code || change.reporting_to,
-      employment_status: this.mapEmploymentStatus(change.status || change.emp_status),
-      active_status: change.active === 1 || change.is_active === 1,
-    };
-    
+  async fetchChanges(lastSyncTime: Date, batchSize: number = 1000): Promise<LegacyEmployee[]> {
+    const pool = await getLegacyPool();
+
+    const [rows] = await pool.execute<any[]>(`
+      SELECT *
+      FROM masjclrentry
+      WHERE lastUpdated > ?
+         OR (lastUpdated IS NULL AND (EntryDate > ? OR CreateDate > ?))
+      ORDER BY COALESCE(lastUpdated, EntryDate, CreateDate) ASC
+      LIMIT ?
+    `, [lastSyncTime, lastSyncTime, lastSyncTime, batchSize]);
+
+    return rows as LegacyEmployee[];
+  }
+
+  /**
+   * Transform legacy record to HRMS format
+   */
+  transform(legacyRecord: LegacyEmployee): TransformedEmployee {
+    // Split name: "DEEPAK KASHYAP" → first="DEEPAK", last="KASHYAP"
+    const nameParts = (legacyRecord.EmpName || '').trim().split(/\s+/);
+    const firstName = nameParts[0] || 'Unknown';
+    const lastName = nameParts.slice(1).join(' ') || null;
+
+    // Mask Aadhaar (SECURITY: only last 4 digits)
+    const aadhaarLast4 = legacyRecord.AdharId
+      ? legacyRecord.AdharId.replace(/\s/g, '').slice(-4)
+      : null;
+
     return {
-      operation: change.SYS_CHANGE_OPERATION,
-      source_key: String(change.emp_id || change.id || change.employee_id),
-      data,
+      employee_code: legacyRecord.EmpCode,
+      biometric_code: legacyRecord.BioCode,
+      first_name: firstName,
+      last_name: lastName,
+      title: legacyRecord.Title,
+      gender: legacyRecord.Gendar, // Note: typo in legacy
+      date_of_birth: legacyRecord.DOB,
+      date_of_joining: legacyRecord.DOJ,
+      date_of_leaving: legacyRecord.DOL,
+      mobile: legacyRecord.Mobile,
+      email: legacyRecord.EmailId,
+      official_email: legacyRecord.OfficeEmailId,
+      pan_number: legacyRecord.PanNo,
+      aadhaar_last4: aadhaarLast4,
+      passport_number: legacyRecord.PassportNo,
+      epf_number: legacyRecord.EPFNo,
+      esic_number: legacyRecord.ESICNo,
+      uan: legacyRecord.UAN,
+      department: legacyRecord.Dept,
+      designation: legacyRecord.Desgination, // Note: typo in legacy
+      branch: legacyRecord.BranchName,
+      client_name: legacyRecord.ClientName,
+      process: legacyRecord.Process,
+      cost_center: legacyRecord.CostCenter,
+      bank_account_number: legacyRecord.AcNo,
+      bank_name: legacyRecord.AcBank,
+      bank_branch: legacyRecord.AcBranch,
+      ifsc_code: legacyRecord.IFSCCode,
+      account_holder_name: legacyRecord.AccHolder,
+      marital_status: legacyRecord.MaritalStatus,
+      blood_group: legacyRecord.BloodGruop, // Note: typo in legacy
+      qualification: legacyRecord.Qualification,
+      address_line1: legacyRecord.Adrress1, // Note: typo in legacy
+      address_line2: legacyRecord.Adrress2,
+      city: legacyRecord.City,
+      state: legacyRecord.State,
+      pincode: legacyRecord.PinCode,
+      active_status: legacyRecord.Status === '1',
+      legacy_last_updated: legacyRecord.lastUpdated,
+      legacy_emp_id: legacyRecord.id,
+      created_at: legacyRecord.EntryDate || legacyRecord.CreateDate,
     };
   }
-  
+
   /**
    * Validate transformed record
    */
-  protected validate(record: TransformedRecord): ValidationResult {
+  validate(record: TransformedEmployee): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
-    
-    if (!record.data.employee_code) {
+
+    if (!record.employee_code) {
       errors.push('Missing employee_code');
     }
-    
-    if (!record.data.full_name) {
-      errors.push('Missing full_name');
+
+    if (!record.first_name) {
+      errors.push('Missing first_name');
     }
-    
-    if (!record.data.mobile && !record.data.official_email) {
+
+    if (!record.mobile && !record.email) {
       errors.push('Missing both mobile and email');
     }
-    
+
     return {
       valid: errors.length === 0,
       errors,
     };
   }
-  
+
   /**
-   * Stage records into stg_legacy_employee_master
+   * Sync employees to HRMS database
+   * Upserts records: INSERT new, UPDATE existing (legacy wins)
    */
-  protected async stage(syncRunId: string, records: TransformedRecord[]): Promise<StagingResult> {
-    let staged = 0;
-    
+  async syncToHRMS(records: TransformedEmployee[]): Promise<{ inserted: number; updated: number; errors: number }> {
+    let inserted = 0;
+    let updated = 0;
+    let errors = 0;
+
     for (const record of records) {
-      await mysqlDb.execute(
-        `INSERT INTO stg_legacy_employee_master
-         (id, sync_run_id, source_db, source_schema, source_table, source_key,
-          raw_payload_json, employee_code, full_name, first_name, last_name,
-          official_email, personal_email, mobile, date_of_joining, date_of_exit,
-          branch_code, process_code, department_code, designation_code,
-          reporting_manager_code, employment_status, active_status,
-          processed_status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-        [
-          randomUUID(),
-          syncRunId,
-          'db_bill',
-          'dbo', // Adjust if different
-          'employee_master', // Adjust to actual table name
-          record.source_key,
-          JSON.stringify(record.data),
-          record.data.employee_code,
-          record.data.full_name,
-          record.data.first_name,
-          record.data.last_name,
-          record.data.official_email,
-          record.data.personal_email,
-          record.data.mobile,
-          record.data.date_of_joining,
-          record.data.date_of_exit,
-          record.data.branch_code,
-          record.data.process_code,
-          record.data.department_code,
-          record.data.designation_code,
-          record.data.reporting_manager_code,
-          record.data.employment_status,
-          record.data.active_status,
-          'pending',
-        ]
-      );
-      staged++;
+      const validation = this.validate(record);
+      if (!validation.valid) {
+        console.error(`[Employee Sync] Validation failed for ${record.employee_code}:`, validation.errors);
+        errors++;
+        continue;
+      }
+
+      try {
+        // Upsert: try insert, on duplicate key update
+        const [result] = await mysqlDb.execute<any>(`
+          INSERT INTO employees (
+            id, employee_code, biometric_code, first_name, last_name, title, gender,
+            date_of_birth, date_of_joining, date_of_leaving,
+            mobile, email, official_email,
+            pan_number, aadhaar_last4, passport_number, epf_number, esic_number, uan,
+            department, designation, branch, client_name, process, cost_center,
+            bank_account_number, bank_name, bank_branch, ifsc_code, account_holder_name,
+            marital_status, blood_group, qualification,
+            address_line1, address_line2, city, state, pincode,
+            active_status, legacy_last_updated, legacy_emp_id, created_at, updated_at
+          ) VALUES (
+            UUID(), ?, ?, ?, ?, ?, ?,
+            ?, ?, ?,
+            ?, ?, ?,
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, NOW()
+          )
+          ON DUPLICATE KEY UPDATE
+            biometric_code = VALUES(biometric_code),
+            first_name = VALUES(first_name),
+            last_name = VALUES(last_name),
+            title = VALUES(title),
+            gender = VALUES(gender),
+            date_of_birth = VALUES(date_of_birth),
+            date_of_joining = VALUES(date_of_joining),
+            date_of_leaving = VALUES(date_of_leaving),
+            mobile = VALUES(mobile),
+            email = VALUES(email),
+            official_email = VALUES(official_email),
+            pan_number = VALUES(pan_number),
+            aadhaar_last4 = VALUES(aadhaar_last4),
+            passport_number = VALUES(passport_number),
+            epf_number = VALUES(epf_number),
+            esic_number = VALUES(esic_number),
+            uan = VALUES(uan),
+            department = VALUES(department),
+            designation = VALUES(designation),
+            branch = VALUES(branch),
+            client_name = VALUES(client_name),
+            process = VALUES(process),
+            cost_center = VALUES(cost_center),
+            bank_account_number = VALUES(bank_account_number),
+            bank_name = VALUES(bank_name),
+            bank_branch = VALUES(bank_branch),
+            ifsc_code = VALUES(ifsc_code),
+            account_holder_name = VALUES(account_holder_name),
+            marital_status = VALUES(marital_status),
+            blood_group = VALUES(blood_group),
+            qualification = VALUES(qualification),
+            address_line1 = VALUES(address_line1),
+            address_line2 = VALUES(address_line2),
+            city = VALUES(city),
+            state = VALUES(state),
+            pincode = VALUES(pincode),
+            active_status = VALUES(active_status),
+            legacy_last_updated = VALUES(legacy_last_updated),
+            legacy_emp_id = VALUES(legacy_emp_id),
+            updated_at = NOW()
+        `, [
+          record.employee_code, record.biometric_code, record.first_name, record.last_name,
+          record.title, record.gender,
+          record.date_of_birth, record.date_of_joining, record.date_of_leaving,
+          record.mobile, record.email, record.official_email,
+          record.pan_number, record.aadhaar_last4, record.passport_number,
+          record.epf_number, record.esic_number, record.uan,
+          record.department, record.designation, record.branch,
+          record.client_name, record.process, record.cost_center,
+          record.bank_account_number, record.bank_name, record.bank_branch,
+          record.ifsc_code, record.account_holder_name,
+          record.marital_status, record.blood_group, record.qualification,
+          record.address_line1, record.address_line2, record.city, record.state, record.pincode,
+          record.active_status, record.legacy_last_updated, record.legacy_emp_id,
+          record.created_at,
+        ]);
+
+        // Check if INSERT or UPDATE based on affectedRows and insertId
+        if (result.insertId) {
+          inserted++;
+        } else {
+          updated++;
+        }
+      } catch (error: any) {
+        console.error(`[Employee Sync] Failed to sync ${record.employee_code}:`, error.message);
+        errors++;
+      }
     }
-    
-    return { staged };
+
+    return { inserted, updated, errors };
   }
-  
+
   /**
-   * Merge staged records into final employees table
-   * Legacy wins conflicts (source of truth during transition)
+   * Get last sync checkpoint
    */
-  protected async merge(syncRunId: string): Promise<MergeResult> {
-    // Insert new employees
-    const [insertResult] = await mysqlDb.execute<any>(
-      `INSERT INTO employees
-       (id, employee_code, full_name, first_name, last_name, official_email, personal_email,
-        mobile, date_of_joining, date_of_exit, active_status)
-       SELECT 
-         UUID(),
-         stg.employee_code,
-         stg.full_name,
-         stg.first_name,
-         stg.last_name,
-         stg.official_email,
-         stg.personal_email,
-         stg.mobile,
-         stg.date_of_joining,
-         stg.date_of_exit,
-         stg.active_status
-       FROM stg_legacy_employee_master stg
-       WHERE stg.sync_run_id = ?
-         AND stg.processed_status = 'pending'
-         AND NOT EXISTS (
-           SELECT 1 FROM employees e WHERE e.employee_code = stg.employee_code
-         )`
-    );
-    
-    const inserted = insertResult.affectedRows || 0;
-    
-    // Update existing employees (legacy wins)
-    const [updateResult] = await mysqlDb.execute<any>(
-      `UPDATE employees e
-       INNER JOIN stg_legacy_employee_master stg ON e.employee_code = stg.employee_code
-       SET 
-         e.full_name = stg.full_name,
-         e.first_name = stg.first_name,
-         e.last_name = stg.last_name,
-         e.official_email = COALESCE(stg.official_email, e.official_email),
-         e.personal_email = COALESCE(stg.personal_email, e.personal_email),
-         e.mobile = COALESCE(stg.mobile, e.mobile),
-         e.date_of_exit = stg.date_of_exit,
-         e.active_status = stg.active_status,
-         e.updated_at = NOW()
-       WHERE stg.sync_run_id = ?
-         AND stg.processed_status = 'pending'`
-    );
-    
-    const updated = updateResult.affectedRows || 0;
-    
-    // Mark staged records as processed
-    await mysqlDb.execute(
-      `UPDATE stg_legacy_employee_master
-       SET processed_status = 'completed', processed_at = NOW()
-       WHERE sync_run_id = ? AND processed_status = 'pending'`,
-      [syncRunId]
-    );
-    
-    return { inserted, updated };
-  }
-  
-  // Helper methods
-  
-  private extractFirstName(fullName: string | null): string | null {
-    if (!fullName) return null;
-    return fullName.split(' ')[0];
-  }
-  
-  private extractLastName(fullName: string | null): string | null {
-    if (!fullName) return null;
-    const parts = fullName.split(' ');
-    return parts.length > 1 ? parts.slice(1).join(' ') : null;
-  }
-  
-  private parseDate(dateValue: any): string | null {
-    if (!dateValue) return null;
-    try {
-      const date = new Date(dateValue);
-      return date.toISOString().split('T')[0]; // YYYY-MM-DD
-    } catch {
-      return null;
+  async getLastSyncTime(): Promise<Date> {
+    const [rows] = await mysqlDb.execute<any[]>(`
+      SELECT last_sync_time
+      FROM legacy_sync_checkpoint
+      WHERE domain = ?
+      LIMIT 1
+    `, [this.domain]);
+
+    if (rows.length > 0 && rows[0].last_sync_time) {
+      return new Date(rows[0].last_sync_time);
     }
+
+    // Default: start from 6 months ago for initial sync
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    return sixMonthsAgo;
   }
-  
-  private mapEmploymentStatus(status: any): string {
-    if (!status) return 'Active';
-    const statusStr = String(status).toLowerCase();
-    if (statusStr.includes('active')) return 'Active';
-    if (statusStr.includes('exit') || statusStr.includes('left')) return 'Exited';
-    if (statusStr.includes('notice')) return 'Notice Period';
-    return 'Active'; // Default
+
+  /**
+   * Update sync checkpoint
+   */
+  async updateCheckpoint(lastSyncTime: Date): Promise<void> {
+    await mysqlDb.execute(`
+      INSERT INTO legacy_sync_checkpoint (domain, last_sync_time, updated_at)
+      VALUES (?, ?, NOW())
+      ON DUPLICATE KEY UPDATE
+        last_sync_time = VALUES(last_sync_time),
+        updated_at = NOW()
+    `, [this.domain, lastSyncTime]);
+  }
+
+  /**
+   * Log sync run
+   */
+  async logSyncRun(status: 'success' | 'failure', recordsProcessed: number, recordsFailed: number, errorMessage?: string): Promise<void> {
+    await mysqlDb.execute(`
+      INSERT INTO legacy_sync_run_log
+        (id, domain, status, records_processed, records_failed, error_message, started_at, completed_at)
+      VALUES
+        (UUID(), ?, ?, ?, ?, ?, NOW(), NOW())
+    `, [this.domain, status, recordsProcessed, recordsFailed, errorMessage || null]);
   }
 }
 
