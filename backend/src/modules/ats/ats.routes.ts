@@ -27,82 +27,10 @@ atsRouter.post("/candidates",                    h(c.createCandidate.bind(c)));
 atsRouter.use("/onboarding-full", onboardingFullRouter);
 atsRouter.use("/bgv", bgvVerificationRouter);
 
-// ── PROTECTED — all remaining routes require a logged-in HR/recruiter ────────
-atsRouter.use(requireAuth);
-
-// Candidates (HR/recruiter facing) - Scoped
-atsRouter.get("/candidates", requireRole("admin", "hr", "recruiter", "manager"), h(async (req, res) => {
-  // Apply scope filtering
-  const scoped = await buildScopeWhereClause(
-    req.authUser!.id,
-    ["hr", "recruiter"],
-    {
-      branchId: "c.branch_id",
-      processId: "c.process_id"
-    },
-    { allowCeoAllRead: true }
-  );
-  (req as any).scopeFilter = scoped;
-  return c.listCandidates.bind(c)(req, res);
-}));
-atsRouter.get("/candidates/:id",                 requireRole("admin", "hr", "recruiter", "manager"), h(c.getCandidate.bind(c)));
-atsRouter.put("/candidates/:id",                 requireRole("admin", "recruiter"), h(c.updateCandidate.bind(c)));
-atsRouter.post("/candidates/:id/move-stage",     requireRole("admin", "recruiter", "manager"), h(c.moveStage.bind(c)));
-atsRouter.get("/candidates/:id/stage-logs",      requireRole("admin", "hr", "recruiter", "manager"), h(c.listStageLogs.bind(c)));
-
-// Candidate → Employee conversion
-atsRouter.post(
-  "/convert/:candidateId",
-  requireRole("admin", "hr"),
-  h(async (req: AuthenticatedRequest, res: Response) => {
-    const result = await convertCandidateToEmployee(
-      req.params.candidateId,
-      req.authUser!.id
-    );
-    return res.status(201).json({ success: true, data: result });
-  })
-);
-
-// Onboarding bridge
-atsRouter.post("/onboarding-bridge",             requireRole("admin", "hr"), h(c.createOnboardingBridge.bind(c)));
-atsRouter.patch("/onboarding-bridge/:id",        requireRole("admin", "hr"), h(c.updateOnboardingBridge.bind(c)));
-
-// Reference data
-atsRouter.get("/sourcing-channels",              requireRole("admin", "hr", "recruiter"), h(c.listSourcingChannels.bind(c)));
-atsRouter.get("/stats",                          requireRole("admin", "hr", "recruiter", "manager"), h(c.getDashboardStats.bind(c)));
-
-// Walk-in queue — candidates who arrived via Walk-In channel, sorted by walk_in_date desc
-atsRouter.get("/walkin-queue",                   requireRole("admin", "hr", "recruiter"), h(async (req: any, res: any) => {
-  const { db } = await import("../../db/mysql.js");
-  const [rows] = await db.execute(
-    `SELECT c.*, e.full_name AS assigned_to_name
-     FROM ats_candidate c
-     LEFT JOIN employees e ON e.id = c.created_by
-     WHERE c.sourcing_channel = 'Walk-In' AND c.active_status = 1
-     ORDER BY c.walk_in_date DESC, c.created_at DESC
-     LIMIT 100`,
-    []
-  ) as any[];
-  return res.json({ success: true, data: rows });
-}));
-
-// Alias: waiting-queue = walkin-queue (used by NativeATSWaitingQueue page)
-atsRouter.get("/waiting-queue",                  requireRole("admin", "hr", "recruiter", "manager"), h(async (req: any, res: any) => {
-  const { db } = await import("../../db/mysql.js");
-  const [rows] = await db.execute(
-    `SELECT c.* FROM ats_candidate c
-     WHERE c.current_stage IN ('New','Screening') AND c.active_status = 1
-     ORDER BY c.walk_in_date DESC, c.created_at DESC
-     LIMIT 100`,
-    []
-  ) as any[];
-  return res.json({ success: true, data: rows });
-}));
-
-// ── Candidate File Upload (PUBLIC - 1 hour window after registration) ────────
-
+// ── PUBLIC — candidate file upload (1 hour window after registration) ────────
 // Configure multer for candidate uploads
 const uploadDir = path.join(process.cwd(), "uploads", "candidates");
+const fs = await import("fs");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -188,6 +116,79 @@ atsRouter.post(
     });
   })
 );
+
+// ── PROTECTED — all remaining routes require a logged-in HR/recruiter ────────
+atsRouter.use(requireAuth);
+
+// Candidates (HR/recruiter facing) - Scoped
+atsRouter.get("/candidates", requireRole("admin", "hr", "recruiter", "manager"), h(async (req, res) => {
+  // Apply scope filtering
+  const scoped = await buildScopeWhereClause(
+    req.authUser!.id,
+    ["hr", "recruiter"],
+    {
+      branchId: "c.branch_id",
+      processId: "c.process_id"
+    },
+    { allowCeoAllRead: true }
+  );
+  (req as any).scopeFilter = scoped;
+  return c.listCandidates.bind(c)(req, res);
+}));
+atsRouter.get("/candidates/:id",                 requireRole("admin", "hr", "recruiter", "manager"), h(c.getCandidate.bind(c)));
+atsRouter.put("/candidates/:id",                 requireRole("admin", "recruiter"), h(c.updateCandidate.bind(c)));
+atsRouter.post("/candidates/:id/move-stage",     requireRole("admin", "recruiter", "manager"), h(c.moveStage.bind(c)));
+atsRouter.get("/candidates/:id/stage-logs",      requireRole("admin", "hr", "recruiter", "manager"), h(c.listStageLogs.bind(c)));
+
+// Candidate → Employee conversion
+atsRouter.post(
+  "/convert/:candidateId",
+  requireRole("admin", "hr"),
+  h(async (req: AuthenticatedRequest, res: Response) => {
+    const result = await convertCandidateToEmployee(
+      req.params.candidateId,
+      req.authUser!.id
+    );
+    return res.status(201).json({ success: true, data: result });
+  })
+);
+
+// Onboarding bridge
+atsRouter.post("/onboarding-bridge",             requireRole("admin", "hr"), h(c.createOnboardingBridge.bind(c)));
+atsRouter.patch("/onboarding-bridge/:id",        requireRole("admin", "hr"), h(c.updateOnboardingBridge.bind(c)));
+
+// Reference data
+atsRouter.get("/sourcing-channels",              requireRole("admin", "hr", "recruiter"), h(c.listSourcingChannels.bind(c)));
+atsRouter.get("/stats",                          requireRole("admin", "hr", "recruiter", "manager"), h(c.getDashboardStats.bind(c)));
+
+// Walk-in queue — candidates who arrived via Walk-In channel, sorted by walk_in_date desc
+atsRouter.get("/walkin-queue",                   requireRole("admin", "hr", "recruiter"), h(async (req: any, res: any) => {
+  const { db } = await import("../../db/mysql.js");
+  const [rows] = await db.execute(
+    `SELECT c.*, e.full_name AS assigned_to_name
+     FROM ats_candidate c
+     LEFT JOIN employees e ON e.id = c.created_by
+     WHERE c.sourcing_channel = 'Walk-In' AND c.active_status = 1
+     ORDER BY c.walk_in_date DESC, c.created_at DESC
+     LIMIT 100`,
+    []
+  ) as any[];
+  return res.json({ success: true, data: rows });
+}));
+
+// Alias: waiting-queue = walkin-queue (used by NativeATSWaitingQueue page)
+atsRouter.get("/waiting-queue",                  requireRole("admin", "hr", "recruiter", "manager"), h(async (req: any, res: any) => {
+  const { db } = await import("../../db/mysql.js");
+  const [rows] = await db.execute(
+    `SELECT c.* FROM ats_candidate c
+     WHERE c.current_stage IN ('New','Screening') AND c.active_status = 1
+     ORDER BY c.walk_in_date DESC, c.created_at DESC
+     LIMIT 100`,
+    []
+  ) as any[];
+  return res.json({ success: true, data: rows });
+}));
+
 
 // Onboarding flow — token generation, profile submission, offer mgmt, approve/reject
 atsRouter.use("/onboarding", onboardingRouter);
