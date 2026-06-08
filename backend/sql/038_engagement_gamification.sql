@@ -5,6 +5,34 @@
 -- =====================================================
 
 -- =====================================================
+-- 0. SCHEMA COMPATIBILITY: rename old column names to canonical ones
+--    (handles production tables created from a pre-038 schema definition
+--     that used id/badge_code/category/point_value instead of the canonical
+--     badge_id/badge_name/badge_category/points_value)
+-- =====================================================
+
+-- Rename id -> badge_id if old column exists and new one does not
+SET @has_old_id = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gamification_badge_master' AND COLUMN_NAME = 'id');
+SET @has_new_id = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gamification_badge_master' AND COLUMN_NAME = 'badge_id');
+SET @sql = IF(@has_old_id > 0 AND @has_new_id = 0, 'ALTER TABLE gamification_badge_master CHANGE COLUMN id badge_id CHAR(36) NOT NULL', 'SELECT ''badge_id ok'' AS migration_note');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Rename category -> badge_category if old column exists
+SET @col = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gamification_badge_master' AND COLUMN_NAME = 'category');
+SET @sql = IF(@col > 0, 'ALTER TABLE gamification_badge_master CHANGE COLUMN category badge_category ENUM(''performance'',''activity'',''tenure'',''social'') NOT NULL', 'SELECT ''badge_category ok'' AS migration_note');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Rename point_value -> points_value if old column exists
+SET @col = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gamification_badge_master' AND COLUMN_NAME = 'point_value');
+SET @sql = IF(@col > 0, 'ALTER TABLE gamification_badge_master CHANGE COLUMN point_value points_value INT NOT NULL DEFAULT 0', 'SELECT ''points_value ok'' AS migration_note');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Drop badge_code if it exists (not in canonical schema; no data dependency)
+SET @col = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gamification_badge_master' AND COLUMN_NAME = 'badge_code');
+SET @sql = IF(@col > 0, 'ALTER TABLE gamification_badge_master DROP COLUMN badge_code', 'SELECT ''badge_code absent ok'' AS migration_note');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- =====================================================
 -- 1. BADGE MASTER
 -- =====================================================
 CREATE TABLE IF NOT EXISTS gamification_badge_master (
