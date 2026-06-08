@@ -17,9 +17,20 @@ SET @has_new_id = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_S
 SET @sql = IF(@has_old_id > 0 AND @has_new_id = 0, 'ALTER TABLE gamification_badge_master CHANGE COLUMN id badge_id CHAR(36) NOT NULL', 'SELECT ''badge_id ok'' AS migration_note');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
--- Rename category -> badge_category if old column exists
+-- Rename category -> badge_category keeping VARCHAR (avoid ENUM truncation on old values)
 SET @col = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gamification_badge_master' AND COLUMN_NAME = 'category');
-SET @sql = IF(@col > 0, 'ALTER TABLE gamification_badge_master CHANGE COLUMN category badge_category ENUM(''performance'',''activity'',''tenure'',''social'') NOT NULL', 'SELECT ''badge_category ok'' AS migration_note');
+SET @sql = IF(@col > 0, 'ALTER TABLE gamification_badge_master CHANGE COLUMN category badge_category VARCHAR(50) NOT NULL', 'SELECT ''badge_category rename ok'' AS migration_note');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Normalize old category values that fall outside the canonical ENUM
+-- (043_demo_data used: teamwork -> social, attendance -> activity, learning -> activity)
+SET @col = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gamification_badge_master' AND COLUMN_NAME = 'badge_category');
+SET @sql = IF(@col > 0, 'UPDATE gamification_badge_master SET badge_category = CASE badge_category WHEN ''teamwork'' THEN ''social'' WHEN ''attendance'' THEN ''activity'' WHEN ''learning'' THEN ''activity'' ELSE badge_category END WHERE badge_category NOT IN (''performance'',''activity'',''tenure'',''social'')', 'SELECT ''badge_category data ok'' AS migration_note');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Now safe to tighten to ENUM
+SET @col = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gamification_badge_master' AND COLUMN_NAME = 'badge_category' AND DATA_TYPE = 'varchar');
+SET @sql = IF(@col > 0, 'ALTER TABLE gamification_badge_master MODIFY COLUMN badge_category ENUM(''performance'',''activity'',''tenure'',''social'') NOT NULL', 'SELECT ''badge_category enum ok'' AS migration_note');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Rename point_value -> points_value if old column exists
