@@ -61,6 +61,13 @@ const envSchema = z.object({
   LEGACY_SYNC_MAX_RETRIES: z.coerce.number().default(3),
   LEGACY_SYNC_RETRY_DELAY_MS: z.coerce.number().default(5000),
   LEGACY_CT_RETENTION_DAYS: z.coerce.number().default(2),
+
+  // Dialer DB (READ-ONLY for call data integration)
+  DIALER_DB_HOST: z.string().default("122.184.128.90"),
+  DIALER_DB_PORT: z.coerce.number().default(3306),
+  DIALER_DB_USER: z.string().default("root"),
+  DIALER_DB_PASSWORD: z.string().default("vicidialnow"),
+  DIALER_DB_NAME: z.string().default("dialer_db"),
 });
 
 const parsed = envSchema.safeParse(process.env);
