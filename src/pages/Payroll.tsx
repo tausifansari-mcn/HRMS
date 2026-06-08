@@ -29,7 +29,7 @@ import {
   useUpdatePayrollStatus,
   type PayrollRecord,
 } from "@/hooks/usePayroll";
-import { useIsAdminOrHR } from "@/hooks/useUserRole";
+import { useCanAccessPayroll } from "@/hooks/useUserRole";
 import { usePagination } from "@/hooks/usePagination";
 import { useToast } from "@/hooks/use-toast";
 
@@ -171,7 +171,7 @@ const Payroll = () => {
   );
 
   const { toast } = useToast();
-  const { isAdminOrHR, isLoading: roleLoading } = useIsAdminOrHR();
+  const { canAccessPayroll, isLoading: roleLoading } = useCanAccessPayroll();
 
   const currentDate = new Date();
   const currentMonth = currentDate.getMonth() + 1;
@@ -753,7 +753,7 @@ const Payroll = () => {
     );
   }
 
-  if (!isAdminOrHR) {
+  if (!canAccessPayroll) {
     return (
       <DashboardLayout>
         <Card className="border-slate-200 bg-white shadow-sm">
