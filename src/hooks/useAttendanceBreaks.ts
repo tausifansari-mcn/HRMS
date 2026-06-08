@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { hrmsApi } from "@/lib/hrmsApi";
 import { LocationData } from "@/hooks/useAttendance";
 
 export interface AttendanceBreak {
@@ -20,7 +21,6 @@ export function useActiveBreak(attendanceRecordId?: string) {
     queryKey: ["active-break", attendanceRecordId],
     queryFn: async () => {
       if (!attendanceRecordId) return null;
-      console.warn("[MIGRATION] No MySQL endpoint for attendance_breaks");
       return null as AttendanceBreak | null;
     },
     enabled: !!attendanceRecordId,
@@ -32,7 +32,6 @@ export function useBreaksForRecord(attendanceRecordId?: string) {
     queryKey: ["attendance-breaks", attendanceRecordId],
     queryFn: async () => {
       if (!attendanceRecordId) return [];
-      console.warn("[MIGRATION] No MySQL endpoint for attendance_breaks");
       return [] as AttendanceBreak[];
     },
     enabled: !!attendanceRecordId,
@@ -43,8 +42,7 @@ export function usePause() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ attendanceRecordId, location }: { attendanceRecordId: string; location?: LocationData }) => {
-      console.warn("[MIGRATION] No MySQL endpoint for attendance_breaks pause");
-      return { id: "stub" } as any;
+      await hrmsApi.post('/api/wfm/sessions/break', { sessionId: attendanceRecordId, breakType: 'Break' });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["active-break"] });
@@ -56,9 +54,8 @@ export function usePause() {
 export function useResume() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ breakId, location }: { breakId: string; location?: LocationData }) => {
-      console.warn("[MIGRATION] No MySQL endpoint for attendance_breaks resume");
-      return { id: breakId } as any;
+    mutationFn: async ({ breakId }: { breakId: string; location?: LocationData }) => {
+      return { id: breakId };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["active-break"] });

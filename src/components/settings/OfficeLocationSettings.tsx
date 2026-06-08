@@ -22,11 +22,12 @@ export function useOfficeLocation() {
   return useQuery({
     queryKey: ["office-location"],
     queryFn: async () => {
-      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/org/settings"); return { data: res.data ?? [], error: null }; })();
-
-      if (error) throw error;
-      if (!data) return null;
-      return data.setting_value as unknown as OfficeLocation;
+      try {
+        const result = await hrmsApi.get<{success: boolean; data: {setting_key: string; setting_value: OfficeLocation} | null}>('/api/org/settings/office_location');
+        return (result as any).data?.setting_value ?? null;
+      } catch {
+        return null;
+      }
     },
   });
 }
@@ -68,15 +69,7 @@ export default function OfficeLocationSettings() {
 
   const saveMutation = useMutation({
     mutationFn: async (location: OfficeLocation) => {
-      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/org/settings"); return { data: res.data ?? [], error: null }; })();
-
-      if (existingRow) {
-        const { error } = await (async () => { console.warn("[MIGRATION] update to organization_settings stubbed"); return { data: null, error: null }; })();
-        if (error) throw error;
-      } else {
-        const { error } = await (async () => { console.warn("[MIGRATION] insert to organization_settings stubbed"); return { data: null, error: null }; })();
-        if (error) throw error;
-      }
+      await hrmsApi.put('/api/org/settings/office_location', { setting_value: location });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["office-location"] });

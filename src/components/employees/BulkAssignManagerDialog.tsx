@@ -55,9 +55,11 @@ export function BulkAssignManagerDialog({
 
   const assignManagerMutation = useMutation({
     mutationFn: async ({ employeeIds, managerId }: { employeeIds: string[]; managerId: string }) => {
-      const { error } = await (async () => { console.warn("[MIGRATION] update to employees stubbed"); return { data: null, error: null }; })();
-
-      if (error) throw error;
+      await Promise.all(
+        employeeIds.map((id) =>
+          hrmsApi.patch(`/api/employees/${id}`, { reporting_manager_id: managerId })
+        )
+      );
       return { updatedCount: employeeIds.length };
     },
     onSuccess: ({ updatedCount }) => {

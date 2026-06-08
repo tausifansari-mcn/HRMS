@@ -141,15 +141,7 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
         const rating = ratings[goal.id];
         if (rating === undefined) continue;
 
-        await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/performance-feedback/reports"); return { data: res.data ?? [], error: null }; })();
-
-        if (existing) {
-          const { error } = await (async () => { console.warn("[MIGRATION] update to review_kpi_ratings stubbed"); return { data: null, error: null }; })();
-          if (error) throw error;
-        } else {
-          const { error } = await (async () => { console.warn("[MIGRATION] insert to review_kpi_ratings stubbed"); return { data: null, error: null }; })();
-          if (error) throw error;
-        }
+        await hrmsApi.post('/api/kpi/scores', { metric_id: goal.id, score: rating, notes: `Review ${reviewId}` });
       }
     },
   });

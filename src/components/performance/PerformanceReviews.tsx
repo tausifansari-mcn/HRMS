@@ -53,9 +53,8 @@ export function PerformanceReviews({ employeeId, employeeName = "Employee" }: Pe
     queryKey: ["review-kpi-ratings", expandedReview],
     queryFn: async () => {
       if (!expandedReview) return [];
-      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/performance-feedback/reports"); return { data: res.data ?? [], error: null }; })();
-      if (error) throw error;
-      return data as KpiRating[];
+      const result = await hrmsApi.get<{ success: boolean; data: any[] }>(`/api/performance-feedback/reports`);
+      return result.data ?? [];
     },
     enabled: !!expandedReview,
   });
@@ -63,16 +62,11 @@ export function PerformanceReviews({ employeeId, employeeName = "Employee" }: Pe
   // Upsert employee rating
   const upsertRating = useMutation({
     mutationFn: async ({ reviewId, goalId, rating }: { reviewId: string; goalId: string; rating: number }) => {
-      // Try update first
-      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/performance-feedback/reports"); return { data: res.data ?? [], error: null }; })();
-
-      if (existing) {
-        const { error } = await (async () => { console.warn("[MIGRATION] update to review_kpi_ratings stubbed"); return { data: null, error: null }; })();
-        if (error) throw error;
-      } else {
-        const { error } = await (async () => { console.warn("[MIGRATION] insert to review_kpi_ratings stubbed"); return { data: null, error: null }; })();
-        if (error) throw error;
-      }
+      await hrmsApi.post('/api/kpi/scores', {
+        metric_id: goalId,
+        score: rating,
+        notes: `Review ${reviewId}`,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["review-kpi-ratings", expandedReview] });

@@ -30,20 +30,16 @@ const DomainWhitelistSettings = () => {
   const { data: settings, isLoading } = useQuery({
     queryKey: ['domain-whitelist-settings'],
     queryFn: async () => {
-      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/org/settings"); return { data: res.data ?? [], error: null }; })();
-      
-      if (error) throw error;
-      return data;
-    }
+      const result = await hrmsApi.get<{success: boolean; data: {setting_key: string; setting_value: any} | null}>('/api/org/settings/domain_whitelist');
+      return (result as any).data ?? null;
+    },
   });
 
   const settingValue: DomainWhitelistValue = (settings?.setting_value as unknown as DomainWhitelistValue) || { enabled: false, domains: [] };
 
   const updateMutation = useMutation({
     mutationFn: async (newValue: DomainWhitelistValue) => {
-      const { error } = await (async () => { console.warn("[MIGRATION] update to organization_settings stubbed"); return { data: null, error: null }; })();
-      
-      if (error) throw error;
+      await hrmsApi.put('/api/org/settings/domain_whitelist', { setting_value: newValue });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['domain-whitelist-settings'] });

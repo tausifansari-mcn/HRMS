@@ -1,4 +1,6 @@
-const HRMS_API_URL = import.meta.env.VITE_HRMS_API_URL || 'http://localhost:5055';
+const HRMS_API_URL = (import.meta.env.VITE_HRMS_API_URL !== undefined && import.meta.env.VITE_HRMS_API_URL !== '')
+  ? String(import.meta.env.VITE_HRMS_API_URL).replace(/\/$/, '')
+  : (import.meta.env.DEV ? 'http://localhost:5055' : '');
 
 function getPortalToken(): string | null {
   return localStorage.getItem("portal_token");

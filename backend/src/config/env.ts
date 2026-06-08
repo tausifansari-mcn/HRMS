@@ -8,11 +8,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(5000),
   FRONTEND_URL: z.string().url().default("http://localhost:5173"),
 
-  SUPABASE_URL: z.string().url().optional().default("https://placeholder.supabase.co"),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().optional().default(""),
-  SUPABASE_ANON_KEY: z.string().optional().default(""),
-
-  ACTIVE_DB_PROVIDER: z.enum(["supabase", "sqlserver", "mysql"]).default("supabase"),
+  ACTIVE_DB_PROVIDER: z.enum(["supabase", "sqlserver", "mysql"]).default("mysql"),
 
   // MySQL (mas_hrms) — optional, only required when ACTIVE_DB_PROVIDER includes mysql modules
   DB_HOST:     z.string().default("localhost"),
@@ -45,6 +41,7 @@ const envSchema = z.object({
   SMTP_USER:   z.string().default(""),
   SMTP_PASS:   z.string().default(""),
   SMTP_FROM:   z.string().default("noreply@mascallnet.com"),
+  SMTP_FROM_NAME: z.string().default("MAS Callnet HRMS"),
 
   // Legacy MySQL Database
   LEGACY_MYSQL_HOST: z.string().default(""),

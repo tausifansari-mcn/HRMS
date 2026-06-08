@@ -41,12 +41,18 @@ export function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
   const { data: unpaidLeaveType } = useQuery({
     queryKey: ["unpaid-leave-type"],
     queryFn: async () => {
-      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/leave/types"); return { data: res.data ?? [], error: null }; })();
+      const result = await hrmsApi.get<{ success: boolean; data: Array<{ id: string; leave_name: string; max_days_per_year: number | null; carry_forward: boolean; paid_leave: boolean }> }>('/api/leave/types');
+      const types = result.data ?? [];
+      const existing = types.find(t => t.leave_name === 'Unpaid Leave');
       if (existing) return existing;
-
-      await (async () => { console.warn("[MIGRATION] insert to leave_types stubbed"); return { data: null, error: null }; })();
-      if (insErr) throw insErr;
-      return created;
+      const created = await hrmsApi.post<{ success: boolean; data: { id: string; leave_name: string; max_days_per_year: number | null; carry_forward: boolean; paid_leave: boolean } }>('/api/leave/types', {
+        leave_name: 'Unpaid Leave',
+        max_days_per_year: null,
+        carry_forward: false,
+        requires_approval: true,
+        paid_leave: false,
+      });
+      return created.data;
     },
   });
 

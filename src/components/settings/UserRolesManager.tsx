@@ -158,12 +158,10 @@ export function UserRolesManager() {
     mutationFn: async ({ userId, role, existingRoleId }: { userId: string; role: AppRole; existingRoleId: string | null }) => {
       if (existingRoleId) {
         // Update existing role
-        const { error } = await (async () => { console.warn("[MIGRATION] update to user_roles stubbed"); return { data: null, error: null }; })();
-        if (error) throw error;
+        await hrmsApi.post(`/api/admin/users/${userId}/roles`, { roleKey: role });
       } else {
         // Insert new role
-        const { error } = await (async () => { console.warn("[MIGRATION] insert to user_roles stubbed"); return { data: null, error: null }; })();
-        if (error) throw error;
+        await hrmsApi.post(`/api/admin/users/${userId}/roles`, { roleKey: role });
       }
     },
     onSuccess: () => {
@@ -180,8 +178,11 @@ export function UserRolesManager() {
 
   const toggleBlockMutation = useMutation({
     mutationFn: async ({ userId, block }: { userId: string; block: boolean }) => {
-      const { error } = await (async () => { console.warn("[MIGRATION] update to profiles stubbed"); return { data: null, error: null }; })();
-      if (error) throw error;
+      if (block) {
+        await hrmsApi.post('/api/account-control/lock', { userId });
+      } else {
+        await hrmsApi.post('/api/account-control/unlock', { userId });
+      }
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
@@ -201,8 +202,7 @@ export function UserRolesManager() {
 
   const linkEmployeeMutation = useMutation({
     mutationFn: async ({ employeeId, userId }: { employeeId: string; userId: string }) => {
-      const { error } = await (async () => { console.warn("[MIGRATION] update to employees stubbed"); return { data: null, error: null }; })();
-      if (error) throw error;
+      await hrmsApi.patch(`/api/employees/${employeeId}`, { user_id: userId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
@@ -220,8 +220,7 @@ export function UserRolesManager() {
 
   const unlinkEmployeeMutation = useMutation({
     mutationFn: async ({ employeeId }: { employeeId: string }) => {
-      const { error } = await (async () => { console.warn("[MIGRATION] update to employees stubbed"); return { data: null, error: null }; })();
-      if (error) throw error;
+      await hrmsApi.patch(`/api/employees/${employeeId}`, { user_id: null });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });

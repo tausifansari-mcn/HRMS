@@ -165,9 +165,7 @@ const Profile = () => {
     mutationFn: async (data: ProfileForm) => {
       if (!employee?.id) throw new Error("No employee profile found");
 
-      const { error } = await (async () => { console.warn("[MIGRATION] update to employees stubbed"); return { data: null, error: null }; })();
-
-      if (error) throw error;
+      await hrmsApi.patch(`/api/employees/${employee.id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-profile'] });

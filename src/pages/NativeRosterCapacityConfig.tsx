@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Users, Clock, CheckCircle, XCircle, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { hrmsApi } from '@/lib/hrmsApi';
 
 interface Process {
   id: string;
@@ -49,12 +50,8 @@ export default function NativeRosterCapacityConfig() {
 
   const fetchProcesses = async () => {
     try {
-      const response = await fetch('http://localhost:3002/api/processes', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      const data = await response.json();
+      const result = await hrmsApi.get<{ success: boolean; data: Process[] }>('/api/processes');
+      const data = result.data ?? [];
       setProcesses(data);
       if (data.length > 0) {
         setSelectedProcess(data[0].id);
@@ -71,15 +68,14 @@ export default function NativeRosterCapacityConfig() {
     try {
       // Fetch all 7 days config
       const promises = DAYS.map(day =>
-        fetch(`http://localhost:3002/api/roster-capacity/config/${selectedProcess}/${day.value}`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        }).then(r => r.ok ? r.json() : null)
+        hrmsApi
+          .get<{ success: boolean; data: CapacityConfig | null }>(`/api/roster-capacity/config/${selectedProcess}/${day.value}`)
+          .then(result => result.data ?? null)
+          .catch(() => null)
       );
 
       const results = await Promise.all(promises);
-      setConfigs(results.filter(Boolean));
+      setConfigs(results.filter(Boolean) as CapacityConfig[]);
     } catch (error) {
       console.error('Failed to fetch configs:', error);
     } finally {
@@ -119,29 +115,15 @@ export default function NativeRosterCapacityConfig() {
 
     setSaving(true);
     try {
-      const response = await fetch(
-        `http://localhost:3002/api/roster-capacity/config/${selectedProcess}/${dayOfWeek}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-          body: JSON.stringify({
-            max_weekoff_count: config.max_weekoff_count,
-            max_weekoff_percentage: config.max_weekoff_percentage,
-            auto_approve_enabled: config.auto_approve_enabled === 1,
-            auto_approve_threshold: config.auto_approve_threshold,
-          }),
-        }
-      );
+      await hrmsApi.patch(`/api/roster-capacity/config/${selectedProcess}/${dayOfWeek}`, {
+        max_weekoff_count: config.max_weekoff_count,
+        max_weekoff_percentage: config.max_weekoff_percentage,
+        auto_approve_enabled: config.auto_approve_enabled === 1,
+        auto_approve_threshold: config.auto_approve_threshold,
+      });
 
-      if (response.ok) {
-        alert('Configuration saved successfully');
-        fetchConfigs(); // Refresh
-      } else {
-        alert('Failed to save configuration');
-      }
+      alert('Configuration saved successfully');
+      fetchConfigs(); // Refresh
     } catch (error) {
       console.error('Failed to save config:', error);
       alert('Error saving configuration');

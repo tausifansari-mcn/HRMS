@@ -14,8 +14,8 @@ const h = (fn: Function) => (req: any, res: any, next: any) => fn(req, res).catc
  */
 router.get("/forgot-password-info", (_req, res: Response) => {
   return res.json({
-    message: "Password reset is handled via Supabase Auth.",
-    instructions: "Use the Supabase Auth forgot-password flow or contact your HR/Admin for an admin-initiated reset.",
+    message: "Password reset is handled via email OTP.",
+    instructions: "Use the forgot-password form to receive a reset link by email, or contact your HR/Admin for an admin-initiated reset.",
   });
 });
 

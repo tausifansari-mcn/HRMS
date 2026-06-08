@@ -257,20 +257,16 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
 
   const updateMutation = useMutation({
     mutationFn: async ({ data, isDeptManager }: { data: EditFormData; isDeptManager: boolean }) => {
-      const { error } = await (async () => { console.warn("[MIGRATION] update to employees stubbed"); return { data: null, error: null }; })();
-
-      if (error) throw error;
+      await hrmsApi.patch(`/api/employees/${employee.id}`, data);
 
       // Update department manager status if employee has a department
       if (data.department_id) {
         if (isDeptManager) {
           // Set this employee as the department manager
-          const { error: deptError } = await (async () => { console.warn("[MIGRATION] update to departments stubbed"); return { data: null, error: null }; })();
-          if (deptError) throw deptError;
+          await hrmsApi.put(`/api/org/departments/${data.department_id}`, { manager_id: employee.id });
         } else {
           // Remove this employee as department manager if they were previously set
-          const { error: deptError } = await (async () => { console.warn("[MIGRATION] update to departments stubbed"); return { data: null, error: null }; })();
-          if (deptError) throw deptError;
+          await hrmsApi.put(`/api/org/departments/${data.department_id}`, { manager_id: null });
         }
       }
     },
@@ -299,9 +295,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
         effective_from: data.effective_from,
       };
 
-      const { error } = await (async () => { console.warn("[MIGRATION] upsert to salary_structures stubbed"); return { data: null, error: null }; })();
-
-      if (error) throw error;
+      await hrmsApi.patch(`/api/employees/${employee.id}`, { salary_info: salaryPayload });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salary-structures"] });
