@@ -165,7 +165,7 @@ router.get("/launch-readiness", h(async (_req, res) => {
     `SELECT
        COUNT(*) AS active_employees,
        SUM(CASE WHEN e.user_id IS NULL THEN 1 ELSE 0 END) AS employees_without_user,
-       SUM(CASE WHEN (COALESCE(e.email, '') = '' AND COALESCE(e.official_email, '') = '') THEN 1 ELSE 0 END) AS employees_without_email,
+       SUM(CASE WHEN COALESCE(e.email, '') = '' THEN 1 ELSE 0 END) AS employees_without_email,
        SUM(CASE WHEN e.reporting_manager_id IS NULL THEN 1 ELSE 0 END) AS missing_manager,
        SUM(CASE WHEN e.branch_id IS NULL THEN 1 ELSE 0 END) AS missing_branch,
        SUM(CASE WHEN e.process_id IS NULL THEN 1 ELSE 0 END) AS missing_process
@@ -191,7 +191,7 @@ router.post("/bootstrap-existing-users", h(async (req, res) => {
   const hasKpiTables = await tableExists("kpi_employee_assignment") && await tableExists("kpi_role_template");
 
   for (const emp of employees) {
-    const email = normalizeEmail(emp.email ?? emp.official_email);
+    const email = normalizeEmail(emp.email);
     const employeeId = String(emp.id);
     const employeeCode = String(emp.employee_code ?? "");
     try {
