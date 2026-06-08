@@ -54,6 +54,15 @@ const envSchema = z.object({
   LEGACY_MYSQL_USER: z.string().default(""),
   LEGACY_MYSQL_PASSWORD: z.string().default(""),
 
+  // Legacy SQL Server (MSSQL) for historical billing data
+  LEGACY_MSSQL_HOST:       z.string().default(""),
+  LEGACY_MSSQL_PORT:       z.coerce.number().default(1433),
+  LEGACY_MSSQL_DATABASE:   z.string().default(""),
+  LEGACY_MSSQL_USER:       z.string().default(""),
+  LEGACY_MSSQL_PASSWORD:   z.string().default(""),
+  LEGACY_MSSQL_ENCRYPT:    z.string().default("false"),
+  LEGACY_MSSQL_TRUST_CERT: z.string().default("true"),
+
   // Sync configuration
   LEGACY_SYNC_ENABLED: z.string().default("false"),
   LEGACY_SYNC_INTERVAL_MS: z.coerce.number().default(60000),

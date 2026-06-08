@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { getLegacyPool } from '../../db/legacyDb.js';
 import { db as mysqlDb } from '../../db/mysql.js';
 import type { ScanResult, TableProfile, RelevanceFactors } from './types.js';

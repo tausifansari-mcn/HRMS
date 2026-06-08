@@ -192,11 +192,23 @@ export async function runPendingMigrations(): Promise<MigrationHealth> {
         continue;
       }
 
-      const sql = fs.readFileSync(filePath, "utf8");
+      const rawSql = fs.readFileSync(filePath, "utf8");
+
+      // Strip comment lines before splitting so leading -- comments do not
+      // cause valid statements to be silently dropped.
+      const sql = rawSql
+        .split("\n")
+        .filter((line) => !line.trim().startsWith("--"))
+        .join("\n");
       const statements = sql
         .split(";")
         .map((s) => s.trim())
-        .filter((s) => s.length > 0 && !s.startsWith("--"));
+        .filter((statement) => {
+          if (!statement) return false;
+          const upper = statement.toUpperCase();
+          // SOURCE is a MySQL client directive — not valid in programmatic execute()
+          return !upper.startsWith("SOURCE ");
+        });
 
       try {
         for (const statement of statements) await db.execute(statement);

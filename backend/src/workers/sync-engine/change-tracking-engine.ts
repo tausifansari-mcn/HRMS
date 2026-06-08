@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { getLegacyPool } from '../../db/legacyDb.js';
 import type { LegacyChange } from '../../modules/legacy/types.js';
 

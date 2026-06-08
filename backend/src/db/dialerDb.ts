@@ -2,11 +2,11 @@ import mysql from 'mysql2/promise';
 import { env } from '../config/env.js';
 
 const config: mysql.PoolOptions = {
-  host: env.DIALER_DB_HOST || '122.184.128.90',
+  host: env.DIALER_DB_HOST,
   port: env.DIALER_DB_PORT || 3306,
-  user: env.DIALER_DB_USER || 'root',
-  password: env.DIALER_DB_PASSWORD || 'vicidialnow',
-  database: env.DIALER_DB_NAME || 'dialer_db',
+  user: env.DIALER_DB_USER,
+  password: env.DIALER_DB_PASSWORD,
+  database: env.DIALER_DB_NAME,
   waitForConnections: true,
   connectionLimit: 5, // Low limit for read-only queries
   queueLimit: 0,
@@ -14,7 +14,7 @@ const config: mysql.PoolOptions = {
   keepAliveInitialDelay: 0,
   connectTimeout: 15000,
   // ENFORCE READ-ONLY
-  flags: '-ALLOW_LOCAL_INFILE',
+  flags: ['-ALLOW_LOCAL_INFILE'],
   connectAttributes: {
     program_name: 'HRMS_ReadOnly_Dialer',
   },

@@ -14,7 +14,7 @@ const DEMO_ACCOUNTS = [
   { id: 'demo-hr-id',        email: 'hr@mascallnet.com',        password: 'Hr@123456'   },
   { id: 'demo-recruiter-id', email: 'recruiter@mascallnet.com', password: 'Recruiter@1' },
   { id: 'demo-manager-id',   email: 'manager@mascallnet.com',   password: 'Manager@1'   },
-  { id: 'demo-tl-id',        email: 'tl@mascallnet.com',        password: 'TL@123456'   },
+  { id: 'demo-tl-id',        email: 'tl@mascallnet.com',        password: 'TeamLead@1'  },
   { id: 'demo-qa-id',        email: 'qa@mascallnet.com',        password: 'Quality@1'   },
   { id: 'demo-wfm-id',       email: 'wfm@mascallnet.com',       password: 'Workforce@1' },
   { id: 'demo-finance-id',   email: 'finance@mascallnet.com',   password: 'Finance@1'   },
