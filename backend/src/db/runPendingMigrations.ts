@@ -1,11 +1,87 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import mysql from "mysql2/promise";
 import { db } from "./mysql.js";
 import { env } from "../config/env.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SQL_DIR = path.resolve(__dirname, "../../sql");
+
+// Canonical migration order, derived from 000_run_all.sql.
+// 043_demo_data.sql is excluded unless SEED_DEMO_DATA=true.
+// Non-b duplicates (020, 021, 022) are excluded — only b-variants are sourced.
+const MIGRATION_MANIFEST: string[] = [
+  "001_core_org.sql",
+  "002_employees.sql",
+  "003_access_control.sql",
+  "004_ats.sql",
+  "005_attendance_wfm.sql",
+  "006_leave.sql",
+  "007_payroll.sql",
+  "008_integration_hub.sql",
+  "009_dialer_ispark.sql",
+  "010_kpi.sql",
+  "010_kpi_migration.sql",
+  "011_exit_management.sql",
+  "012_client_portal.sql",
+  "012_roster_shift_times.sql",
+  "015_platform_foundation.sql",
+  "016_employee_lifecycle.sql",
+  "017_ats_wfm_completion.sql",
+  "018_payroll_exit_completion.sql",
+  "019_performance_surfaces.sql",
+  "020_lms_integration.sql",
+  "020b_roster_governance.sql",
+  "021_location_master.sql",
+  "021b_attendance_leave_rta.sql",
+  "022_benefits_claims.sql",
+  "022b_account_control_workforce_mandate.sql",
+  "023_career_pip.sql",
+  "024_erp.sql",
+  "025_goals_skills.sql",
+  "026_notifications_transfer.sql",
+  "027_jobs_reports.sql",
+  "028_statutory_compliance.sql",
+  "029_labour_law.sql",
+  "030_dpdp_privacy.sql",
+  "031_breach_log.sql",
+  "032_consent_text_versions.sql",
+  "033_kpi_process_config.sql",
+  "034_kpi_families.sql",
+  "035_portal_published_data.sql",
+  "036_erp_billing.sql",
+  "037_performance_feedback.sql",
+  "037_performance_feedback_fix.sql",
+  "038_engagement_gamification.sql",
+  "039_engagement_activity_badges.sql",
+  "040_communication.sql",
+  "041_schema_gap_fill.sql",
+  "042_maternity_schema_patch.sql",
+  "044_attendance_engine.sql",
+  "045_role_compat.sql",
+  "046_call_centre_code.sql",
+  "047_roster_preference.sql",
+  "048_offerletter_cc.sql",
+  "049_report_master.sql",
+  "050_auth_mysql.sql",
+  "051_ats_form_config.sql",
+  "052_legacy_migration_tables.sql",
+  "053_password_reset.sql",
+  "054_ats_onboarding_flow.sql",
+  "060_roster_master.sql",
+  "061_roster_capacity.sql",
+  "062_ats_candidate_created_by.sql",
+  "064_leave_type_updated_at.sql",
+  "065_department_description.sql",
+  "066_company_events.sql",
+  "067_org_settings.sql",
+  "068_upload_batch.sql",
+  "069_upload_batch_row_unique.sql",
+  "070_attendance_clock_columns.sql",
+  "071_communication_provider_config.sql",
+  "102_biometric_tables.sql",
+];
 
 export type MigrationHealth = {
   status: "not_started" | "running" | "ok" | "failed";
@@ -44,9 +120,32 @@ function isIdempotentMigrationError(error: any): boolean {
 }
 
 /**
- * Runs pending SQL migrations and records a health summary for monitoring.
- * Production startup is blocked when any migration fails so the API cannot
- * advertise a healthy deployment against an incomplete schema.
+ * Ensures the target database exists before the pooled connection (which
+ * requires the DB name) is used. Uses a temporary no-database connection.
+ */
+async function ensureDatabaseExists(): Promise<void> {
+  const conn = await mysql.createConnection({
+    host: env.DB_HOST,
+    port: env.DB_PORT,
+    user: env.DB_USER,
+    password: env.DB_PASSWORD,
+  });
+  try {
+    await conn.query(
+      `CREATE DATABASE IF NOT EXISTS \`${env.DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+    );
+    console.log(`[migration] database '${env.DB_NAME}' ensured`);
+  } finally {
+    await conn.end();
+  }
+}
+
+/**
+ * Runs pending SQL migrations in manifest order and records a health summary.
+ * - Uses MIGRATION_MANIFEST (derived from 000_run_all.sql) instead of directory scan.
+ * - Skips non-b duplicate variants (020, 021, 022) which are excluded from manifest.
+ * - Runs 043_demo_data.sql only when SEED_DEMO_DATA=true.
+ * - Production startup is blocked when any migration fails.
  */
 export async function runPendingMigrations(): Promise<MigrationHealth> {
   migrationHealth = {
@@ -59,6 +158,9 @@ export async function runPendingMigrations(): Promise<MigrationHealth> {
   };
 
   try {
+    // Ensure the database exists before attempting any DDL via the pool.
+    await ensureDatabaseExists();
+
     await db.execute(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         filename   VARCHAR(255) NOT NULL PRIMARY KEY,
@@ -69,22 +171,32 @@ export async function runPendingMigrations(): Promise<MigrationHealth> {
     const [applied] = await db.execute<any[]>("SELECT filename FROM schema_migrations");
     const appliedSet = new Set((applied as any[]).map((row: any) => row.filename));
 
-    const files = fs
-      .readdirSync(SQL_DIR)
-      .filter((file) => file.endsWith(".sql") && file !== "000_run_all.sql")
-      .sort();
+    // Build the effective file list: manifest + optional demo seed
+    const files: string[] = [...MIGRATION_MANIFEST];
+    if (env.SEED_DEMO_DATA) {
+      // Insert demo seed after 050_auth_mysql.sql (which creates auth_user)
+      const idx = files.indexOf("050_auth_mysql.sql");
+      files.splice(idx + 1, 0, "043_demo_data.sql");
+    }
 
     for (const file of files) {
+      const filePath = path.join(SQL_DIR, file);
+      if (!fs.existsSync(filePath)) {
+        console.warn(`[migration] skipping missing file: ${file}`);
+        migrationHealth.skipped.push(file);
+        continue;
+      }
+
       if (appliedSet.has(file)) {
         migrationHealth.skipped.push(file);
         continue;
       }
 
-      const sql = fs.readFileSync(path.join(SQL_DIR, file), "utf8");
+      const sql = fs.readFileSync(filePath, "utf8");
       const statements = sql
         .split(";")
-        .map((statement) => statement.trim())
-        .filter((statement) => statement.length > 0 && !statement.startsWith("--"));
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0 && !s.startsWith("--"));
 
       try {
         for (const statement of statements) await db.execute(statement);

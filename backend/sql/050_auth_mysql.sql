@@ -24,20 +24,4 @@ CREATE TABLE IF NOT EXISTS auth_refresh_token (
   INDEX idx_rt_token (token_hash)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Seed demo users with bcrypt hashes of their passwords
--- IMPORTANT: These are the SAME users as in the demo credential map in authMiddleware.ts
--- Passwords: Admin@123, Hr@123456, Recruiter@1, Manager@1, TL@123456, Quality@1, Workforce@1, Finance@1, Employee@1, Ceo@12345, Trainer@1
-INSERT IGNORE INTO auth_user (id, email, password_hash) VALUES
-  ('demo-admin-id',     'admin@mascallnet.com',     '$2b$10$placeholder_admin_hash'),
-  ('demo-hr-id',        'hr@mascallnet.com',         '$2b$10$placeholder_hr_hash'),
-  ('demo-recruiter-id', 'recruiter@mascallnet.com',  '$2b$10$placeholder_recruiter_hash'),
-  ('demo-manager-id',   'manager@mascallnet.com',    '$2b$10$placeholder_manager_hash'),
-  ('demo-tl-id',        'tl@mascallnet.com',         '$2b$10$placeholder_tl_hash'),
-  ('demo-qa-id',        'qa@mascallnet.com',         '$2b$10$placeholder_qa_hash'),
-  ('demo-wfm-id',       'wfm@mascallnet.com',        '$2b$10$placeholder_wfm_hash'),
-  ('demo-finance-id',   'finance@mascallnet.com',    '$2b$10$placeholder_finance_hash'),
-  ('demo-employee-id',  'employee@mascallnet.com',   '$2b$10$placeholder_employee_hash'),
-  ('demo-ceo-id',       'ceo@mascallnet.com',        '$2b$10$placeholder_ceo_hash'),
-  ('demo-trainer-id',   'trainer@mascallnet.com',    '$2b$10$placeholder_trainer_hash');
-
 SELECT 'Migration 050 applied: auth_user and auth_refresh_token tables created' AS status;

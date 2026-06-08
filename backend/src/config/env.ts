@@ -5,8 +5,8 @@ dotenv.config();
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  PORT: z.coerce.number().default(5000),
-  FRONTEND_URL: z.string().url().default("http://localhost:5173"),
+  PORT: z.coerce.number().default(5055),
+  FRONTEND_URL: z.string().url().default("http://localhost:8080"),
 
   ACTIVE_DB_PROVIDER: z.enum(["supabase", "sqlserver", "mysql"]).default("mysql"),
 
@@ -19,9 +19,9 @@ const envSchema = z.object({
   DB_POOL_MAX: z.coerce.number().default(10),
 
   // NCOSEC Biometric DB (Matrix Cosec SQL Server)
-  NCOSEC_DB_HOST:     z.string().default("172.10.10.146"),
+  NCOSEC_DB_HOST:     z.string().default(""),
   NCOSEC_DB_PORT:     z.coerce.number().default(1433),
-  NCOSEC_DB_USER:     z.string().default("shivamg"),
+  NCOSEC_DB_USER:     z.string().default(""),
   NCOSEC_DB_PASSWORD: z.string().default(""),
   NCOSEC_DB_NAME:     z.string().default("NCOSEC"),
   NCOSEC_DB_ENCRYPT:  z.string().default("false"),
@@ -36,6 +36,10 @@ const envSchema = z.object({
   COMM_SECRET: z.string().min(16).optional(),
   // Enables mock-token demo bypass. Must NOT be "true" in production.
   INTERNAL_DEMO_BYPASS: z.string().optional().default("false"),
+  // Set to "true" to start tenure, communication, attendance, and legacy sync workers.
+  ENABLE_SCHEDULERS: z.string().default("false"),
+  // Set to "true" to run 043_demo_data.sql during migrations (local dev only).
+  SEED_DEMO_DATA: z.string().default("false"),
   SMTP_HOST:   z.string().default("smtp.gmail.com"),
   SMTP_PORT:   z.coerce.number().default(587),
   SMTP_USER:   z.string().default(""),
@@ -60,11 +64,11 @@ const envSchema = z.object({
   LEGACY_CT_RETENTION_DAYS: z.coerce.number().default(2),
 
   // Dialer DB (READ-ONLY for call data integration)
-  DIALER_DB_HOST: z.string().default("122.184.128.90"),
+  DIALER_DB_HOST: z.string().default(""),
   DIALER_DB_PORT: z.coerce.number().default(3306),
-  DIALER_DB_USER: z.string().default("root"),
-  DIALER_DB_PASSWORD: z.string().default("vicidialnow"),
-  DIALER_DB_NAME: z.string().default("dialer_db"),
+  DIALER_DB_USER: z.string().default(""),
+  DIALER_DB_PASSWORD: z.string().default(""),
+  DIALER_DB_NAME: z.string().default(""),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -108,4 +112,6 @@ export const env = {
   // Convert string boolean env vars to actual booleans
   LEGACY_SYNC_ENABLED: parsed.data.LEGACY_SYNC_ENABLED === 'true',
   LEGACY_SYNC_PARALLEL_DOMAINS: parsed.data.LEGACY_SYNC_PARALLEL_DOMAINS !== 'false',
+  ENABLE_SCHEDULERS: parsed.data.ENABLE_SCHEDULERS === 'true',
+  SEED_DEMO_DATA: parsed.data.SEED_DEMO_DATA === 'true',
 };

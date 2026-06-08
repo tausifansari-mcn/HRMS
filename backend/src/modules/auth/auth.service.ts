@@ -91,14 +91,14 @@ export const authService = {
               COALESCE(au.must_change_password, 0) AS must_change_password,
               e.active_status
          FROM auth_user au
-         LEFT JOIN employees e ON e.id = au.id
+         LEFT JOIN employees e ON e.user_id = au.id
         WHERE LOWER(au.email) = LOWER(?)
         UNION
        SELECT au.id, au.email, au.password_hash, au.is_blocked,
               COALESCE(au.must_change_password, 0) AS must_change_password,
               e.active_status
          FROM auth_user au
-         JOIN employees e ON e.id = au.id
+         JOIN employees e ON e.user_id = au.id
         WHERE UPPER(e.employee_code) = UPPER(?)
         LIMIT 1`,
       [trimmed, trimmed]

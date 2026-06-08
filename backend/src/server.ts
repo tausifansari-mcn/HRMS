@@ -8,10 +8,15 @@ import { legacySyncWorker } from "./workers/legacy-sync-worker.js";
 
 function startServer() {
   app.listen(env.PORT, () => {
-    startTenureBadgeScheduler();
-    startCommunicationCleanup();
-    startAttendanceEngineScheduler();
-    legacySyncWorker.start();
+    if (env.ENABLE_SCHEDULERS) {
+      startTenureBadgeScheduler();
+      startCommunicationCleanup();
+      startAttendanceEngineScheduler();
+      legacySyncWorker.start();
+      console.log(`[schedulers] tenure, communication, attendance, legacy-sync started`);
+    } else {
+      console.log(`[schedulers] disabled (set ENABLE_SCHEDULERS=true to enable)`);
+    }
     console.log(`MCN HRMS backend running on http://localhost:${env.PORT}`);
   });
 }
