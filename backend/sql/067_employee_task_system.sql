@@ -101,8 +101,8 @@ CREATE TABLE IF NOT EXISTS employee_task (
   created_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
-  FOREIGN KEY (assigned_to_user_id) REFERENCES users(id) ON DELETE SET NULL,
-  FOREIGN KEY (completed_by) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (assigned_to_user_id) REFERENCES auth_user(id) ON DELETE SET NULL,
+  FOREIGN KEY (completed_by) REFERENCES auth_user(id) ON DELETE SET NULL,
   FOREIGN KEY (template_id) REFERENCES task_template(id) ON DELETE SET NULL,
   INDEX idx_emp_task_emp (employee_id),
   INDEX idx_emp_task_assigned_user (assigned_to_user_id),
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS employee_task_comment (
   attachment_url      VARCHAR(500),
   created_at          DATETIME  NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (task_id) REFERENCES employee_task(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES auth_user(id) ON DELETE CASCADE,
   INDEX idx_task_comment (task_id),
   INDEX idx_task_comment_created (created_at)
 ) COMMENT='Comments and updates on tasks';
@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS employee_task_checklist (
   completed_at    DATETIME,
   sequence_order  INT          NOT NULL,
   FOREIGN KEY (task_id) REFERENCES employee_task(id) ON DELETE CASCADE,
-  FOREIGN KEY (completed_by) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (completed_by) REFERENCES auth_user(id) ON DELETE SET NULL,
   INDEX idx_task_checklist (task_id),
   INDEX idx_task_checklist_order (sequence_order)
 ) COMMENT='Checklist items within tasks';
