@@ -7,19 +7,19 @@
  *    live backend or seeded database.
  *  - VITE_ENABLE_DEMO_LOGIN=true must be set in the build/dev server so the
  *    frontend AuthContext accepts the injected session.
- *  - Tests assert page structure (heading, nav, card) not dynamic data counts.
+ *  - Tests use domcontentloaded (not networkidle) to avoid timeouts on pages
+ *    that continuously poll backend APIs.
+ *  - Assertions check page structure (heading, nav, card) not dynamic data counts.
  */
 import { test, expect } from '@playwright/test';
-import { injectDemoSession, assertNotCrashed, waitForAppShell } from './helpers';
+import { injectDemoSession, gotoSmoke, assertNotCrashed, waitForAppShell } from './helpers';
 
 // ── 1. Auth page loads without login ─────────────────────────────────────────
 test('auth page loads', async ({ page }) => {
-  await page.goto('/auth');
-  await page.waitForLoadState('networkidle');
+  await gotoSmoke(page, '/auth');
 
   await assertNotCrashed(page);
 
-  // Login form must be visible
   await expect(page.locator('#identifier')).toBeVisible();
   await expect(page.locator('#password')).toBeVisible();
   await expect(page.locator('button[type="submit"]')).toBeVisible();
@@ -27,14 +27,12 @@ test('auth page loads', async ({ page }) => {
 
 // ── 2. Login with admin credentials ──────────────────────────────────────────
 test('admin login navigates to dashboard', async ({ page }) => {
-  await page.goto('/auth');
-  await page.waitForLoadState('domcontentloaded');
+  await gotoSmoke(page, '/auth');
 
   await page.locator('#identifier').fill('admin@mascallnet.com');
   await page.locator('#password').fill('Admin@123');
   await page.locator('button[type="submit"]').click();
 
-  // Should redirect to /dashboard
   await page.waitForURL('**/dashboard', { timeout: 15_000 });
   await assertNotCrashed(page);
   await waitForAppShell(page);
@@ -43,37 +41,30 @@ test('admin login navigates to dashboard', async ({ page }) => {
 });
 
 // ── 3–10. Protected pages — use injected demo session ────────────────────────
-// These tests inject the admin demo session via localStorage before page load,
-// bypassing the login form entirely.
 
 test('dashboard loads after session inject', async ({ page }) => {
   await injectDemoSession(page, 'admin');
-  await page.goto('/dashboard');
-  await page.waitForLoadState('networkidle');
+  await gotoSmoke(page, '/dashboard');
 
   await assertNotCrashed(page);
   await waitForAppShell(page);
 
-  // Should still be on dashboard, not redirected to /auth
   expect(page.url()).toContain('/dashboard');
 });
 
 test('employees page loads', async ({ page }) => {
   await injectDemoSession(page, 'admin');
-  await page.goto('/employees');
-  await page.waitForLoadState('networkidle');
+  await gotoSmoke(page, '/employees');
 
   await assertNotCrashed(page);
   await waitForAppShell(page);
 
-  // Page should show "Employee" text somewhere
   await expect(page.locator('body')).toContainText(/employee/i);
 });
 
 test('ATS dashboard loads', async ({ page }) => {
   await injectDemoSession(page, 'admin');
-  await page.goto('/ats/dashboard');
-  await page.waitForLoadState('networkidle');
+  await gotoSmoke(page, '/ats/dashboard');
 
   await assertNotCrashed(page);
   await waitForAppShell(page);
@@ -83,8 +74,7 @@ test('ATS dashboard loads', async ({ page }) => {
 
 test('ATS candidate master loads', async ({ page }) => {
   await injectDemoSession(page, 'admin');
-  await page.goto('/ats/candidate-master');
-  await page.waitForLoadState('networkidle');
+  await gotoSmoke(page, '/ats/candidate-master');
 
   await assertNotCrashed(page);
   await waitForAppShell(page);
@@ -94,8 +84,7 @@ test('ATS candidate master loads', async ({ page }) => {
 
 test('attendance page loads', async ({ page }) => {
   await injectDemoSession(page, 'admin');
-  await page.goto('/attendance');
-  await page.waitForLoadState('networkidle');
+  await gotoSmoke(page, '/attendance');
 
   await assertNotCrashed(page);
   await waitForAppShell(page);
@@ -105,8 +94,7 @@ test('attendance page loads', async ({ page }) => {
 
 test('WFM roster page loads', async ({ page }) => {
   await injectDemoSession(page, 'admin');
-  await page.goto('/wfm/roster');
-  await page.waitForLoadState('networkidle');
+  await gotoSmoke(page, '/wfm/roster');
 
   await assertNotCrashed(page);
   await waitForAppShell(page);
@@ -116,8 +104,7 @@ test('WFM roster page loads', async ({ page }) => {
 
 test('leave page loads', async ({ page }) => {
   await injectDemoSession(page, 'admin');
-  await page.goto('/leaves');
-  await page.waitForLoadState('networkidle');
+  await gotoSmoke(page, '/leaves');
 
   await assertNotCrashed(page);
   await waitForAppShell(page);
@@ -127,8 +114,7 @@ test('leave page loads', async ({ page }) => {
 
 test('work inbox (task) page loads', async ({ page }) => {
   await injectDemoSession(page, 'admin');
-  await page.goto('/work-inbox');
-  await page.waitForLoadState('networkidle');
+  await gotoSmoke(page, '/work-inbox');
 
   await assertNotCrashed(page);
   await waitForAppShell(page);
@@ -138,8 +124,7 @@ test('work inbox (task) page loads', async ({ page }) => {
 
 test('KPI config page loads', async ({ page }) => {
   await injectDemoSession(page, 'admin');
-  await page.goto('/kpi-config');
-  await page.waitForLoadState('networkidle');
+  await gotoSmoke(page, '/kpi-config');
 
   await assertNotCrashed(page);
   await waitForAppShell(page);
@@ -149,8 +134,7 @@ test('KPI config page loads', async ({ page }) => {
 
 test('process config page loads', async ({ page }) => {
   await injectDemoSession(page, 'admin');
-  await page.goto('/process-config');
-  await page.waitForLoadState('networkidle');
+  await gotoSmoke(page, '/process-config');
 
   await assertNotCrashed(page);
   await waitForAppShell(page);
@@ -159,19 +143,16 @@ test('process config page loads', async ({ page }) => {
 });
 
 test('client portal login page loads', async ({ page }) => {
-  await page.goto('/portal/login');
-  await page.waitForLoadState('networkidle');
+  await gotoSmoke(page, '/portal/login');
 
   await assertNotCrashed(page);
-  // Portal login should show some form or portal branding
   await expect(page.locator('body')).toContainText(/portal|login|client/i);
 });
 
 // ── HR role smoke ─────────────────────────────────────────────────────────────
 test('HR role can reach employees page', async ({ page }) => {
   await injectDemoSession(page, 'hr');
-  await page.goto('/employees');
-  await page.waitForLoadState('networkidle');
+  await gotoSmoke(page, '/employees');
 
   await assertNotCrashed(page);
   await waitForAppShell(page);
@@ -182,8 +163,7 @@ test('HR role can reach employees page', async ({ page }) => {
 // ── TL role smoke ─────────────────────────────────────────────────────────────
 test('TL role can reach WFM roster page', async ({ page }) => {
   await injectDemoSession(page, 'tl');
-  await page.goto('/wfm/roster');
-  await page.waitForLoadState('networkidle');
+  await gotoSmoke(page, '/wfm/roster');
 
   await assertNotCrashed(page);
   await waitForAppShell(page);

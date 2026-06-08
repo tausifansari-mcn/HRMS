@@ -35,13 +35,19 @@ export async function injectDemoSession(
 }
 
 /**
- * Navigate to a page and wait for it to be stable (no spinner, no redirect loop).
+ * Navigate to a path using domcontentloaded (not networkidle) to avoid
+ * false timeouts on pages that poll backend APIs continuously.
+ */
+export async function gotoSmoke(page: Page, path: string): Promise<void> {
+  await page.goto(path, { waitUntil: 'domcontentloaded' });
+}
+
+/**
+ * Navigate to a page and wait for it to be stable.
  * Returns true if the expected path was reached, false if redirected elsewhere.
  */
 export async function goTo(page: Page, path: string): Promise<boolean> {
-  await page.goto(path);
-  // Wait for main content to be visible — not a loading spinner
-  await page.waitForLoadState('networkidle');
+  await page.goto(path, { waitUntil: 'domcontentloaded' });
   return page.url().includes(path);
 }
 
@@ -67,8 +73,6 @@ export async function assertNotCrashed(page: Page): Promise<void> {
  * Tolerates slow lazy-loaded pages.
  */
 export async function waitForAppShell(page: Page): Promise<void> {
-  // The app renders a spinner while loading auth, then mounts the layout.
-  // Wait for either: a nav element, a heading, or a known layout class.
   await page.waitForSelector(
     'nav, [role="navigation"], h1, h2, [data-testid="layout"], .min-h-screen',
     { timeout: 15_000 }
