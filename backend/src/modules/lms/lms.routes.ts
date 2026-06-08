@@ -31,6 +31,21 @@ router.get("/launch-urls/:employeeId", h(async (req: AuthenticatedRequest, res: 
   }});
 }));
 
+// Get progress summary for all employees (admin/hr/trainer)
+router.get("/progress-summary", requireRole("admin", "hr", "trainer"), h(async (_req: AuthenticatedRequest, res: Response) => {
+  res.json({ success: true, data: await lmsService.getProgressSummary() });
+}));
+
+// Get current user's LMS progress (convenience endpoint)
+router.get("/progress/me", h(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.authUser!.id;
+  const emp = await getEmployeeForUser(userId);
+  if (!emp) {
+    return res.status(404).json({ success: false, message: "Employee record not found for this user" });
+  }
+  res.json({ success: true, data: await lmsService.getProgress(emp.id) });
+}));
+
 // Get employee's LMS progress snapshot
 router.get("/progress/:employeeId", h(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.authUser!.id;
