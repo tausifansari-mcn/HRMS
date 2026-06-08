@@ -10,7 +10,7 @@ const _pool: Pool = mysql.createPool({
   connectionLimit:    env.DB_POOL_MAX,
   waitForConnections: true,
   queueLimit:         0,
-  timezone:           "+00:00",
+  timezone:           "Z", // Force UTC timezone for all datetime operations
   decimalNumbers:     true,
 });
 

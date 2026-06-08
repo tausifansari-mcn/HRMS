@@ -219,10 +219,10 @@ export const authService = {
   async createPasswordResetTokenByUserId(userId: string, hours = RESET_EXPIRES_HOURS): Promise<string> {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+    // Use MySQL's DATE_ADD with UTC_TIMESTAMP to avoid timezone issues
     await db.execute(
-      'INSERT INTO auth_password_reset (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
-      [userId, tokenHash, mysqlDateTime(expiresAt)]
+      'INSERT INTO auth_password_reset (user_id, token_hash, expires_at) VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? HOUR))',
+      [userId, tokenHash, hours]
     );
     return rawToken;
   },
@@ -236,12 +236,12 @@ export const authService = {
     if (rows[0]) return this.createPasswordResetTokenByUserId(rows[0].id, 1);
 
     // First-time employee access fallback. If launch bootstrap has not yet created
-    // auth_user, prepare an active employee account from employees.email/official_email.
+    // auth_user, prepare employee account from employees.email/official_email.
+    // Includes both active and inactive employees (35K+ total).
     const [employeeRows] = await db.execute<RowDataPacket[]>(
       `SELECT id, email, official_email, user_id, active_status
          FROM employees
-        WHERE active_status = 1
-          AND (LOWER(email) = LOWER(?) OR LOWER(official_email) = LOWER(?))
+        WHERE (LOWER(email) = LOWER(?) OR LOWER(official_email) = LOWER(?))
         LIMIT 1`,
       [normalizedEmail, normalizedEmail]
     );
@@ -256,7 +256,7 @@ export const authService = {
   async resetPassword(rawToken: string, newPassword: string): Promise<void> {
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
     const [rows] = await db.execute<RowDataPacket[]>(
-      'SELECT user_id FROM auth_password_reset WHERE token_hash = ? AND used = 0 AND expires_at > NOW() LIMIT 1',
+      'SELECT user_id FROM auth_password_reset WHERE token_hash = ? AND used = 0 AND expires_at > UTC_TIMESTAMP() LIMIT 1',
       [tokenHash]
     );
     if (!rows[0]) throw new Error('Invalid or expired reset token');

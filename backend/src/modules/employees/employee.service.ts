@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import bcrypt from "bcryptjs";
 import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
 import type { Employee, PaginatedResult } from "./employee.types.js";
@@ -14,6 +15,61 @@ const assignSalary = async (employeeId: string, structureId: string, ctcAnnual: 
     "INSERT INTO employee_salary_assignment (id, employee_id, structure_id, ctc_annual, effective_from) VALUES (?, ?, ?, ?, ?)",
     [asgId, employeeId, structureId, ctcAnnual, effectiveFrom]
   );
+};
+
+/**
+ * Auto-create auth_user for employee with valid email.
+ * Links employees.user_id to auth_user.id so employee can login via password reset.
+ */
+const createAuthUserForEmployee = async (employeeId: string, email: string): Promise<string | null> => {
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // Check if auth_user already exists for this email
+  const [existingAuth] = await db.execute<RowDataPacket[]>(
+    'SELECT id, is_blocked FROM auth_user WHERE LOWER(email) = LOWER(?) LIMIT 1',
+    [normalizedEmail]
+  );
+
+  if (existingAuth.length > 0) {
+    const authUser = existingAuth[0];
+    if (Number(authUser.is_blocked ?? 0) === 1) {
+      return null; // Don't link to blocked accounts
+    }
+    // Link existing auth_user to this employee
+    await db.execute('UPDATE employees SET user_id = ? WHERE id = ?', [authUser.id, employeeId]);
+    return String(authUser.id);
+  }
+
+  // Create new auth_user with random password (user must reset via "Forgot Password")
+  const userId = randomUUID();
+  const randomPassword = randomUUID(); // Secure random password
+  const passwordHash = await bcrypt.hash(randomPassword, 10);
+
+  await db.execute(
+    'INSERT INTO auth_user (id, email, password_hash, must_change_password, is_blocked) VALUES (?, ?, ?, 1, 0)',
+    [userId, normalizedEmail, passwordHash]
+  );
+
+  // Link employee to auth_user
+  await db.execute('UPDATE employees SET user_id = ? WHERE id = ?', [userId, employeeId]);
+
+  // Assign default "employee" role if exists
+  try {
+    const [roleCheck] = await db.execute<RowDataPacket[]>(
+      'SELECT role_key FROM workforce_role_catalog WHERE role_key = ? AND active_status = 1 LIMIT 1',
+      ['employee']
+    );
+    if (roleCheck.length > 0) {
+      await db.execute(
+        'INSERT INTO user_roles (id, user_id, role_key, active_status) VALUES (UUID(), ?, ?, 1) ON DUPLICATE KEY UPDATE active_status = 1',
+        [userId, 'employee']
+      );
+    }
+  } catch {
+    // Non-fatal - role assignment failure shouldn't block employee creation
+  }
+
+  return userId;
 };
 
 export const employeeService = {
@@ -52,6 +108,18 @@ export const employeeService = {
         input.reportingManagerId ?? null,
       ]
     );
+
+    // CRITICAL FIX: Auto-create auth_user if employee has valid email
+    // This ensures employees can login via "Forgot Password" flow immediately
+    if (input.email && input.email.includes('@') && input.email.toLowerCase() !== 'n/a') {
+      try {
+        await createAuthUserForEmployee(id, input.email);
+      } catch (error) {
+        // Log but don't block employee creation if auth fails
+        console.error(`[WARN] Failed to auto-create auth for employee ${input.employeeCode}:`, error);
+      }
+    }
+
     const employee = await this.getEmployee(id);
 
     // Auto-assign salary when structureId + ctcAnnual provided at creation

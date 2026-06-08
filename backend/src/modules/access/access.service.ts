@@ -145,6 +145,13 @@ export interface AccessMeResponse {
   employeeId: string | null;
   employeeCode: string | null;
   employeeName: string | null;
+  employee: {
+    id: string;
+    employee_code: string;
+    first_name: string;
+    last_name: string | null;
+    full_name: string | null;
+  } | null;
   roles: string[];
   scopes: Array<{
     id: string; role_key: string; scope_type: string;
@@ -168,7 +175,7 @@ export async function getAccessMe(userId: string): Promise<AccessMeResponse> {
 
   // 2. Employee record linked to this user
   const [empRows] = await db.execute<RowDataPacket[]>(
-    "SELECT id, employee_code, full_name FROM employees WHERE user_id = ? AND active_status = 1 LIMIT 1",
+    "SELECT id, employee_code, first_name, last_name, full_name FROM employees WHERE user_id = ? AND active_status = 1 LIMIT 1",
     [userId]
   );
   const emp = (empRows as RowDataPacket[])[0] as any ?? null;
@@ -236,6 +243,13 @@ export async function getAccessMe(userId: string): Promise<AccessMeResponse> {
     employeeId:   emp?.id ?? null,
     employeeCode: emp?.employee_code ?? null,
     employeeName: emp?.full_name ?? null,
+    employee: emp ? {
+      id: emp.id,
+      employee_code: emp.employee_code,
+      first_name: emp.first_name,
+      last_name: emp.last_name ?? null,
+      full_name: emp.full_name ?? null,
+    } : null,
     roles,
     scopes,
     pages,

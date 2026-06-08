@@ -83,29 +83,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const init = async () => {
-      // Demo sessions are allowed only in local development or when explicitly enabled.
-      if (DEMO_LOGIN_ENABLED) {
-        const demoRaw = localStorage.getItem('hrms_demo_session');
-        if (demoRaw) {
-          try {
-            const demo = JSON.parse(demoRaw);
-            if (demo?.user?.id) {
-              setUser({ id: demo.user.id, email: demo.user.email ?? '' });
-              setIsLoading(false);
-              return;
-            }
-          } catch {
-            localStorage.removeItem('hrms_demo_session');
-          }
-        }
-      } else {
-        localStorage.removeItem('hrms_demo_session');
-      }
-
+      // Real JWT tokens always take priority over demo sessions
       const token = localStorage.getItem('hrms_access_token');
       if (token) {
         const decoded = decodeJwtUser(token);
         if (decoded) {
+          // Clear any lingering demo session when real JWT is present
+          localStorage.removeItem('hrms_demo_session');
           setUser(decoded);
           setIsLoading(false);
           scheduleRefresh();
@@ -120,6 +104,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         localStorage.removeItem('hrms_refresh_token');
+      }
+
+      // Demo sessions are only checked if no real JWT token exists
+      if (DEMO_LOGIN_ENABLED) {
+        const demoRaw = localStorage.getItem('hrms_demo_session');
+        if (demoRaw) {
+          try {
+            const demo = JSON.parse(demoRaw);
+            if (demo?.user?.id) {
+              setUser({ id: demo.user.id, email: demo.user.email ?? '' });
+              setIsLoading(false);
+              return;
+            }
+          } catch {
+            localStorage.removeItem('hrms_demo_session');
+          }
+        }
       }
 
       setUser(null);

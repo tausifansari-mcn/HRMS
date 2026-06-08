@@ -271,3 +271,5 @@
 {"type":"edit","file":"/home/shuvam/hrms-audit/src/App.tsx","timestamp":1780800397555,"sessionId":null}
 {"type":"edit","file":"/home/shuvam/hrms-audit/backend/src/app.ts","timestamp":1780807148223,"sessionId":null}
 {"type":"edit","file":"/home/shuvam/hrms-audit/backend/src/modules/auth/auth.service.ts","timestamp":1780807159797,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/backend/scripts/sync-leaves-safe.cjs","timestamp":1780812313499,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/PASSWORD_RESET_STATUS.md","timestamp":1780890417476,"sessionId":null}

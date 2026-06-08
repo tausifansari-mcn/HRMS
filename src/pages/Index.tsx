@@ -30,7 +30,7 @@ import { UpcomingHolidays } from "@/components/dashboard/UpcomingHolidays";
 
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { useEmployeeStatus } from "@/hooks/useEmployeeStatus";
-import { useIsAdminOrHR } from "@/hooks/useUserRole";
+import { useIsAdminOrHR, useWorkforceAccess } from "@/hooks/useUserRole";
 import { useAuth } from "@/contexts/AuthContext";
 
 import { Skeleton } from "@/components/ui/skeleton";
@@ -205,6 +205,7 @@ const Index = () => {
   const { data: employeeStatus, isLoading: isEmployeeStatusLoading } =
     useEmployeeStatus();
   const { isAdminOrHR, isLoading: isRoleLoading } = useIsAdminOrHR();
+  const { employeeName } = useWorkforceAccess();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -220,8 +221,12 @@ const Index = () => {
   };
 
   const getUserFirstName = () => {
-    const fullName = user?.email || "User";
-    return fullName.split(" ")[0];
+    if (employeeName) {
+      // Use first name from employee record
+      return employeeName.split(" ")[0];
+    }
+    // Fallback to email if no employee name
+    return user?.email?.split("@")[0] || "User";
   };
 
   const quickActions: QuickAction[] = isAdminOrHR
