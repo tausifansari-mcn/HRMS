@@ -70,6 +70,7 @@ import { atsFullParityRouter } from "./modules/ats-full-parity/atsFullParity.rou
 import { engagementIntelligenceRouter } from "./modules/engagement/engagement-intelligence.routes.js";
 import legacyRouter from "./modules/legacy/legacy.routes.js";
 import dialerRouter from "./modules/dialer/dialer.routes.js";
+import taskRouter from "./modules/tasks/task.routes.js";
 
 export const app = express();
 
@@ -176,6 +177,7 @@ app.use("/api/engagement-intelligence", engagementIntelligenceRouter); // Health
 app.use("/api/communication", communicationRouter);
 app.use('/api/wfm/attendance', attendanceEngineRouter);
 app.use("/api/dialer", dialerRouter);
+app.use("/api/tasks", taskRouter);
 app.use('/api/wfm/biometric-punch', biometricPunchRouter);
 app.use("/api/customization", customizationRouter);
 app.use("/api/roster-master", rosterMasterRouter);
