@@ -28,8 +28,12 @@ Handlebars.registerHelper('currency', (amount: number) => {
 let _schemas: Record<string, any> | null = null;
 async function getVariableSchemas(): Promise<Record<string, any>> {
   if (_schemas) return _schemas;
-  const raw = await fs.readFile(path.join(TMPL_DIR, 'variable-schemas.json'), 'utf-8');
-  _schemas = JSON.parse(raw);
+  try {
+    const raw = await fs.readFile(path.join(TMPL_DIR, 'variable-schemas.json'), 'utf-8');
+    _schemas = JSON.parse(raw);
+  } catch {
+    _schemas = {};
+  }
   return _schemas!;
 }
 
