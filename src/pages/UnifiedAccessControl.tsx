@@ -10,8 +10,6 @@ import { Badge } from "@/components/ui/badge";
 interface RbacMismatch {
   user_id: string;
   mysql_roles: string[];
-  supabase_roles: string[];
-  in_supabase_only: string[];
   in_mysql_only: string[];
 }
 
@@ -122,7 +120,7 @@ export default function UnifiedAccessControl() {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h2 className="font-semibold">RBAC Sync</h2>
-                <p className="mt-1 text-xs text-slate-500">Users whose roles differ between MySQL and Supabase.</p>
+                <p className="mt-1 text-xs text-slate-500">Users whose roles differ from expected MySQL assignments.</p>
               </div>
               <Button variant="outline" size="sm" className="gap-2" onClick={() => refetchRbac()}>
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -134,7 +132,7 @@ export default function UnifiedAccessControl() {
               <p className="text-sm text-slate-500">Loading reconciliation data…</p>
             ) : rbacMismatches.length === 0 ? (
               <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-                No mismatches found — MySQL and Supabase roles are in sync.
+                No mismatches found — all roles are properly assigned in MySQL.
               </p>
             ) : (
               <div className="overflow-auto">

@@ -64,7 +64,7 @@ export const useLMSSession = (): LMSSessionState => {
         const res = await fetch(`${LMS_API_URL}/api/auth/bridge`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ supabase_token: accessToken }),
+          body: JSON.stringify({ token: accessToken }),
         });
 
         const json = await res.json();
