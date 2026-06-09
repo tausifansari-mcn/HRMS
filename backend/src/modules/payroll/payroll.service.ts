@@ -224,8 +224,22 @@ export const payrollService = {
 
     // Apply scope filter from middleware
     if ((filters as any).scopeFilter) {
-      const scopeClause = String((filters as any).scopeFilter).replace(/^WHERE\s+/i, '').trim();
-      if (scopeClause) conds.push(`(${scopeClause})`);
+      const scopeFilter = (filters as any).scopeFilter;
+      // scopeFilter is {sql: string, params: unknown[]} from buildScopeWhereClause
+      if (typeof scopeFilter === 'object' && scopeFilter.sql) {
+        const { sql, params: scopeParams } = scopeFilter;
+        if (sql === "1=0") {
+          // User has no access - return empty result immediately
+          return { data: [], total: 0, page, limit };
+        }
+        if (sql && sql !== "1=1") {
+          // Add scope filter SQL (already without WHERE prefix)
+          conds.push(`(${sql})`);
+          // Merge scope params into main params array
+          params.push(...(scopeParams || []));
+        }
+        // If sql === "1=1", user has full access - no additional filter needed
+      }
     }
 
     const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
