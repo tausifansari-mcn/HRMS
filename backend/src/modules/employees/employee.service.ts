@@ -72,7 +72,7 @@ export const employeeService = {
     return rec;
   },
 
-  async listEmployees(filters: EmployeeFilters & { scopeFilter?: string }): Promise<PaginatedResult<Employee>> {
+  async listEmployees(filters: EmployeeFilters & { scopeFilter?: { sql: string; params: unknown[] } | string }): Promise<PaginatedResult<Employee>> {
     const { page, limit, status, processId, branchId, search, scopeFilter } = filters;
     const offset = (page - 1) * limit;
     const conds: string[] = ["active_status = 1"];
@@ -83,18 +83,25 @@ export const employeeService = {
     if (branchId)  { conds.push("branch_id = ?");         params.push(branchId); }
     if (search)    { conds.push("(full_name LIKE ? OR employee_code LIKE ?)"); params.push(`%${search}%`, `%${search}%`); }
 
-    // Apply scope filter from middleware
+    // Apply scope filter from middleware (object {sql, params} or legacy string)
     if (scopeFilter) {
-      const scopeClause = String(scopeFilter).replace(/^WHERE\s+/i, '').trim();
-      if (scopeClause) conds.push(`(${scopeClause})`);
+      if (typeof scopeFilter === 'object' && scopeFilter.sql) {
+        const scopeClause = String(scopeFilter.sql).replace(/^WHERE\s+/i, '').trim();
+        if (scopeClause) {
+          conds.push(`(${scopeClause})`);
+          params.push(...(scopeFilter.params || []));
+        }
+      } else if (typeof scopeFilter === 'string') {
+        const scopeClause = scopeFilter.replace(/^WHERE\s+/i, '').trim();
+        if (scopeClause) conds.push(`(${scopeClause})`);
+      }
     }
 
     const where = `WHERE ${conds.join(" AND ")}`;
 
-    // Use string interpolation for LIMIT/OFFSET to avoid parameter binding issues
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT * FROM employees ${where} ORDER BY employee_code ASC LIMIT ${limit} OFFSET ${offset}`,
-      params
+      `SELECT * FROM employees ${where} ORDER BY employee_code ASC LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
     );
     const [countRows] = await db.execute<RowDataPacket[]>(
       `SELECT COUNT(*) AS total FROM employees ${where}`, params
