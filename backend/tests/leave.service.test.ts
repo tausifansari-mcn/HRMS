@@ -67,13 +67,44 @@ describe("leaveService.reviewRequest", () => {
     ).rejects.toThrow("Leave request not found");
   });
 
-  it("approves request", async () => {
-    exec.mockResolvedValueOnce([[fakeRequest], []]); // get
-    exec.mockResolvedValueOnce([{ affectedRows: 1 }, []]); // UPDATE request
+  it("approves request with existing balance ledger", async () => {
+    exec.mockResolvedValueOnce([[fakeRequest], []]); // get request
+    exec.mockResolvedValueOnce([[fakeBalance], []]); // check balance ledger exists
+    exec.mockResolvedValueOnce([{ affectedRows: 1 }, []]); // update used_days
+    exec.mockResolvedValueOnce([{ affectedRows: 1 }, []]); // UPDATE request status
     exec.mockResolvedValueOnce([{ affectedRows: 1 }, []]); // INSERT approval log
     exec.mockResolvedValueOnce([[{ ...fakeRequest, status: "approved" }], []]); // re-fetch
     const r = await leaveService.reviewRequest("lr-1", { status: "approved" }, "mgr-1");
     expect(r.status).toBe("approved");
+  });
+
+  it("approves request and creates balance ledger when none exists", async () => {
+    exec.mockResolvedValueOnce([[fakeRequest], []]); // get request
+    exec.mockResolvedValueOnce([[], []]); // check balance ledger - none found
+    exec.mockResolvedValueOnce([{ affectedRows: 1 }, []]); // INSERT new ledger row
+    exec.mockResolvedValueOnce([{ affectedRows: 1 }, []]); // UPDATE request status
+    exec.mockResolvedValueOnce([{ affectedRows: 1 }, []]); // INSERT approval log
+    exec.mockResolvedValueOnce([[{ ...fakeRequest, status: "approved" }], []]); // re-fetch
+    const r = await leaveService.reviewRequest("lr-1", { status: "approved" }, "mgr-1");
+    expect(r.status).toBe("approved");
+  });
+
+  it("throws when insufficient balance", async () => {
+    const lowBalance = { ...fakeBalance, allocated_days: 2, used_days: 0 };
+    exec.mockResolvedValueOnce([[fakeRequest], []]); // get request
+    exec.mockResolvedValueOnce([[lowBalance], []]); // check balance ledger
+    await expect(
+      leaveService.reviewRequest("lr-1", { status: "approved" }, "mgr-1")
+    ).rejects.toThrow("Insufficient leave balance");
+  });
+
+  it("rejects request without updating balance", async () => {
+    exec.mockResolvedValueOnce([[fakeRequest], []]); // get request
+    exec.mockResolvedValueOnce([{ affectedRows: 1 }, []]); // UPDATE request status
+    exec.mockResolvedValueOnce([{ affectedRows: 1 }, []]); // INSERT approval log
+    exec.mockResolvedValueOnce([[{ ...fakeRequest, status: "rejected" }], []]); // re-fetch
+    const r = await leaveService.reviewRequest("lr-1", { status: "rejected" }, "mgr-1");
+    expect(r.status).toBe("rejected");
   });
 });
 
