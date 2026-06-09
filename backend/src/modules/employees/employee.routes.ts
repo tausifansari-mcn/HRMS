@@ -49,7 +49,7 @@ router.get("/", requireRole("admin", "hr", "manager"), h(async (req, res) => {
       branchId: "e.branch_id",
       processId: "e.process_id",
       departmentId: "e.department_id",
-      managerEmployeeId: "e.manager_id"
+      managerEmployeeId: "e.reporting_manager_id"
     },
     { allowCeoAllRead: true }
   );
