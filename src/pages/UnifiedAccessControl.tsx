@@ -141,8 +141,6 @@ export default function UnifiedAccessControl() {
                     <tr>
                       <th className="py-2 pr-4">User ID</th>
                       <th className="pr-4">MySQL Roles</th>
-                      <th className="pr-4">Supabase Roles</th>
-                      <th className="pr-4">Supabase Only</th>
                       <th className="pr-4">MySQL Only</th>
                       <th>Action</th>
                     </tr>
@@ -158,21 +156,11 @@ export default function UnifiedAccessControl() {
                         </td>
                         <td className="py-2 pr-4">
                           <div className="flex flex-wrap gap-1">
-                            {row.supabase_roles.map((r) => <Badge key={r} className="bg-slate-100 text-slate-700 hover:bg-slate-100">{r}</Badge>)}
-                          </div>
-                        </td>
-                        <td className="py-2 pr-4">
-                          <div className="flex flex-wrap gap-1">
-                            {row.in_supabase_only.map((r) => <Badge key={r} className="bg-amber-50 text-amber-700 hover:bg-amber-50">{r}</Badge>)}
-                          </div>
-                        </td>
-                        <td className="py-2 pr-4">
-                          <div className="flex flex-wrap gap-1">
                             {row.in_mysql_only.map((r) => <Badge key={r} className="bg-rose-50 text-rose-700 hover:bg-rose-50">{r}</Badge>)}
                           </div>
                         </td>
                         <td className="py-2">
-                          {row.in_supabase_only.length > 0 && (
+                          {row.in_mysql_only.length > 0 && (
                             <Button
                               size="sm"
                               variant="outline"

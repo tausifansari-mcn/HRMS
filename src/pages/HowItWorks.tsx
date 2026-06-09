@@ -25,7 +25,7 @@ const steps = [
     title: "Deploy or Sign Up",
     description: "Choose to self-host on your infrastructure or use our hosted solution. Either way, you're up and running in minutes.",
     details: [
-      "One-click deployment to Vercel, Railway, or Docker",
+      "One-click deployment to local Docker or cloud platforms",
       "Or sign up for our managed cloud option",
       "Full control over your data and infrastructure"
     ]
@@ -74,12 +74,12 @@ const deployOptions = [
   {
     icon: <Cloud className="h-6 w-6" />,
     title: "Cloud Platforms",
-    description: "One-click deploy to Vercel, Railway, Render, or any cloud platform."
+    description: "One-click deploy to Render, AWS, or any cloud platform."
   },
   {
     icon: <Database className="h-6 w-6" />,
-    title: "Supabase Backend",
-    description: "Uses Supabase for authentication, database, and storage — free tier available."
+    title: "MySQL Backend",
+    description: "Uses MySQL for database with JWT authentication — scalable and secure."
   }
 ];
 
