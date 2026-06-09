@@ -45,11 +45,11 @@ export async function requireAuth(
 
     // Demo bypass — only when INTERNAL_DEMO_BYPASS=true AND not in production
     if (token.startsWith("mock-token")) {
-      const demoBypssEnabled =
+      const demoBypassEnabled =
         process.env.INTERNAL_DEMO_BYPASS === "true" &&
         process.env.NODE_ENV !== "production";
 
-      if (!demoBypssEnabled) {
+      if (!demoBypassEnabled) {
         return res.status(401).json({ success: false, message: "Invalid or expired token" });
       }
 
