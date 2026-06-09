@@ -272,8 +272,8 @@ const Onboarding = () => {
 
   const handleViewDocument = async (filePath: string) => {
     const url = getDocumentUrl(filePath);
-    if (url) {
-      window.open(url, '_blank');
+    if (url && (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/"))) {
+      window.open(url, '_blank', 'noopener noreferrer');
     }
   };
 

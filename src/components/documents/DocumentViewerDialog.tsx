@@ -118,8 +118,8 @@ export function DocumentViewerDialog({
   };
 
   const handleOpenInNewTab = () => {
-    if (previewUrl) {
-      window.open(previewUrl, "_blank");
+    if (previewUrl && (previewUrl.startsWith("http://") || previewUrl.startsWith("https://") || previewUrl.startsWith("/"))) {
+      window.open(previewUrl, "_blank", "noopener noreferrer");
     }
   };
 

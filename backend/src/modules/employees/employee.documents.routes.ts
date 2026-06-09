@@ -30,6 +30,10 @@ router.post("/:employeeId", requireRole("admin", "hr"), h(async (req: Authentica
     file_url: string;
   };
   if (!document_type || !file_url) return res.status(400).json({ error: "document_type and file_url required" });
+  if (file_url.length > 2048) return res.status(400).json({ error: "file_url too long" });
+  // Reject javascript: URLs and other dangerous schemes
+  const dangerousScheme = /^(javascript|data|vbscript):/i;
+  if (dangerousScheme.test(file_url)) return res.status(400).json({ error: "Invalid file_url scheme" });
   if (document_name && document_name.length > 255) {
     return res.status(400).json({ error: "document_name must be 255 characters or fewer" });
   }
