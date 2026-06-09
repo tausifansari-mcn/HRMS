@@ -214,24 +214,32 @@ export const payrollService = {
     return this.getRun(id);
   },
 
-  async listRuns(filters: RunFilters): Promise<PaginatedResult<SalaryPrepRun>> {
-    const { page, limit, runMonth, status } = filters;
+  async listRuns(filters: RunFilters & { scopeFilter?: { sql: string; params: unknown[] } | string }): Promise<PaginatedResult<SalaryPrepRun>> {
+    const { page, limit, runMonth, status, scopeFilter } = filters;
     const offset = (page - 1) * limit;
     const conds: string[] = [];
     const params: unknown[] = [];
     if (runMonth) { conds.push("run_month = ?"); params.push(runMonth); }
     if (status)   { conds.push("status = ?");    params.push(status); }
 
-    // Apply scope filter from middleware
-    if ((filters as any).scopeFilter) {
-      const scopeClause = String((filters as any).scopeFilter).replace(/^WHERE\s+/i, '').trim();
-      if (scopeClause) conds.push(`(${scopeClause})`);
+    // Apply scope filter from middleware (object {sql, params} or legacy string)
+    if (scopeFilter) {
+      if (typeof scopeFilter === 'object' && scopeFilter.sql) {
+        const scopeClause = String(scopeFilter.sql).replace(/^WHERE\s+/i, '').trim();
+        if (scopeClause) {
+          conds.push(`(${scopeClause})`);
+          params.push(...(scopeFilter.params || []));
+        }
+      } else if (typeof scopeFilter === 'string') {
+        const scopeClause = scopeFilter.replace(/^WHERE\s+/i, '').trim();
+        if (scopeClause) conds.push(`(${scopeClause})`);
+      }
     }
 
     const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT * FROM salary_prep_run ${where} ORDER BY run_month DESC LIMIT ${limit} OFFSET ${offset}`,
-      params
+      `SELECT * FROM salary_prep_run ${where} ORDER BY run_month DESC LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
     );
     const [countRows] = await db.execute<RowDataPacket[]>(
       `SELECT COUNT(*) AS total FROM salary_prep_run ${where}`, params
