@@ -1,8 +1,8 @@
 // Current application version - update this when releasing new versions
 export const APP_VERSION = "1.0.5";
 
-// Production API URL for version checking (used by self-hosted instances)
-export const VERSION_API_URL = "https://mas-callnet-hrms.vercel.app/functions/v1/version-check";
+// Local-only deployment: no external version API
+export const VERSION_API_URL = "";
 
 export interface ChangelogEntry {
   version: string;
@@ -56,19 +56,13 @@ export const FALLBACK_VERSION_RESPONSE: VersionResponse = {
   releaseDate: "2025-01-19",
   changelog: LOCAL_CHANGELOG,
   hasUpdate: false,
-  updateUrl: "https://github.com/shivamgiri-sudo/mas-callnet-hrms",
-  documentationUrl: "https://mas-callnet-hrms.vercel.app",
+  updateUrl: "",
+  documentationUrl: "",
 };
 
-// Detect if running in an auto-updating environment (Lovable Cloud / production)
+// Local-only deployment: no auto-updating external environment
 export function isAutoUpdatingEnvironment(): boolean {
-  if (typeof window === "undefined") return false;
-  const hostname = window.location.hostname;
-  return (
-    hostname.includes("lovable") ||
-    hostname === "mas-callnet-hrms.vercel.app" ||
-    hostname.endsWith(".mas-callnet-hrms.vercel.app")
-  );
+  return false;
 }
 
 export async function checkForUpdates(): Promise<VersionResponse | null> {
