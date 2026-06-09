@@ -7,11 +7,14 @@ async function getEligibleLeaveTotals(empId: string, year: number) {
   try {
     const res = await hrmsApi.get<{ data: any[] }>(`/api/leave/balance/${empId}?year=${year}`);
     const rows = res.data ?? [];
-    return {
-      totalLeaves: rows.reduce((s, r) => s + (r.max_days_per_year ?? r.allocated_days ?? 0), 0),
-      usedLeaves: rows.reduce((s, r) => s + (r.used_days ?? 0), 0),
-      availableLeaves: rows.reduce((s, r) => s + (r.balance_days ?? 0), 0),
-    };
+      return {
+        totalLeaves: rows.reduce((s, r) => s + (Number(r.allocated_days) ?? Number(r.max_days_per_year) ?? 0), 0),
+        usedLeaves: rows.reduce((s, r) => s + (Number(r.used_days) ?? 0), 0),
+        availableLeaves: rows.reduce(
+          (s, r) => s + ((Number(r.allocated_days) ?? 0) - (Number(r.used_days) ?? 0) + (Number(r.adjusted_days) ?? 0)),
+          0
+        ),
+      };
   } catch {
     return { totalLeaves: null, usedLeaves: null, availableLeaves: null };
   }
