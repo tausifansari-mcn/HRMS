@@ -542,7 +542,7 @@ export default function NativeATSCandidateRegistration() {
     formData.append("file", file);
     formData.append("type", type);
 
-    const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
+    const apiBase = import.meta.env.VITE_HRMS_API_URL || (import.meta.env.DEV ? "http://localhost:5055" : "");
     const res = await fetch(`${apiBase}/api/ats/candidates/${candidateId}/upload`, {
       method: "POST",
       body: formData,

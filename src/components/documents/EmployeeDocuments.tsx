@@ -75,21 +75,26 @@ export function EmployeeDocuments({ employeeId, canUpload = true, canDelete = tr
   };
 
   const handleDownload = async (fileUrl: string, fileName: string) => {
-    const { data, error } = (async () => { const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055"; const url = fileUrl?.startsWith("https://") ? fileUrl : `${HRMS_API}/api/files/documents/${fileUrl}`; const resp = await fetch(url); const blob = await resp.blob(); return { data: blob, error: null }; })();
-
-    if (error) {
-      console.error("Download error:", error);
+    if (!fileUrl) {
+      console.error("Download error: file URL is missing");
       return;
     }
-
-    const url = URL.createObjectURL(data);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055";
+    const url = fileUrl.startsWith("https://") ? fileUrl : `${HRMS_API}/api/files/documents/${fileUrl}`;
+    try {
+      const resp = await fetch(url);
+      const data = await resp.blob();
+      const blobUrl = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Download error:", err);
+    }
   };
 
   const getTypeBadgeVariant = (type: string) => {

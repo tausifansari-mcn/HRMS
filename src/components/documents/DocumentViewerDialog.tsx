@@ -81,11 +81,12 @@ export function DocumentViewerDialog({
       }
 
       // Get signed URL for the file
-      const { data, error } = (() => { const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055"; const fileUrl = documentInfo.file_url?.startsWith("https://") ? documentInfo.file_url : `${HRMS_API}/api/files/documents/${documentInfo.file_url}`; return { data: { signedUrl: fileUrl }, error: null }; })(); // 1 hour expiry
-
-      if (error) throw error;
-
-      setPreviewUrl(data.signedUrl);
+      if (!documentInfo.file_url) {
+        throw new Error("Document file URL is missing");
+      }
+      const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055";
+      const fileUrl = documentInfo.file_url.startsWith("https://") ? documentInfo.file_url : `${HRMS_API}/api/files/documents/${documentInfo.file_url}`;
+      setPreviewUrl(fileUrl);
     } catch (error) {
       console.error("Error loading preview:", error);
       setPreviewUrl(null);
@@ -95,21 +96,22 @@ export function DocumentViewerDialog({
   };
 
   const handleDownload = async () => {
-    if (!documentInfo) return;
+    if (!documentInfo || !documentInfo.file_url) return;
 
     try {
-      const { data, error } = (async () => { const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055"; const url = documentInfo.file_url?.startsWith("https://") ? documentInfo.file_url : `${HRMS_API}/api/files/documents/${documentInfo.file_url}`; const resp = await fetch(url); const blob = await resp.blob(); return { data: blob, error: null }; })();
+      const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055";
+      const fileUrl = documentInfo.file_url.startsWith("https://") ? documentInfo.file_url : `${HRMS_API}/api/files/documents/${documentInfo.file_url}`;
+      const resp = await fetch(fileUrl);
+      const data = await resp.blob();
 
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
+      const blobUrl = URL.createObjectURL(data);
       const a = window.document.createElement("a");
-      a.href = url;
+      a.href = blobUrl;
       a.download = documentInfo.document_name;
       window.document.body.appendChild(a);
       a.click();
       window.document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error("Download error:", error);
     }

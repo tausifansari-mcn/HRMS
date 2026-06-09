@@ -44,8 +44,9 @@ export function useUploadDocument() {
       formData.append("document_name", file.name);
 
       const token = localStorage.getItem("hrms_access_token");
+      const apiBase = import.meta.env.VITE_HRMS_API_URL || (import.meta.env.DEV ? "http://localhost:5055" : "");
       const uploadRes = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL ?? ""}/api/employee-docs/${employeeId}/upload`,
+        `${apiBase}/api/employee-docs/${employeeId}/upload`,
         {
           method: "POST",
           headers: token ? { Authorization: `Bearer ${token}` } : {},
