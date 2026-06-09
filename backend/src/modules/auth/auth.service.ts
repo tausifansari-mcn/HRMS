@@ -41,31 +41,37 @@ async function ensureEmployeeRole(userId: string): Promise<void> {
   }
 }
 
-async function createOrRepairEmployeeAuthUser(employee: RowDataPacket, email: string): Promise<string | null> {
+async function createOrRepairEmployeeAuthUser(
+  employee: RowDataPacket,
+  email: string,
+  forcePasswordChange = true
+): Promise<string | null> {
   const existingUserId = employee.user_id ? String(employee.user_id) : '';
 
   if (existingUserId) {
     const [byId] = await db.execute<RowDataPacket[]>(
-      'SELECT id, is_blocked FROM auth_user WHERE id = ? LIMIT 1',
+      'SELECT id, is_blocked, must_change_password FROM auth_user WHERE id = ? LIMIT 1',
       [existingUserId]
     );
     if (byId[0]) {
       if (Number(byId[0].is_blocked ?? 0) === 1) return null;
-      await db.execute('UPDATE auth_user SET email = ?, must_change_password = 1 WHERE id = ?', [email, existingUserId]);
+      const mustChange = forcePasswordChange ? 1 : (Number(byId[0].must_change_password ?? 0));
+      await db.execute('UPDATE auth_user SET email = ?, must_change_password = ? WHERE id = ?', [email, mustChange, existingUserId]);
       await ensureEmployeeRole(existingUserId);
       return existingUserId;
     }
   }
 
   const [byEmail] = await db.execute<RowDataPacket[]>(
-    'SELECT id, is_blocked FROM auth_user WHERE email = ? LIMIT 1',
+    'SELECT id, is_blocked, must_change_password FROM auth_user WHERE email = ? LIMIT 1',
     [email]
   );
   if (byEmail[0]) {
     if (Number(byEmail[0].is_blocked ?? 0) === 1) return null;
     const userId = String(byEmail[0].id);
     await db.execute('UPDATE employees SET user_id = ? WHERE id = ?', [userId, employee.id]);
-    await db.execute('UPDATE auth_user SET must_change_password = 1 WHERE id = ?', [userId]);
+    const mustChange = forcePasswordChange ? 1 : (Number(byEmail[0].must_change_password ?? 0));
+    await db.execute('UPDATE auth_user SET must_change_password = ? WHERE id = ?', [mustChange, userId]);
     await ensureEmployeeRole(userId);
     return userId;
   }
@@ -83,8 +89,10 @@ async function createOrRepairEmployeeAuthUser(employee: RowDataPacket, email: st
 
 export const authService = {
   async login(identifier: string, password: string): Promise<AuthTokens> {
-    // identifier can be email OR employee_code — try both
+    // identifier can be email OR employee_code OR official_email — try all
     const trimmed = identifier.trim();
+
+    // 1) Primary search via auth_user.email + employee_code + employee emails
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT au.id, au.email, au.password_hash, au.is_blocked,
               COALESCE(au.must_change_password, 0) AS must_change_password,
@@ -99,10 +107,60 @@ export const authService = {
          FROM auth_user au
          JOIN employees e ON e.user_id = au.id
         WHERE UPPER(e.employee_code) = UPPER(?)
+        UNION
+       SELECT au.id, au.email, au.password_hash, au.is_blocked,
+              COALESCE(au.must_change_password, 0) AS must_change_password,
+              e.active_status
+         FROM auth_user au
+         JOIN employees e ON e.user_id = au.id
+        WHERE LOWER(e.official_email) = LOWER(?)
+        UNION
+       SELECT au.id, au.email, au.password_hash, au.is_blocked,
+              COALESCE(au.must_change_password, 0) AS must_change_password,
+              e.active_status
+         FROM auth_user au
+         JOIN employees e ON e.user_id = au.id
+        WHERE LOWER(e.email) = LOWER(?)
         LIMIT 1`,
-      [trimmed, trimmed]
+      [trimmed, trimmed, trimmed, trimmed]
     );
-    const user = rows[0];
+    let user = rows[0];
+
+    // 2) Fallback: if identifier matches an active employee but no auth link exists, auto-repair
+    if (!user) {
+      const [empRows] = await db.execute<RowDataPacket[]>(
+        `SELECT id, email, official_email, user_id, active_status
+           FROM employees
+          WHERE active_status = 1
+            AND (UPPER(employee_code) = UPPER(?)
+                 OR LOWER(official_email) = LOWER(?)
+                 OR LOWER(email) = LOWER(?))
+          LIMIT 1`,
+        [trimmed, trimmed, trimmed]
+      );
+      const employee = empRows[0];
+      if (employee) {
+        const preferredEmail = normalizeEmail(employee.official_email ?? employee.email ?? "");
+        if (preferredEmail) {
+          const repairedUserId = await createOrRepairEmployeeAuthUser(employee, preferredEmail, false);
+          if (repairedUserId) {
+            // Re-query the repaired account directly
+            const [repairRows] = await db.execute<RowDataPacket[]>(
+              `SELECT au.id, au.email, au.password_hash, au.is_blocked,
+                      COALESCE(au.must_change_password, 0) AS must_change_password,
+                      e.active_status
+                 FROM auth_user au
+                 JOIN employees e ON e.user_id = au.id
+                WHERE au.id = ?
+                LIMIT 1`,
+              [repairedUserId]
+            );
+            user = repairRows[0];
+          }
+        }
+      }
+    }
+
     if (!user) throw new Error('Invalid credentials');
     if (user.is_blocked) throw new Error('Account is blocked');
 
