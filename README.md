@@ -16,8 +16,8 @@ See:
 
 | Layer | Current Direction |
 |---|---|
-| Frontend | React 18 + TypeScript + Vite + Tailwind/shadcn/Radix; Vercel deployment direction |
-| Backend | Express + TypeScript under `/backend`; Railway deployment direction |
+| Frontend | React 18 + TypeScript + Vite + Tailwind/shadcn/Radix; Local/Docker deployment |
+| Backend | Express + TypeScript under `/backend`; Local/Docker deployment |
 | Operational data | MySQL `mas_hrms` for backend operational modules |
 | Authentication / files | Supabase Auth and Storage; transitional Supabase-native flows still exist |
 | LMS | Separately deployed internal tool; integrate into PeopleOS |

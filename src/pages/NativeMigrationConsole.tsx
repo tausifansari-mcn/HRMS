@@ -3,9 +3,8 @@ import { Database, CheckCircle2, RefreshCcw, AlertCircle, ArrowRight, Server } f
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { hrmsApi } from "@/lib/hrmsApi";
 
-// Supabase direct access removed — service role key revoked.
-// Legacy Supabase sync features are disabled. Use MySQL migration endpoints instead.
-const supabaseSyncAvailable = false;
+// MySQL migration endpoints only — Supabase sync removed.
+const mysqlMigrationOnly = true;
 
 interface TableEntry {
   key: string;
@@ -14,7 +13,6 @@ interface TableEntry {
 }
 
 interface RowCounts {
-  supabase: number | null;
   mysql: number | null;
 }
 
@@ -31,10 +29,8 @@ const TRACKED_TABLES: TableEntry[] = [
   { key: "assets", label: "Assets", module: "Assets" },
 ];
 
-function migrationStatus(sbCount: number | null, mysqlCount: number | null): string {
-  if (sbCount === null) return "unknown";
-  if (mysqlCount === null) return sbCount > 0 ? "seeded" : "empty";
-  if (sbCount > 0 && mysqlCount === 0) return "ready";
+function migrationStatus(mysqlCount: number | null): string {
+  if (mysqlCount === null) return "unknown";
   if (mysqlCount > 0) return "migrated";
   return "empty";
 }
@@ -42,15 +38,11 @@ function migrationStatus(sbCount: number | null, mysqlCount: number | null): str
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     migrated: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    ready: "bg-blue-50 text-blue-700 border-blue-200",
-    seeded: "bg-indigo-50 text-indigo-700 border-indigo-200",
     empty: "bg-gray-100 text-gray-500 border-gray-200",
     unknown: "bg-amber-50 text-amber-600 border-amber-200",
   };
   const labels: Record<string, string> = {
     migrated: "Migrated",
-    ready: "Ready to migrate",
-    seeded: "Has Supabase data",
     empty: "Empty",
     unknown: "Unknown",
   };
@@ -75,11 +67,9 @@ export default function NativeMigrationConsole() {
     setLoading(true);
     setBackendStatus("checking");
 
-    // Supabase row counts disabled — service role key revoked.
-    // All supabase counts are reported as null (unavailable).
     const newCounts: CountMap = {};
     TRACKED_TABLES.forEach((t) => {
-      newCounts[t.key] = { supabase: null, mysql: null };
+      newCounts[t.key] = { mysql: null };
     });
 
     // Try backend for MySQL counts
@@ -94,7 +84,7 @@ export default function NativeMigrationConsole() {
         });
         TRACKED_TABLES.forEach((t) => {
           if (mysqlMap[t.key] !== undefined) {
-            newCounts[t.key] = { ...newCounts[t.key], mysql: mysqlMap[t.key] };
+            newCounts[t.key] = { mysql: mysqlMap[t.key] };
           }
         });
         setBackendStatus("online");
@@ -140,13 +130,13 @@ export default function NativeMigrationConsole() {
           </button>
         </div>
 
-        {/* Supabase sync disabled notice */}
-        {!supabaseSyncAvailable && (
-          <div className="rounded-3xl border border-amber-100 bg-amber-50 p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-amber-700">
+        {/* MySQL migration notice */}
+        {mysqlMigrationOnly && (
+          <div className="rounded-3xl border border-blue-100 bg-blue-50 p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-blue-700">
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span className="text-sm">
-                Supabase sync removed — use MySQL migration endpoints. Supabase row counts are unavailable.
+                Using MySQL migration endpoints only.
               </span>
             </div>
           </div>
@@ -229,10 +219,9 @@ export default function NativeMigrationConsole() {
                       </td>
                     </tr>
                   ))
-                : TRACKED_TABLES.map((t) => {
-                    const sb = counts[t.key]?.supabase ?? null;
+                  : TRACKED_TABLES.map((t) => {
                     const mysql = counts[t.key]?.mysql ?? null;
-                    const status = migrationStatus(sb, mysql);
+                    const status = migrationStatus(mysql);
                     return (
                       <tr key={t.key} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
