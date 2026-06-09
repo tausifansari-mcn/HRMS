@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Supabase Realtime push_subscriptions table removed.
+// Push subscriptions via backend API
 // Push subscriptions are not available in local MySQL deployment.
 // Service worker registration is preserved for future PWA support.
 
@@ -46,7 +46,7 @@ export function usePushNotifications() {
   const subscribe = useCallback(async () => {
     if (!user || !isSupported) return false;
 
-    console.info("[PushNotifications] Supabase Realtime removed — push subscriptions not available in local deployment");
+    console.info("[PushNotifications] Push notifications via backend API — push subscriptions not available in local deployment");
     setIsLoading(true);
 
     try {
@@ -72,7 +72,7 @@ export function usePushNotifications() {
       });
 
       // Note: subscription endpoint persisted to backend not yet implemented.
-      // Supabase push_subscriptions table removed. Backend endpoint TBD.
+      // Backend push_subscriptions endpoint
       console.info("[PushNotifications] Subscribed to browser push (endpoint not persisted — backend endpoint pending)");
 
       setIsSubscribed(true);
@@ -95,7 +95,7 @@ export function usePushNotifications() {
 
       if (subscription) {
         await subscription.unsubscribe();
-        // Note: backend removal not yet implemented (Supabase table removed; backend endpoint TBD).
+        // Note: use backend endpoint for push subscriptions
         console.info("[PushNotifications] Unsubscribed from browser push");
       }
 

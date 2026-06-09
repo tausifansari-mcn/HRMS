@@ -122,7 +122,7 @@ const useUnlinkedUsers = () => {
       const linkedUserIds = new Set(employees.map((e: any) => e.user_id).filter(Boolean));
 
       // Use active employees as a stand-in user list (those without an employee record linked)
-      // Since we no longer have a profiles table in Supabase, return employees as "users"
+      // Since profiles are stored in MySQL, return employees as "users"
       // that aren't already linked (i.e. users who have employee records but may need relinking)
       // For now, return an empty array — users will be created on invite
       return [] as Array<{ id: string; email: string; full_name: string; avatar_url: string | null }>;
@@ -265,7 +265,7 @@ const Onboarding = () => {
   const getDocumentUrl = (filePath: string) => {
     if (!filePath) return null;
     const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055";
-    // Legacy Supabase URLs or full URLs — use as-is
+    // Legacy URLs or full URLs — use as-is
     const isLegacyUrl = filePath.startsWith("https://") || filePath.startsWith("http://");
     return isLegacyUrl ? filePath : `${HRMS_API}/api/files/employee-documents/${filePath}`;
   };

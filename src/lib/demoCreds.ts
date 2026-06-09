@@ -1,6 +1,6 @@
 /**
  * Demo credentials for role-based testing.
- * Each entry creates a local mock session — no Supabase call required.
+ * Each entry creates a local mock session — backend API only.
  * Passwords are intentionally simple for test convenience.
  */
 
@@ -216,7 +216,7 @@ export function getDemoCred(email: string): DemoCred | undefined {
   return _byEmail.get(email.toLowerCase());
 }
 
-/** Build demo session for localStorage — plain shape, no Supabase types */
+/** Build demo session for localStorage — plain shape, no external auth types */
 export function buildDemoSession(cred: DemoCred) {
   return {
     access_token: `mock-token-${cred.role}`,

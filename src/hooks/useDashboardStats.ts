@@ -24,7 +24,7 @@ export function useDashboardStats() {
   const { user } = useAuth();
   const { isAdminOrHR, isLoading: roleLoading } = useIsAdminOrHR();
 
-  // Realtime Supabase channel removed — polling via refetchInterval handles freshness.
+  // Realtime updates via polling
 
   return useQuery({
     queryKey: ["dashboard-stats", user?.id, isAdminOrHR],

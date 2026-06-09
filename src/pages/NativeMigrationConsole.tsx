@@ -3,7 +3,7 @@ import { Database, CheckCircle2, RefreshCcw, AlertCircle, ArrowRight, Server } f
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { hrmsApi } from "@/lib/hrmsApi";
 
-// MySQL migration endpoints only — Supabase sync removed.
+// MySQL migration endpoints only.
 const mysqlMigrationOnly = true;
 
 interface TableEntry {

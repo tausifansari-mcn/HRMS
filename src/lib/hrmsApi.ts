@@ -4,7 +4,7 @@ function apiBaseUrl(): string {
   return import.meta.env.DEV ? "http://localhost:5055" : "";
 }
 
-// Production uses the same-origin Vercel /api proxy when VITE_HRMS_API_URL is not set.
+// Production uses the same-origin /api proxy when VITE_HRMS_API_URL is not set.
 const HRMS_API_URL = apiBaseUrl();
 
 const LEGACY_DOUBLE_DATA_PATHS = [
