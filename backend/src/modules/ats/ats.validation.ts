@@ -5,14 +5,18 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const createCandidateSchema = z.object({
   fullName:          z.string().trim().min(2).max(255),
   mobile:            z.string().trim().min(10).max(20),
-  email:             z.string().email().nullable().optional(),
+  email:             z.string().email({ message: "Valid email required" }),
   gender:            z.enum(["Male", "Female", "Other"]).nullable().optional(),
   dateOfBirth:       z.string().regex(DATE_RE).nullable().optional(),
-  appliedForProcess: z.string().trim().max(255).nullable().optional(),
-  appliedForBranch:  z.string().trim().max(255).nullable().optional(),
-  sourcingChannel:   z.string().trim().max(100).nullable().optional(),
+  education:         z.string().trim().min(1).max(255),
+  experience:        z.string().trim().min(1).max(255),
+  appliedForProcess: z.string().trim().min(1).max(255),
+  appliedForBranch:  z.string().trim().min(1).max(255),
+  appliedForRole:    z.string().trim().min(1).max(255).nullable().optional(),
+  sourcingChannel:   z.string().trim().min(1).max(100),
   referredBy:        z.string().trim().max(255).nullable().optional(),
   walkInDate:        z.string().regex(DATE_RE).nullable().optional(),
+  arrivalTime:       z.string().trim().max(10).nullable().optional(),
   remarks:           z.string().trim().nullable().optional(),
 });
 

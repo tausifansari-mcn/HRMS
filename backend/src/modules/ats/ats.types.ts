@@ -73,19 +73,21 @@ export interface CandidateListFilters {
 export interface CreateCandidateInput {
   fullName: string;
   mobile: string;
-  email?: string | null;
+  email: string;
+  education: string;
+  experience: string;
+  appliedForProcess: string;
+  appliedForBranch: string;
+  sourcingChannel: string;
   gender?: string | null;
   dateOfBirth?: string | null;
-  appliedForProcess?: string | null;
-  appliedForBranch?: string | null;
-  sourcingChannel?: string | null;
+  appliedForRole?: string | null;
   referredBy?: string | null;
   walkInDate?: string | null;
+  arrivalTime?: string | null;
   remarks?: string | null;
-  // New fields from migration 054_ats_onboarding_flow
+  // Additional fields from migration 054_ats_onboarding_flow
   address?: string | null;
-  education?: string | null;
-  experience?: string | null;
   rotationalShift?: string | null;
   preferredShift?: string | null;
   nightShiftOk?: string | null;

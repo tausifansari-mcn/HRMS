@@ -87,10 +87,51 @@ export const atsService = {
   },
 
   async createCandidate(input: CreateCandidateInput, userId: string | null): Promise<AtsCandidate> {
-    const [dup] = await db.execute<RowDataPacket[]>(
-      "SELECT id FROM ats_candidate WHERE mobile = ? LIMIT 1", [input.mobile]
+    // Check mobile duplicate — detect candidate status for reprocess messaging
+    const [dupMobile] = await db.execute<RowDataPacket[]>(
+      "SELECT id, current_stage, active_status FROM ats_candidate WHERE mobile = ? LIMIT 1",
+      [input.mobile]
     );
-    if ((dup as RowDataPacket[]).length > 0) throw new Error("This mobile already registered");
+    if ((dupMobile as RowDataPacket[]).length > 0) {
+      const existing = (dupMobile as RowDataPacket[])[0];
+      const stage: string = String(existing.current_stage ?? '');
+      if (stage === 'Rejected') {
+        const err = new Error("This mobile belongs to a previously rejected candidate. Please contact HR to reprocess.");
+        (err as any).statusCode = 409;
+        (err as any).code = 'DUPLICATE_REJECTED';
+        throw err;
+      }
+      if (stage === 'Selected' || stage === 'converted') {
+        const err = new Error("This mobile belongs to a candidate who was already selected.");
+        (err as any).statusCode = 409;
+        (err as any).code = 'DUPLICATE_SELECTED';
+        throw err;
+      }
+      const err = new Error("This mobile is already registered");
+      (err as any).statusCode = 409;
+      (err as any).code = 'DUPLICATE_MOBILE';
+      throw err;
+    }
+
+    // Check email duplicate
+    const [dupEmail] = await db.execute<RowDataPacket[]>(
+      "SELECT id, current_stage FROM ats_candidate WHERE email = ? LIMIT 1",
+      [input.email]
+    );
+    if ((dupEmail as RowDataPacket[]).length > 0) {
+      const existing = (dupEmail as RowDataPacket[])[0];
+      const stage: string = String(existing.current_stage ?? '');
+      if (stage === 'Rejected') {
+        const err = new Error("This email belongs to a previously rejected candidate. Please contact HR to reprocess.");
+        (err as any).statusCode = 409;
+        (err as any).code = 'DUPLICATE_EMAIL_REJECTED';
+        throw err;
+      }
+      const err = new Error("This email is already registered");
+      (err as any).statusCode = 409;
+      (err as any).code = 'DUPLICATE_EMAIL';
+      throw err;
+    }
 
     // Normalize sourcing channel before insert
     const normalizedChannel = normalizeSourceChannel(input.sourcingChannel);
@@ -104,10 +145,10 @@ export const atsService = {
           leaves_in_3months, owns_two_wheeler, id_proof_available, education_proof_available,
           recruiter_name, profile_status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, candidateCode(), input.fullName, input.mobile, input.email ?? null, input.gender ?? null,
-       input.dateOfBirth ?? null, input.appliedForProcess ?? null, input.appliedForBranch ?? null,
+      [id, candidateCode(), input.fullName, input.mobile, input.email, input.gender ?? null,
+       input.dateOfBirth ?? null, input.appliedForProcess, input.appliedForBranch,
        normalizedChannel, input.referredBy ?? null, input.walkInDate ?? null, input.remarks ?? null, userId,
-       input.address ?? null, input.education ?? null, input.experience ?? null,
+       input.address ?? null, input.education, input.experience,
        input.rotationalShift ?? null, input.preferredShift ?? null, input.nightShiftOk ?? null,
        input.leavesIn3months ?? null, input.ownsTwoWheeler ?? null, input.idProofAvailable ?? null,
        input.educationProofAvailable ?? null, input.recruiterName ?? null, input.profileStatus ?? 'registered']

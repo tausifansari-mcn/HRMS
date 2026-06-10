@@ -38,8 +38,8 @@ atsRouter.get("/candidates", requireRole("admin", "hr", "recruiter", "manager"),
     req.authUser!.id,
     ["hr", "recruiter"],
     {
-      branchId: "c.branch_id",
-      processId: "c.process_id"
+      branchId: "c.applied_for_branch",
+      processId: "c.applied_for_process"
     },
     { allowCeoAllRead: true }
   );
