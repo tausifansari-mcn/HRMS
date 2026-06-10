@@ -162,8 +162,8 @@ class DispatchService {
     const countQ = q.replace('SELECT *', 'SELECT COUNT(*) AS total');
     const [countRows] = await db.execute<RowDataPacket[]>(countQ, p);
 
-    q += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-    const [rows] = await db.execute<RowDataPacket[]>(q, [...p, limit, offset]);
+    q += ` ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+    const [rows] = await db.execute<RowDataPacket[]>(q, p);
 
     return {
       logs:  rows as DispatchLog[],
