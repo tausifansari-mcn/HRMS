@@ -61,10 +61,10 @@ export async function validateOnboardingToken(token: string) {
     [token]
   );
 
-  if (!rows.length) throw Object.assign(new Error("Invalid onboarding token"), { status: 400 });
+  if (!rows.length) throw Object.assign(new Error("Invalid onboarding token"), { statusCode: 400 });
   const row = rows[0];
   if (new Date(row.onboarding_token_expires_at as string) < new Date()) {
-    throw Object.assign(new Error("Onboarding token expired"), { status: 410 });
+    throw Object.assign(new Error("Onboarding token expired"), { statusCode: 410 });
   }
 
   const [profileRows] = await db.execute<RowDataPacket[]>(
@@ -373,13 +373,13 @@ export async function submitFullOnboarding(token: string, meta?: { ip?: string; 
        FROM candidate_onboarding_profile WHERE candidate_id = ? LIMIT 1`,
     [candidateId]
   );
-  if (!profileRows.length) throw Object.assign(new Error("Employee details are required before submit"), { status: 400 });
+  if (!profileRows.length) throw Object.assign(new Error("Employee details are required before submit"), { statusCode: 400 });
 
   const [bankRows] = await db.execute<RowDataPacket[]>(
     `SELECT id FROM candidate_onboarding_bank_detail WHERE candidate_id = ? LIMIT 1`,
     [candidateId]
   );
-  if (!bankRows.length) throw Object.assign(new Error("Bank details are required before submit"), { status: 400 });
+  if (!bankRows.length) throw Object.assign(new Error("Bank details are required before submit"), { statusCode: 400 });
 
   await db.execute(
     `UPDATE candidate_onboarding_profile SET profile_status = 'submitted', submitted_at = NOW(), updated_at = NOW()
@@ -401,7 +401,7 @@ export async function submitFullOnboarding(token: string, meta?: { ip?: string; 
 }
 
 export async function uploadOnboardingDocument(token: string, file: Express.Multer.File, input: Record<string, unknown>, meta?: { ip?: string; userAgent?: string }) {
-  if (!file) throw Object.assign(new Error("File is required"), { status: 400 });
+  if (!file) throw Object.assign(new Error("File is required"), { statusCode: 400 });
   const tokenData = await validateOnboardingToken(token);
   const candidateId = tokenData.candidate_id as string;
 

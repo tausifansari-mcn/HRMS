@@ -1,8 +1,8 @@
 # ATS E2E Audit — Session Resume
 
-> Session: HRMS1 ATS End-to-End Audit (Session 6)
+> Session: HRMS1 ATS End-to-End Audit (Session 7)
 > Date: 2026-06-10
-> Commit: see git log (post-S6)
+> Commit: see git log (post-S7)
 > Scope: ATS module + directly dependent onboarding / BGV / offer / training flows
 
 ---
@@ -78,6 +78,95 @@
 - TC-15: Frontend validation messages match backend errors
 
 **All 28 new + 60 existing ATS tests pass (88 total ATS, 1129 total).**
+
+---
+
+## 2a. Session 7 — Fixes Applied
+
+### Fix 1 (S7): CI-BGV-01 — HMAC Signature Validation for BGV Webhook
+
+**File modified**: `backend/src/config/env.ts`
+- Added `BGV_WEBHOOK_SECRET: z.string().optional()`.
+- Added production fatal guard: `process.exit(1)` if `BGV_WEBHOOK_SECRET` not set in production.
+
+**File modified**: `backend/src/app.ts`
+- Added `verify` callback to `express.json()` to capture raw body as `req.rawBody: Buffer` for HMAC computation.
+
+**File modified**: `backend/src/modules/ats/bgv-verification.routes.ts`
+- `POST /provider/callback`: added HMAC-SHA256 signature check using `timingSafeEqual` on `x-bgv-signature` header vs `createHmac('sha256', BGV_WEBHOOK_SECRET).update(rawBody)`.
+- Returns 401 for missing/invalid signature; warns and skips in non-production if secret not configured.
+- Added `requireBgvCandidateScope()` helper: loads candidate branch/process from DB, calls `hasScopedAccess`.
+- Replaced `listBgvQueue` import with `listBgvQueueScoped` (takes pre-built scope clause).
+
+**File modified**: `backend/src/modules/ats/bgv-verification.service.ts`
+- Renamed `listBgvQueue` → `listBgvQueueScoped(status, scopeClause)` — injects branch/process scope SQL.
+- Fixed all `throw Object.assign(new Error(...), { status: N })` → `{ statusCode: N }` (was inconsistent with `errorHandler.ts` which uses `.statusCode`).
+
+### Fix 2 (S7): BGV Endpoint Row-Scope
+
+**File modified**: `backend/src/modules/ats/bgv-verification.routes.ts`
+- `GET /queue`: now calls `buildScopeWhereClause` and passes result to `listBgvQueueScoped`.
+- `GET /candidates/:candidateId`: now calls `requireBgvCandidateScope` before service call.
+- `POST /candidates/:candidateId/verify/pan`: `requireBgvCandidateScope` added.
+- `POST /candidates/:candidateId/verify/bank`: `requireBgvCandidateScope` added.
+- `POST /candidates/:candidateId/manual-review`: `requireBgvCandidateScope` added.
+- `POST /candidates/:candidateId/waive`: `requireBgvCandidateScope` added.
+
+### Fix 3 (S7): validateToken / ensureConsent Status Code Fix
+
+**Files modified**: `backend/src/modules/ats/ats.onboarding.service.ts`, `backend/src/modules/ats/onboarding-full.service.ts`
+- All `throw Object.assign(new Error(...), { status: N })` replaced with `{ statusCode: N }`.
+- Token expiry (status 410) and invalid token (status 400) now correctly propagate through `errorHandler.ts`.
+
+### Fix 4 (S7): Onboarding Bridge Row-Scope
+
+**File modified**: `backend/src/modules/ats/ats.service.ts`
+- Added `import { hasScopedAccess }` from `scopeAccess.js`.
+- `createOnboardingBridge`: after `getCandidate`, calls `hasScopedAccess(userId, ["admin","hr"], { branchId, processId })` — throws 403 if denied.
+- `updateOnboardingBridge`: loads bridge record first, then calls `getCandidate` + `hasScopedAccess` — throws 404 if bridge not found, 403 if scope denied; changed `_userId` param to `userId`.
+
+### Tests (S7)
+
+**New file**: `backend/tests/ats.bgv.security.test.ts` — 15 tests:
+- TC-BGV-01: `providerCallback` service processes valid payload (check found)
+- TC-BGV-02: `providerCallback` throws statusCode 400 when providerRequestId missing
+- TC-BGV-03: `providerCallback` throws statusCode 404 when check not found
+- TC-BGV-04: HMAC-SHA256 produces same digest for same body
+- TC-BGV-05: HMAC-SHA256 differs for tampered payload
+- TC-BGV-06: `listBgvQueueScoped` injects scope SQL into query
+- TC-BGV-07: scope `1=0` returns empty results
+- TC-BGV-08: `getBgvStatusForCandidate` returns data normally
+- TC-BGV-09: `hasScopedAccess` returns false when scope denied (unit)
+- TC-BGV-10: `validateToken` throws statusCode 410 on expired token
+- TC-BGV-11: `validateToken` throws statusCode 400 on invalid token
+- TC-BGV-12: `createOnboardingBridge` throws 403 when actor lacks scope
+- TC-BGV-13: `createOnboardingBridge` succeeds when actor has scope
+- TC-BGV-14: `updateOnboardingBridge` throws 404 when bridge not found
+- TC-BGV-15: `updateOnboardingBridge` throws 403 when actor lacks scope
+
+**Updated**: `backend/tests/ats.service.test.ts`
+- Added `vi.mock("../src/shared/scopeAccess.js", ...)` to mock `hasScopedAccess` — required after bridge scope enforcement.
+
+**All 15 new + 108 existing ATS tests pass (123 total ATS, 1144 total backend).**
+
+---
+
+## 2b. Session 7 — Build Results
+
+### Frontend (Root)
+
+| Command | Exit | Errors | Notes |
+|---------|------|--------|-------|
+| `npm run build` | 0 | 0 | Vite build clean |
+
+### Backend (`/backend`)
+
+| Command | Exit | Result | Notes |
+|---------|------|--------|-------|
+| `npx tsc --noEmit` | 1 | **1 error** | `leave.routes.ts:134` — pre-existing non-ATS |
+| `npx vitest run` | 1 | **25 failed / 1144 total** | Same 25 pre-existing non-ATS failures; 15 new S7 BGV security tests added |
+
+**ATS suite**: 123/123 passing (88 S6 + 15 new S7 BGV security tests + 20 ats.wfm.completion).
 
 ---
 
@@ -220,8 +309,8 @@
 | 5 | POST | `/api/ats/candidates/:id/move-stage` | JWT | admin,recruiter,manager | ✅ `hasScopedAccess` | Row-scope S2 |
 | 6 | GET | `/api/ats/candidates/:id/stage-logs` | JWT | admin,hr,recruiter,manager | ❌ None | Audit trail |
 | 7 | POST | `/api/ats/convert/:candidateId` | JWT | admin,hr | ✅ `hasScopedAccess` | Row-scope S2 |
-| 8 | POST | `/api/ats/onboarding-bridge` | JWT | admin,hr | ❌ None | |
-| 9 | PATCH | `/api/ats/onboarding-bridge/:id` | JWT | admin,hr | ❌ None | |
+| 8 | POST | `/api/ats/onboarding-bridge` | JWT | admin,hr | ✅ `hasScopedAccess` via candidate | Fixed S7 |
+| 9 | PATCH | `/api/ats/onboarding-bridge/:id` | JWT | admin,hr | ✅ `hasScopedAccess` via bridge→candidate | Fixed S7 |
 | 10 | GET | `/api/ats/sourcing-channels` | JWT | admin,hr,recruiter | N/A | Reference |
 | 11 | GET | `/api/ats/stats` | JWT | admin,hr,recruiter,manager | 🟡 Partial | Query-param scope |
 | 12 | GET | `/api/ats/walkin-queue` | JWT | admin,hr,recruiter | ✅ `buildScopeWhereClause` | S2 |
@@ -282,10 +371,12 @@
 | 13 | P1 | No email duplicate check | `ats.service.ts` | ✅ Fixed S5 |
 | 14 | P2 | No DB-level UNIQUE on mobile or email | `004_ats.sql` | ✅ Fixed S5 — migration 127 |
 | 15 | P1 | No queue token system | — | ✅ Fixed S5 — migration 128 + service + 8 endpoints |
-| 16 | P2 | BGV endpoints — no row-scope (`hasScopedAccess`) | `bgv-verification.routes.ts` | 🔴 Open |
+| 16 | P2 | BGV endpoints — no row-scope (`hasScopedAccess`) | `bgv-verification.routes.ts` | ✅ Fixed S7 |
 | 17 | P2 | onboarding/send-token — no row-scope | `ats.onboarding.routes.ts` | 🔴 Open |
 | 18 | P2 | offer approve/reject — no row-scope on branch_head | `ats.onboarding.service.ts` | ✅ Fixed S4 |
-| CI-BGV-01 | **P0** | `POST /api/ats/bgv/provider/callback` — no signature validation | `bgv-verification.routes.ts` | 🔴 Open — CRITICAL |
+| CI-BGV-01 | **P0** | `POST /api/ats/bgv/provider/callback` — no signature validation | `bgv-verification.routes.ts` | ✅ Fixed S7 — HMAC-SHA256 + timingSafeEqual |
+| 21 | P1 | `validateToken`/`ensureConsent` used `.status` not `.statusCode` | `ats.onboarding.service.ts`, `bgv-verification.service.ts` | ✅ Fixed S7 |
+| 22 | P1 | Onboarding bridge POST/PATCH — no row-scope | `ats.service.ts` | ✅ Fixed S7 |
 | CI-FP-01 | **P0** | `POST /api/ats-full-parity/intake` — public PII intake | `ats-full-parity.routes.ts` | 🔴 Open — CRITICAL |
 | CI-FP-02 | **P0** | `POST /api/ats-full-parity/bgv` — public BGV submission | `ats-full-parity.routes.ts` | 🔴 Open — CRITICAL |
 | CI-FP-03 | **P0** | `POST /api/ats-full-parity/doc-upload-response` — no validation | `ats-full-parity.routes.ts` | 🔴 Open — CRITICAL |
@@ -295,24 +386,25 @@
 
 ---
 
-## 6. Exact Next Task (Session 7)
+## 6. Exact Next Task (Session 8)
 
-**Next open P0 issue: CI-BGV-01 — BGV provider callback has no signature validation**
+**S7 is complete. Remaining open P0 issues:**
 
-**Task**: `POST /api/ats/bgv/provider/callback` accepts external BGV provider results with no HMAC or PKI signature check. A forged callback can mark a candidate's BGV as clear.
+| Issue | Location | Status |
+|-------|----------|--------|
+| CI-FP-01: `POST /api/ats-full-parity/intake` — public PII intake | `atsFullParity.routes.ts` | 🔴 Open — CRITICAL |
+| CI-FP-02: `POST /api/ats-full-parity/bgv` — public BGV submission | `atsFullParity.routes.ts` | 🔴 Open — CRITICAL |
+| CI-FP-03: `POST /api/ats-full-parity/doc-upload-response` — no validation | `atsFullParity.routes.ts` | 🔴 Open — CRITICAL |
+| CI-FP-04: `POST /api/ats-full-parity/recruiter-devices` — public | `atsFullParity.routes.ts` | 🔴 Open |
+| 17: `POST /api/ats/onboarding/send-token/:id` — no row-scope | `ats.onboarding.service.ts` | 🔴 Open |
+| BGV provider mock only: `getBgvProviderAdapter()` always returns `MockBgvProviderAdapter` | `bgv-provider.adapter.ts` | 🟡 Integration gap — needs real Infinity AI / Digio adapters in production |
 
-**Approach**:
-1. Find the route handler in the BGV routes file.
-2. Add a `x-bgv-signature` header check using `crypto.createHmac('sha256', BGV_WEBHOOK_SECRET).update(rawBody).digest('hex')` and compare with `timingSafeEqual`.
-3. Return 401 if signature missing or invalid.
-4. If `BGV_WEBHOOK_SECRET` env var is not set, log a warning and accept in dev / reject in production.
-
-**Files to Modify**: `grep -r "provider/callback" backend/src/` to locate.
+**Approach for S8**: Audit atsFullParity routes — add token/auth validation to CI-FP-01/02/03; add role requirement to CI-FP-04; add row-scope to send-token endpoint; document BGV provider integration gap.
 
 **Exact Next Command**:
 ```bash
 cd /c/Users/shivamg/HRMS1-ats-e2e/backend
-npx vitest run tests/ats.routes.test.ts tests/ats.registration.test.ts tests/ats.queue.test.ts
+npx vitest run tests/ats.bgv.security.test.ts tests/ats.recruiter.test.ts
 ```
 
 ---
@@ -335,6 +427,8 @@ npx vitest run tests/ats.routes.test.ts tests/ats.registration.test.ts tests/ats
 | 3.0.0 | 2026-06-10 | Audit Agent | Session 3: test fix applied, full journey map completed, CI-001 identified |
 | 4.0.0 | 2026-06-10 | Audit Agent | Session 4: CI-001 + 3 scope fixes; full 89-endpoint API audit; 5 new P0 issues identified |
 | 5.0.0 | 2026-06-10 | Audit Agent | Session 5: 6 fixes (scope column, required fields, email dup, DB UNIQUE, reprocess, queue token); 60 ATS tests; both builds clean |
+| 6.0.0 | 2026-06-10 | Audit Agent | Session 6: recruiter auth (bcrypt+biometric); scoped pending list; interview submission (validate+transaction+upsert+audit); 3 SQL migrations; frontend workspace rewrite; 88 ATS tests |
+| 7.0.0 | 2026-06-10 | Audit Agent | Session 7: CI-BGV-01 HMAC-SHA256 webhook signature validation; BGV row-scope (queue+candidates+manual-review+waive+verify/pan+verify/bank); validateToken/ensureConsent statusCode fix; onboarding bridge row-scope; 15 new BGV security tests; 123 total ATS tests |
 | 6.0.0 | 2026-06-10 | Audit Agent | Session 6: recruiter identity (bcrypt+biometric), scoped pending list, interview submission service (validate+transaction+upsert+audit), 3 SQL migrations, frontend workspace rewrite, 28 new tests (88 ATS total) |
 
 ---

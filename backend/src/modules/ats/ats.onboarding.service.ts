@@ -51,7 +51,7 @@ export async function sendOnboardingToken(
      WHERE c.id = ? AND c.active_status = 1`,
     [candidateId],
   );
-  if (!rows.length) throw Object.assign(new Error('Candidate not found'), { status: 404 });
+  if (!rows.length) throw Object.assign(new Error('Candidate not found'), { statusCode: 404 });
   const cand = rows[0];
 
   const rawToken = randomUUID() + '-' + randomUUID();
@@ -106,10 +106,10 @@ export async function validateToken(token: string) {
      WHERE b.onboarding_token = ?`,
     [token],
   );
-  if (!rows.length) throw Object.assign(new Error('Invalid token'), { status: 400 });
+  if (!rows.length) throw Object.assign(new Error('Invalid token'), { statusCode: 400 });
   const row = rows[0];
   if (new Date(row.onboarding_token_expires_at) < new Date()) {
-    throw Object.assign(new Error('Token expired'), { status: 410 });
+    throw Object.assign(new Error('Token expired'), { statusCode: 410 });
   }
   return row;
 }
@@ -209,7 +209,7 @@ export async function saveOffer(
      WHERE r.id = ?`,
     [requestId],
   );
-  if (!reqRows.length) throw Object.assign(new Error('Request not found'), { status: 404 });
+  if (!reqRows.length) throw Object.assign(new Error('Request not found'), { statusCode: 404 });
   const req = reqRows[0];
 
   // Fetch branch head email separately to avoid complex role joins
@@ -349,7 +349,7 @@ export async function approveOffer(offerId: string, approverId: string, remarks?
      WHERE o.id = ?`,
     [offerId],
   );
-  if (!offerRows.length) throw Object.assign(new Error('Offer not found'), { status: 404 });
+  if (!offerRows.length) throw Object.assign(new Error('Offer not found'), { statusCode: 404 });
   const offer = offerRows[0];
   const candidateId: string = offer.req_candidate_id;
 
@@ -359,7 +359,7 @@ export async function approveOffer(offerId: string, approverId: string, remarks?
     { branchId: offer.applied_for_branch, processId: offer.applied_for_process },
     { allowAdminBypass: true },
   );
-  if (!allowed) throw Object.assign(new Error('Access denied'), { status: 403 });
+  if (!allowed) throw Object.assign(new Error('Access denied'), { statusCode: 403 });
 
   // Pre-compute values that don't need a DB connection
   const mobile: string = offer.mobile ?? '0000';
@@ -502,7 +502,7 @@ export async function rejectOffer(offerId: string, approverId: string, remarks: 
      WHERE o.id = ?`,
     [offerId],
   );
-  if (!rows.length) throw Object.assign(new Error('Offer not found'), { status: 404 });
+  if (!rows.length) throw Object.assign(new Error('Offer not found'), { statusCode: 404 });
   const row = (rows as RowDataPacket[])[0];
 
   const allowed = await hasScopedAccess(
@@ -511,7 +511,7 @@ export async function rejectOffer(offerId: string, approverId: string, remarks: 
     { branchId: row.applied_for_branch, processId: row.applied_for_process },
     { allowAdminBypass: true },
   );
-  if (!allowed) throw Object.assign(new Error('Access denied'), { status: 403 });
+  if (!allowed) throw Object.assign(new Error('Access denied'), { statusCode: 403 });
 
   await db.execute(
     `INSERT INTO ats_offer_approval (id, offer_id, approver_id, action, remarks)

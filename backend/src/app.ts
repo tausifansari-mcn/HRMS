@@ -108,7 +108,12 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "5mb" }));
+app.use(express.json({
+  limit: "5mb",
+  verify: (req: express.Request & { rawBody?: Buffer }, _res, buf) => {
+    req.rawBody = buf;
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 

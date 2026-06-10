@@ -27,7 +27,7 @@ async function ensureConsent(candidateId: string) {
     `SELECT id FROM candidate_bgv_consent WHERE candidate_id = ? AND consent_status = 'granted' ORDER BY granted_at DESC LIMIT 1`,
     [candidateId]
   );
-  if (!rows.length) throw Object.assign(new Error("BGV consent is required before verification"), { status: 403 });
+  if (!rows.length) throw Object.assign(new Error("BGV consent is required before verification"), { statusCode: 403 });
 }
 
 async function getCandidateIdentity(candidateId: string) {
@@ -39,7 +39,7 @@ async function getCandidateIdentity(candidateId: string) {
       WHERE c.id = ? LIMIT 1`,
     [candidateId]
   );
-  if (!rows.length) throw Object.assign(new Error("Candidate not found"), { status: 404 });
+  if (!rows.length) throw Object.assign(new Error("Candidate not found"), { statusCode: 404 });
   return rows[0];
 }
 
@@ -151,7 +151,7 @@ export async function verifyPanForCandidate(candidateId: string, input: { panNum
   await ensureConsent(candidateId);
   const candidate = await getCandidateIdentity(candidateId);
   const pan = String(input.panNumber ?? "").trim().toUpperCase();
-  if (!pan) throw Object.assign(new Error("PAN number is required"), { status: 400 });
+  if (!pan) throw Object.assign(new Error("PAN number is required"), { statusCode: 400 });
   const adapter = getBgvProviderAdapter();
   const started = Date.now();
   const result = await adapter.verifyPan({ candidateName: candidate.employee_name ?? candidate.full_name, dateOfBirth: candidate.date_of_birth, panNumber: pan });
@@ -194,12 +194,12 @@ export async function verifyBankForCandidate(candidateId: string, input: { accou
   if (!accountNo || !ifscCode) {
     const [bankRows] = await db.execute<RowDataPacket[]>(`SELECT * FROM candidate_onboarding_bank_detail WHERE candidate_id = ? LIMIT 1`, [candidateId]);
     const bank = bankRows[0];
-    if (!bank) throw Object.assign(new Error("Bank details are required before verification"), { status: 400 });
+    if (!bank) throw Object.assign(new Error("Bank details are required before verification"), { statusCode: 400 });
     ifscCode = ifscCode || String(bank.ifsc_code ?? "");
     accountHolderName = accountHolderName || String(bank.account_holder_name ?? "");
     // Raw account is intentionally not recoverable once hashed. Candidate must enter raw account for verification.
   }
-  if (!accountNo) throw Object.assign(new Error("Raw account number is required for digital verification"), { status: 400 });
+  if (!accountNo) throw Object.assign(new Error("Raw account number is required for digital verification"), { statusCode: 400 });
   const adapter = getBgvProviderAdapter();
   const started = Date.now();
   const result = await adapter.verifyBank({ candidateName: candidate.employee_name ?? candidate.full_name, accountHolderName, accountNo, ifscCode });
@@ -302,9 +302,9 @@ export async function startDigilockerByToken(token: string, requestedDocuments: 
 export async function providerCallback(input: Record<string, unknown>) {
   const providerRequestId = String(input.providerRequestId ?? input.request_id ?? "");
   const status = String(input.status ?? "in_progress");
-  if (!providerRequestId) throw Object.assign(new Error("providerRequestId required"), { status: 400 });
+  if (!providerRequestId) throw Object.assign(new Error("providerRequestId required"), { statusCode: 400 });
   const [rows] = await db.execute<RowDataPacket[]>(`SELECT * FROM candidate_bgv_check WHERE provider_request_id = ? LIMIT 1`, [providerRequestId]);
-  if (!rows.length) throw Object.assign(new Error("Check not found"), { status: 404 });
+  if (!rows.length) throw Object.assign(new Error("Check not found"), { statusCode: 404 });
   const check = rows[0];
   await db.execute(
     `UPDATE candidate_bgv_check SET status = ?, result_json = ?, updated_at = NOW(), verified_at = IF(? = 'verified', NOW(), verified_at) WHERE id = ?`,
@@ -339,7 +339,7 @@ export async function waiveCheck(candidateId: string, input: { checkId?: string;
   return getBgvStatusForCandidate(candidateId);
 }
 
-export async function listBgvQueue(status?: string) {
+export async function listBgvQueueScoped(status: string | undefined, scopeClause: { sql: string; params: unknown[] }) {
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT c.id AS candidate_id, c.candidate_code, c.full_name, c.mobile, c.email,
             br.branch_name, pm.process_name,
@@ -351,11 +351,12 @@ export async function listBgvQueue(status?: string) {
        LEFT JOIN branch_master br ON br.id = c.applied_for_branch
        LEFT JOIN process_master pm ON pm.id = c.applied_for_process
       WHERE (? IS NULL OR ch.status = ?)
+        AND (${scopeClause.sql})
       GROUP BY c.id, c.candidate_code, c.full_name, c.mobile, c.email, br.branch_name, pm.process_name
       HAVING COUNT(ch.id) > 0
       ORDER BY last_check_at DESC
       LIMIT 200`,
-    [status ?? null, status ?? null]
+    [status ?? null, status ?? null, ...scopeClause.params]
   );
   return rows;
 }

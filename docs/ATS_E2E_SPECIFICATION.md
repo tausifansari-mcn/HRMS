@@ -1,10 +1,10 @@
 # ATS E2E Specification
 
-> Version: 6.0.0  
+> Version: 7.0.0  
 > Date: 2026-06-10  
-> Commit: post-S6 (see git log)
+> Commit: post-S7 (see git log)
 > Scope: ATS module + onboarding / BGV / offer / training dependency flows  
-> Session: 6 — Recruiter interview workflow: auth (bcrypt+biometric), scoped pending list, submission validation+upsert+audit, frontend workspace rewrite
+> Session: 7 — BGV: HMAC webhook signature validation (CI-BGV-01), row-scope on all BGV HR endpoints, onboarding bridge scope, statusCode consistency fix
 
 ---
 
@@ -147,7 +147,8 @@ Converted employee → LMS integration layer → learner mapping
 | ATS Registration | `backend/tests/ats.registration.test.ts` | 10 | 0 | 0 | S5: valid insert, sourcing normalise, 4 mobile dup codes, 2 email dup codes, scope column SQL assertions |
 | ATS Queue | `backend/tests/ats.queue.test.ts` | 12 | 0 | 0 | S5: create/404/409, walkOut/400/404, reEntry/409, listActiveQueue thresholds, tampering 404 |
 | ATS Recruiter | `backend/tests/ats.recruiter.test.ts` | 28 | 0 | 0 | S6: 15 mandatory test cases — auth, biometric, validation, upsert, audit, cascade |
-| **Total ATS** | | **88** | **0** | **0** | |
+| ATS BGV Security | `backend/tests/ats.bgv.security.test.ts` | 15 | 0 | 0 | S7: CI-BGV-01 HMAC, BGV scope, validateToken statusCode, bridge scope |
+| **Total ATS** | | **103** | **0** | **0** | (+ 20 ats.wfm.completion = 123 total) |
 | Non-ATS suites | various | 1101 | 25 | 56 | Pre-existing failures in leave, integrationHub, customization, routes.integration — unchanged from S3 baseline |
 
 **Session 2 New Test Failures**:
@@ -201,13 +202,13 @@ Before any ATS production deployment:
 - [x] Scoped pending-candidate list (server-side pendingMinutes, Waiting+assigned filter) (S6)
 - [x] Interview submission: full validation + transaction/upsert + ats_interview_submission + audit (S6)
 - [x] Frontend NativeATSRecruiterWorkspace rewritten (login verify, pending list, history, submit, cascade) (S6)
-- [ ] BGV endpoints have row-scope enforcement (SG-010)
+- [x] BGV endpoints have row-scope enforcement (S7: queue+candidates+manual-review+waive+verify/pan+verify/bank)
 - [x] Offer approval passes branch-head scope — `hasScopedAccess` added to approveOffer + rejectOffer (S4)
-- [ ] CI-BGV-01: BGV provider callback signature validation
+- [x] CI-BGV-01: BGV provider callback signature validation — HMAC-SHA256 with timingSafeEqual (S7)
 - [ ] CI-FP-01/02/03: ats-full-parity public intake/BGV/doc endpoints require auth or token
-- [x] Frontend build passes (`npm run build`) (S5: ✓ clean)
+- [x] Frontend build passes (`npm run build`) (S7: ✓ clean)
 - [ ] Backend typecheck clean — `leave.routes.ts:134` `leaveService` error must be fixed (pre-existing, non-ATS)
-- [x] Backend test pass rate >= 95 % (S5: 25 failures / 1182 tests = 97.9% pass rate; all 25 pre-existing non-ATS)
+- [x] Backend test pass rate >= 95 % (S7: 25 failures / 1144 backend tests = 97.8% pass rate; all 25 pre-existing non-ATS)
 - [ ] Manual E2E smoke of registration → stage move → onboarding → conversion
 
 ---
@@ -222,6 +223,7 @@ Before any ATS production deployment:
 | 4.0.0 | 2026-06-10 | Audit Agent | Session 4: CI-001 fixed; requests/pending-approval scoped; offer approve/reject scoped; 4 new P0 CI issues added to gate |
 | 5.0.0 | 2026-06-10 | Audit Agent | Session 5: scope column fix; required registration fields; email dup check; reprocess detection; DB UNIQUE constraints; queue token system; 60 ATS tests |
 | 6.0.0 | 2026-06-10 | Audit Agent | Session 6: recruiter auth (bcrypt+biometric); scoped pending list; interview submission service (validate+transaction+upsert+audit); 3 SQL migrations; frontend workspace rewrite; 88 ATS tests |
+| 7.0.0 | 2026-06-10 | Audit Agent | Session 7: CI-BGV-01 HMAC webhook validation; BGV queue+candidate row-scope; onboarding bridge scope; validateToken/ensureConsent statusCode fix; 15 new BGV security tests; 123 total ATS tests |
 
 ---
 

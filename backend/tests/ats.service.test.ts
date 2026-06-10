@@ -4,6 +4,11 @@ vi.mock("../src/db/mysql.js", () => ({
   db: { execute: vi.fn().mockResolvedValue([[], []]) },
 }));
 
+vi.mock("../src/shared/scopeAccess.js", () => ({
+  hasScopedAccess: vi.fn().mockResolvedValue(true),
+  buildScopeWhereClause: vi.fn().mockResolvedValue({ sql: "1=1", params: [] }),
+}));
+
 import { db } from "../src/db/mysql.js";
 import { atsService } from "../src/modules/ats/ats.service.js";
 

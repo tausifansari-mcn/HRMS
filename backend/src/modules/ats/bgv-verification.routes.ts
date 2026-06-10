@@ -1,12 +1,14 @@
-import { Router } from "express";
-import type { Request, Response, NextFunction } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
+import { createHmac, timingSafeEqual } from "crypto";
 import { requireAuth } from "../../middleware/authMiddleware.js";
 import { requireRole } from "../../middleware/requireRole.js";
 import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
+import { hasScopedAccess, buildScopeWhereClause } from "../../shared/scopeAccess.js";
+import { env } from "../../config/env.js";
 import {
   getBgvStatusByToken,
   getBgvStatusForCandidate,
-  listBgvQueue,
+  listBgvQueueScoped,
   manualReview,
   providerCallback,
   saveBgvConsentByToken,
@@ -18,11 +20,24 @@ import {
   verifyPanForCandidate,
   waiveCheck,
 } from "./bgv-verification.service.js";
+import { db } from "../../db/mysql.js";
+import type { RowDataPacket } from "mysql2";
 
 const router = Router();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: Request, res: Response, next: NextFunction) => fn(req, res).catch(next);
 const meta = (req: Request) => ({ ip: req.ip, userAgent: req.get("user-agent") ?? undefined });
+
+async function requireBgvCandidateScope(req: AuthenticatedRequest, candidateId: string): Promise<void> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    "SELECT applied_for_branch AS branchId, applied_for_process AS processId FROM ats_candidate WHERE id = ? LIMIT 1",
+    [candidateId]
+  );
+  const row = (rows as RowDataPacket[])[0];
+  if (!row) throw Object.assign(new Error("Candidate not found"), { statusCode: 404 });
+  const allowed = await hasScopedAccess(req.authUser!.id, ["admin", "hr", "recruiter"], { branchId: row.branchId ?? undefined, processId: row.processId ?? undefined }, { allowAdminBypass: true });
+  if (!allowed) throw Object.assign(new Error("Access denied"), { statusCode: 403 });
+}
 
 // Public token-driven candidate BGV routes. Mount before global requireAuth.
 router.post("/consent", h(async (req, res) => {
@@ -61,34 +76,58 @@ router.post("/digilocker/start", h(async (req, res) => {
   return res.json({ success: true, data: await startDigilockerByToken(token, Array.isArray(req.body.requestedDocuments) ? req.body.requestedDocuments : [], meta(req)) });
 }));
 
-router.post("/provider/callback", h(async (req, res) => {
+// CI-BGV-01: HMAC-SHA256 signature validation
+router.post("/provider/callback", h(async (req: Request & { rawBody?: Buffer }, res) => {
+  const secret = env.BGV_WEBHOOK_SECRET;
+  if (!secret) {
+    if (env.NODE_ENV === "production") return res.status(503).json({ success: false, message: "Webhook not configured" });
+    console.warn("[BGV] BGV_WEBHOOK_SECRET not set — skipping signature check in non-production mode");
+  } else {
+    const sigHeader = req.get("x-bgv-signature") ?? "";
+    if (!sigHeader) return res.status(401).json({ success: false, message: "Missing x-bgv-signature header" });
+    const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(req.body));
+    const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+    let match = false;
+    try {
+      match = timingSafeEqual(Buffer.from(sigHeader, "hex"), Buffer.from(expected, "hex"));
+    } catch {
+      match = false;
+    }
+    if (!match) return res.status(401).json({ success: false, message: "Invalid webhook signature" });
+  }
   return res.json({ success: true, data: await providerCallback(req.body) });
 }));
 
-// HR/BGV/Admin protected routes
+// HR/BGV/Admin protected routes — all have role check + row-scope
 router.get("/queue", requireAuth, requireRole("admin", "hr", "recruiter"), h(async (req: AuthenticatedRequest, res) => {
-  return res.json({ success: true, data: await listBgvQueue(req.query.status as string | undefined) });
+  const scoped = await buildScopeWhereClause(req.authUser!.id, ["admin", "hr", "recruiter"], { branchId: "c.applied_for_branch", processId: "c.applied_for_process" }, { allowAdminBypass: true });
+  return res.json({ success: true, data: await listBgvQueueScoped(req.query.status as string | undefined, scoped) });
 }));
 
 router.get("/candidates/:candidateId", requireAuth, requireRole("admin", "hr", "recruiter"), h(async (req: AuthenticatedRequest, res) => {
+  await requireBgvCandidateScope(req, req.params.candidateId);
   return res.json({ success: true, data: await getBgvStatusForCandidate(req.params.candidateId) });
 }));
 
 router.post("/candidates/:candidateId/verify/pan", requireAuth, requireRole("admin", "hr"), h(async (req: AuthenticatedRequest, res) => {
+  await requireBgvCandidateScope(req, req.params.candidateId);
   return res.json({ success: true, data: await verifyPanForCandidate(req.params.candidateId, req.body, { actorType: "hr", actorId: req.authUser!.id }) });
 }));
 
 router.post("/candidates/:candidateId/verify/bank", requireAuth, requireRole("admin", "hr"), h(async (req: AuthenticatedRequest, res) => {
+  await requireBgvCandidateScope(req, req.params.candidateId);
   return res.json({ success: true, data: await verifyBankForCandidate(req.params.candidateId, req.body, { actorType: "hr", actorId: req.authUser!.id }) });
 }));
 
 router.post("/candidates/:candidateId/manual-review", requireAuth, requireRole("admin", "hr"), h(async (req: AuthenticatedRequest, res) => {
   if (!req.body.remarks) return res.status(400).json({ success: false, message: "remarks required" });
+  await requireBgvCandidateScope(req, req.params.candidateId);
   return res.json({ success: true, data: await manualReview(req.params.candidateId, req.body, req.authUser!.id) });
 }));
 
 router.post("/candidates/:candidateId/waive", requireAuth, requireRole("admin", "hr"), h(async (req: AuthenticatedRequest, res) => {
   if (!req.body.reason) return res.status(400).json({ success: false, message: "reason required" });
+  await requireBgvCandidateScope(req, req.params.candidateId);
   return res.json({ success: true, data: await waiveCheck(req.params.candidateId, req.body, req.authUser!.id) });
 }));
 

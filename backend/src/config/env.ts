@@ -78,6 +78,9 @@ const envSchema = z.object({
   DIALER_DB_USER: z.string().default(""),
   DIALER_DB_PASSWORD: z.string().default(""),
   DIALER_DB_NAME: z.string().default(""),
+
+  // BGV webhook signature secret — HMAC-SHA256 of raw request body
+  BGV_WEBHOOK_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -112,6 +115,10 @@ if (parsed.data.NODE_ENV === "production") {
   }
   if (parsed.data.PORTAL_DEMO_BYPASS === "true") {
     console.error("[FATAL] PORTAL_DEMO_BYPASS must not be 'true' in production.");
+    process.exit(1);
+  }
+  if (!parsed.data.BGV_WEBHOOK_SECRET) {
+    console.error("[FATAL] BGV_WEBHOOK_SECRET must be set in production.");
     process.exit(1);
   }
 }

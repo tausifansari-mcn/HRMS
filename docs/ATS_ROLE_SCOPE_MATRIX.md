@@ -1,9 +1,9 @@
 # ATS Role ↔ Scope Matrix
 
-> Version: 6.0.0  
+> Version: 7.0.0  
 > Date: 2026-06-10  
-> Commit: post-S6 (see git log)
-> Session: 6 — Recruiter auth endpoint (biometric), scoped pending list, interview submission (validate+upsert+audit)
+> Commit: post-S7 (see git log)
+> Session: 7 — BGV HMAC webhook validation (CI-BGV-01), BGV row-scope, onboarding bridge row-scope, statusCode fixes
 
 ---
 
@@ -94,18 +94,18 @@
 | `GET /api/ats/walkin-queue` | ✅ | ✅ `buildScopeWhereClause` | ✅ `buildScopeWhereClause` | — | **✅ Fixed** | S2 |
 | `GET /api/ats/waiting-queue` | ✅ | ✅ `buildScopeWhereClause` | ✅ `buildScopeWhereClause` | — | **✅ Fixed** | S2 |
 | `POST /api/ats/convert/:id` | ✅ | ✅ `hasScopedAccess` | ✅ `hasScopedAccess` | ✅ | **✅ Fixed** | S2 |
-| `POST /api/ats/onboarding-bridge` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
-| `PATCH /api/ats/onboarding-bridge/:id` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
+| `POST /api/ats/onboarding-bridge` | ✅ | ✅ `hasScopedAccess` via candidate | ✅ `hasScopedAccess` via candidate | ✅ | **✅ Fixed S7** | S7 |
+| `PATCH /api/ats/onboarding-bridge/:id` | ✅ | ✅ `hasScopedAccess` via bridge→candidate | ✅ `hasScopedAccess` via bridge→candidate | ✅ | **✅ Fixed S7** | S7 |
 | `GET /api/ats/onboarding/requests` | ✅ | ✅ `buildScopeWhereClause` on `r.branch_id` | ❌ | — | **✅ Fixed S4** | — |
 | `GET /api/ats/onboarding/pending-approval` | ✅ | ✅ `buildScopeWhereClause` on `r.branch_id` | ❌ | — | **✅ Fixed S4** | — |
 | `POST /api/ats/onboarding/offers/:id/approve` | ✅ | ✅ `hasScopedAccess` | ✅ `hasScopedAccess` | ✅ | **✅ Fixed S4** | S4 |
 | `POST /api/ats/onboarding/offers/:id/reject` | ✅ | ✅ `hasScopedAccess` | ✅ `hasScopedAccess` | ✅ | **✅ Fixed S4** | S4 |
 | `GET /api/ats/stats` | ✅ | ❌ | ❌ | N/A | **Missing** (aggregates) | — |
 | `GET /api/ats/sourcing-channels` | ✅ | N/A | N/A | N/A | N/A | — |
-| `GET /api/ats/bgv/queue` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
-| `GET /api/ats/bgv/candidates/:id` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
-| `POST /api/ats/bgv/candidates/:id/manual-review` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
-| `POST /api/ats/bgv/candidates/:id/waive` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
+| `GET /api/ats/bgv/queue` | ✅ | ✅ `buildScopeWhereClause` on `c.applied_for_branch` | ✅ `buildScopeWhereClause` on `c.applied_for_process` | — | **✅ Fixed S7** | S7 |
+| `GET /api/ats/bgv/candidates/:id` | ✅ | ✅ `hasScopedAccess` | ✅ `hasScopedAccess` | ✅ | **✅ Fixed S7** | S7 |
+| `POST /api/ats/bgv/candidates/:id/manual-review` | ✅ | ✅ `hasScopedAccess` | ✅ `hasScopedAccess` | ✅ | **✅ Fixed S7** | S7 |
+| `POST /api/ats/bgv/candidates/:id/waive` | ✅ | ✅ `hasScopedAccess` | ✅ `hasScopedAccess` | ✅ | **✅ Fixed S7** | S7 |
 | `POST /api/ats/onboarding/send-token/:id` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
 | `GET /api/ats/onboarding/requests` | ✅ | ✅ `buildScopeWhereClause` | ❌ | — | **✅ Fixed S4** | — |
 | `POST /api/ats/onboarding/requests/:id/offer` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
@@ -167,7 +167,7 @@ export async function requireCandidateScope(
 | P1 | `GET /api/ats/bgv/queue` | HR/recruiter views all-branch BGV queue | 🔴 Open |
 | P1 | `GET /api/ats/bgv/candidates/:id` | HR reads BGV details cross-branch | 🔴 Open |
 | P1 | `POST /api/ats/bgv/candidates/:id/waive` / `manual-review` | Admin overrides BGV cross-branch | 🔴 Open |
-| **P0** | **CI-BGV-01: `POST /api/ats/bgv/provider/callback` — no signature validation** | **BGV results can be forged** | **🔴 Open — CRITICAL** |
+| **P0** | **CI-BGV-01: `POST /api/ats/bgv/provider/callback` — no signature validation** | **BGV results can be forged** | **✅ Fixed S7 — HMAC-SHA256 + timingSafeEqual** |
 | **P0** | **CI-FP-01: `POST /api/ats-full-parity/intake` — public PII intake** | **Unauthenticated PII submission** | **🔴 Open — CRITICAL** |
 | **P0** | **CI-FP-02: `POST /api/ats-full-parity/bgv` — public BGV submission** | **No token/auth validation** | **🔴 Open — CRITICAL** |
 | **P0** | **CI-FP-03: `POST /api/ats-full-parity/doc-upload-response` — public doc callback** | **No validation** | **🔴 Open — CRITICAL** |
@@ -185,6 +185,7 @@ export async function requireCandidateScope(
 | 4.0.0 | 2026-06-10 | Audit Agent | Session 4: CI-001 fixed; requests/pending-approval scoped; offer approve/reject scoped; 4 new P0 CI issues from full-parity audit |
 | 5.0.0 | 2026-06-10 | Audit Agent | Session 5: GET /candidates scope column bug fixed (c.branch_id→c.applied_for_branch); queue token endpoints added with branch/process scope |
 | 6.0.0 | 2026-06-10 | Audit Agent | Session 6: recruiter verify endpoint (bcrypt+biometric); my-candidates scoped to recruiter's assigned Waiting candidates; submission via ats_interview_submission with ownership check |
+| 7.0.0 | 2026-06-10 | Audit Agent | Session 7: CI-BGV-01 HMAC-SHA256 webhook (timingSafeEqual); BGV queue+candidate+manual-review+waive row-scope; onboarding bridge POST+PATCH row-scope; validateToken/ensureConsent statusCode fix |
 
 ---
 
