@@ -92,7 +92,7 @@ export async function hasScopedAccess(
   target: ScopeTarget,
   options: { allowAdminBypass?: boolean; requireScopeForNonAdmin?: boolean } = {}
 ): Promise<boolean> {
-  const allowAdminBypass = options.allowAdminBypass ?? true;
+  const allowAdminBypass = options.allowAdminBypass ?? false;
   const requireScopeForNonAdmin = options.requireScopeForNonAdmin ?? true;
 
   if (allowAdminBypass && await hasAnyRole(userId, "admin")) return true;
@@ -188,7 +188,7 @@ export async function buildScopeWhereClause(
   aliases: ScopeAliases,
   options: { allowAdminBypass?: boolean; allowCeoAllRead?: boolean } = {}
 ): Promise<{ sql: string; params: unknown[] }> {
-  const allowAdminBypass = options.allowAdminBypass ?? true;
+  const allowAdminBypass = options.allowAdminBypass ?? false;
   const allowCeoAllRead = options.allowCeoAllRead ?? false;
 
   if (allowAdminBypass && await hasAnyRole(userId, "admin")) {
