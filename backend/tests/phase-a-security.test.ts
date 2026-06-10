@@ -4,9 +4,8 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import db from '../src/db.js';
+import { db } from '../src/db/mysql.js';
 import { randomUUID } from 'crypto';
-import bcrypt from 'bcrypt';
 
 describe('Phase A: Security Hardening Tests', () => {
   let testRecruiterId: string;
@@ -18,8 +17,8 @@ describe('Phase A: Security Hardening Tests', () => {
     testRecruiterId = randomUUID();
     testRecruiterCode = `TEST-${Date.now()}`;
 
-    // Create test recruiter
-    const pinHash = await bcrypt.hash('1234', 10);
+    // Create test recruiter (pin_hash can be any string for testing)
+    const pinHash = '$2b$10$mockHashForTesting1234567890123456789012'; // Mock bcrypt hash
     await db.execute(
       `INSERT INTO ats_recruiter_roster
        (id, recruiter_code, name, pin_hash, email, mobile, branch, daily_capacity, assigned_today, available_today, active_status)
