@@ -569,18 +569,94 @@ export const atsFullParityService = {
     const rows = await candidateSelect(candidateId ? `(c.id = ? OR c.candidate_code = ?)` : `c.q_token = ?`, candidateId ? [candidateId, candidateId] : [qToken]);
     const c = rows[0];
     if (!c) throw Object.assign(new Error("Candidate not found"), { statusCode: 404 });
+
     const finalDecision = normalizeText(input.finalDecision || input.FinalDecision || input["Final Decision"]);
     const endStage = normalizeText(input.walkinEndStage || input["Walk-in End Stage"] || input.walkin_end_stage);
+
+    // Extract round results and VOCs
+    let round1Result = normalizeText(input.round1Result || input.Round1_Result || input["Round1 Result"]);
+    let round1Voc = normalizeText(input.round1Voc || input.Round1_VOC || input["Round1 VOC"]);
+    let skillTestResult = normalizeText(input.skillTestResult || input["SkillTest Result"]);
+    let skillTestVoc = normalizeText(input.skillTestVoc || input["SkillTest VOC"]);
+    let round2Result = normalizeText(input.round2Result || input["Round2 Result"]);
+    let round2Voc = normalizeText(input.round2Voc || input["Round2 VOC"]);
+    let round3Result = normalizeText(input.round3Result || input["Round3 Result"]);
+    let round3Voc = normalizeText(input.round3Voc || input["Round3 VOC"]);
+
+    // VOC Validation: Require VOC when finalDecision is Rejected
+    if (finalDecision === "Rejected") {
+      const hasAnyVOC = round1Voc || skillTestVoc || round2Voc || round3Voc;
+      if (!hasAnyVOC) {
+        throw Object.assign(
+          new Error("At least one round VOC is required when rejecting a candidate"),
+          { statusCode: 400 }
+        );
+      }
+    }
+
+    // VOC Validation: Require VOC when finalDecision is No Show
+    if (finalDecision === "No Show") {
+      if (!round1Voc) {
+        throw Object.assign(
+          new Error("Round1 VOC is required for No Show (reason must be documented)"),
+          { statusCode: 400 }
+        );
+      }
+    }
+
+    // Cascade logic: When Selected, set all reached rounds to Selected and null VOCs
+    if (finalDecision === "Selected") {
+      // Determine which rounds were reached based on endStage
+      if (endStage) {
+        if (contains(endStage, ["round 1", "hr screening"])) {
+          round1Result = "Selected";
+          round1Voc = null;  // Clear VOC when cascading to Selected
+        }
+        if (contains(endStage, ["skill test", "skilltest"])) {
+          round1Result = "Selected";
+          round1Voc = null;
+          skillTestResult = "Selected";
+          skillTestVoc = null;
+        }
+        if (contains(endStage, ["round 2", "op's", "ops"])) {
+          round1Result = "Selected";
+          round1Voc = null;
+          skillTestResult = "Selected";
+          skillTestVoc = null;
+          round2Result = "Selected";
+          round2Voc = null;
+        }
+        if (contains(endStage, ["round 3", "client"])) {
+          round1Result = "Selected";
+          round1Voc = null;
+          skillTestResult = "Selected";
+          skillTestVoc = null;
+          round2Result = "Selected";
+          round2Voc = null;
+          round3Result = "Selected";
+          round3Voc = null;
+        }
+      }
+    }
+
     const newStatus = finalDecision || (endStage ? (contains(endStage, ["no show"]) ? "No Show" : endStage) : c.status);
+
     await db.execute(
       `UPDATE ats_candidate SET
         walkin_end_stage=?, round1_result=?, round1_voc=?, round1_remarks=?, skilltest_typing=?, skilltest_ai=?, skilltest_result=?, skilltest_voc=?, skilltest_remarks=?, round2_result=?, round2_voc=?, round2_remarks=?, round3_result=?, round3_voc=?, round3_remarks=?, final_decision=?, offer_salary=?, offer_doj=?, reporting_shift=?, process_text=?, status=?, current_stage=?, hr_form_submission_time=NOW(), updated_at=NOW()
        WHERE id=?`,
-      [endStage || null, input.round1Result || input.Round1_Result || input["Round1 Result"] || null, input.round1Voc || input.Round1_VOC || input["Round1 VOC"] || null, input.round1Remarks || input["Round1 Remarks"] || null, input.skillTestTyping || input["SkillTest Typing Score (WPM/Accuracy%)"] || null, input.skillTestAI || input["SkillTest AI Score"] || null, input.skillTestResult || input["SkillTest Result"] || null, input.skillTestVoc || input["SkillTest VOC"] || null, input.skillTestRemarks || input["SkillTest Remarks"] || null, input.round2Result || input["Round2 Result"] || null, input.round2Voc || input["Round2 VOC"] || null, input.round2Remarks || input["Round2 Remarks"] || null, input.round3Result || input["Round3 Result"] || null, input.round3Voc || input["Round3 VOC"] || null, input.round3Remarks || input["Round3 Remarks"] || null, finalDecision || null, toNumber(input.offerSalary || input["Offer Salary"], null as any), input.offerDoj || input["Date of Joining"] || null, input.reportingTiming || input["Reporting Timing"] || null, input.interviewedForProcess || input["Interviewed for Process"] || null, newStatus || null, newStatus || c.current_stage, c.id]
+      [endStage || null, round1Result || null, round1Voc || null, input.round1Remarks || input["Round1 Remarks"] || null, input.skillTestTyping || input["SkillTest Typing Score (WPM/Accuracy%)"] || null, input.skillTestAI || input["SkillTest AI Score"] || null, skillTestResult || null, skillTestVoc || null, input.skillTestRemarks || input["SkillTest Remarks"] || null, round2Result || null, round2Voc || null, input.round2Remarks || input["Round2 Remarks"] || null, round3Result || null, round3Voc || null, input.round3Remarks || input["Round3 Remarks"] || null, finalDecision || null, toNumber(input.offerSalary || input["Offer Salary"], null as any), input.offerDoj || input["Date of Joining"] || null, input.reportingTiming || input["Reporting Timing"] || null, input.interviewedForProcess || input["Interviewed for Process"] || null, newStatus || null, newStatus || c.current_stage, c.id]
     );
-    await db.execute(`INSERT INTO ats_candidate_stage_log (id, candidate_id, from_stage, to_stage, remarks, updated_by) VALUES (?, ?, ?, ?, ?, ?)`, [randomUUID(), c.id, c.current_stage || c.status, newStatus, input.remarks || input.Final_Remarks || null, actorUserId ?? null]);
+
+    // Enhanced stage log with actor tracking
+    await db.execute(
+      `INSERT INTO ats_candidate_stage_log (id, candidate_id, from_stage, to_stage, remarks, updated_by, actor_user_id, submitted_by_user_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [randomUUID(), c.id, c.current_stage || c.status, newStatus, input.remarks || input.Final_Remarks || null, actorUserId ?? null, actorUserId ?? null, actorUserId ?? null]
+    );
+
     await this.recomputeDerivedFields(c.id);
-    await audit("RECRUITER_UPDATE", c.candidate_code || c.id, `Stage=${newStatus}`);
+    await audit("RECRUITER_UPDATE", c.candidate_code || c.id, `Stage=${newStatus}; Decision=${finalDecision || 'None'}; VOCs=${[round1Voc, skillTestVoc, round2Voc, round3Voc].filter(Boolean).join(',') || 'None'}`);
     return (await candidateSelect("c.id = ?", [c.id]))[0];
   },
 

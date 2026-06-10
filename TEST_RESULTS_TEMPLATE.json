@@ -1,0 +1,519 @@
+{
+  "test_execution": {
+    "date": "2026-06-08",
+    "tester_name": "",
+    "start_time": "",
+    "end_time": "",
+    "duration_minutes": 0,
+    "environment": {
+      "frontend_url": "http://localhost:8080",
+      "backend_url": "http://localhost:5055",
+      "database": "mas_hrms @ 122.184.128.90",
+      "backend_version": "",
+      "frontend_version": ""
+    }
+  },
+
+  "test_accounts_used": [
+    {
+      "role": "Employee",
+      "email": "nixon.sethi@teammas.in",
+      "code": "MAS00176",
+      "name": "Nixon Sethi",
+      "tested": false
+    },
+    {
+      "role": "Team Leader",
+      "email": "RUPALI.CHOPRA@TEAMMAS.IN",
+      "code": "MAS07761",
+      "name": "Rupali Chopra",
+      "tested": false
+    },
+    {
+      "role": "Manager",
+      "email": "ANKIT.SHARMA@TEAMMAS.IN",
+      "code": "MAS04461",
+      "name": "Ankit Sharma",
+      "tested": false
+    },
+    {
+      "role": "Admin",
+      "email": "shivam.giri@teammas.in",
+      "code": "ADMIN001",
+      "name": "Shivam Giri",
+      "tested": false
+    }
+  ],
+
+  "functional_tests": {
+    "test_1_clock_in": {
+      "status": "not_tested",
+      "passed": null,
+      "url": "http://localhost:8080/attendance",
+      "role": "nixon.sethi@teammas.in",
+      "checks": {
+        "page_loads": null,
+        "current_time_displayed": null,
+        "clock_in_button_visible": null,
+        "shift_info_visible": null,
+        "location_capture_works": null,
+        "work_mode_selector_present": null
+      },
+      "api_tested": false,
+      "api_response_code": null,
+      "screenshot": "test1_clock_in_page.png",
+      "issues": [],
+      "notes": ""
+    },
+
+    "test_2_attendance_history": {
+      "status": "not_tested",
+      "passed": null,
+      "url": "http://localhost:8080/attendance",
+      "role": "nixon.sethi@teammas.in",
+      "checks": {
+        "history_table_loads": null,
+        "month_selector_works": null,
+        "shows_current_month": null,
+        "date_column_present": null,
+        "clock_in_time_present": null,
+        "clock_out_time_present": null,
+        "total_hours_calculated": null,
+        "break_hours_displayed": null,
+        "status_badges_colored": null,
+        "pagination_works": null,
+        "data_accurate": null
+      },
+      "database_validation": {
+        "query_run": false,
+        "records_found": 0,
+        "expected_vs_actual": ""
+      },
+      "screenshot": "test2_attendance_history.png",
+      "issues": [],
+      "notes": ""
+    },
+
+    "test_3_regularization_request": {
+      "status": "not_tested",
+      "passed": null,
+      "url": "http://localhost:8080/attendance-regularization",
+      "role": "nixon.sethi@teammas.in",
+      "checks": {
+        "page_loads": null,
+        "new_request_button_visible": null,
+        "form_opens": null,
+        "attendance_date_picker": null,
+        "current_status_dropdown": null,
+        "time_pickers_present": null,
+        "reason_field_present": null,
+        "document_upload_works": null,
+        "form_validation_works": null,
+        "submit_button_enabled": null
+      },
+      "submitted_test_request": false,
+      "test_request_id": null,
+      "screenshot": "test3_regularization_form.png",
+      "issues": [],
+      "notes": ""
+    },
+
+    "test_4_team_attendance": {
+      "status": "not_tested",
+      "passed": null,
+      "url": "http://localhost:8080/attendance",
+      "role": "ANKIT.SHARMA@TEAMMAS.IN",
+      "checks": {
+        "team_tab_visible": null,
+        "team_list_loads": null,
+        "shows_branch_employees_only": null,
+        "does_not_show_other_branches": null,
+        "employee_names_present": null,
+        "today_status_visible": null,
+        "clock_times_displayed": null,
+        "late_early_indicators": null,
+        "filters_work": null,
+        "export_button_present": null
+      },
+      "team_count_displayed": 0,
+      "expected_team_count": 0,
+      "screenshot": "test4_team_attendance.png",
+      "issues": [],
+      "notes": ""
+    },
+
+    "test_5_regularization_approvals": {
+      "status": "not_tested",
+      "passed": null,
+      "url": "http://localhost:8080/attendance-regularization",
+      "role": "ANKIT.SHARMA@TEAMMAS.IN",
+      "checks": {
+        "pending_approvals_tab_visible": null,
+        "request_list_loads": null,
+        "shows_team_requests_only": null,
+        "request_details_visible": null,
+        "approve_button_present": null,
+        "reject_button_present": null,
+        "view_details_works": null,
+        "approval_stage_shown": null,
+        "action_log_visible": null
+      },
+      "pending_count": 0,
+      "tested_approval": false,
+      "screenshot": "test5_approval_queue.png",
+      "issues": [],
+      "notes": ""
+    },
+
+    "test_6_shift_management": {
+      "status": "not_tested",
+      "passed": null,
+      "url": "http://localhost:8080/wfm/roster",
+      "role": "admin",
+      "checks": {
+        "page_loads": null,
+        "gate_protection_works": null,
+        "process_selector_present": null,
+        "shift_template_section_visible": null,
+        "existing_shifts_displayed": null,
+        "create_shift_form_visible": null,
+        "shift_code_field": null,
+        "shift_name_field": null,
+        "time_pickers": null,
+        "save_button_present": null
+      },
+      "shifts_count": 0,
+      "created_test_shift": false,
+      "screenshot": "test6_shift_management.png",
+      "issues": [],
+      "notes": ""
+    },
+
+    "test_7_roster_planning": {
+      "status": "not_tested",
+      "passed": null,
+      "url": "http://localhost:8080/wfm/roster",
+      "role": "admin",
+      "checks": {
+        "weekly_cycle_section_visible": null,
+        "existing_cycles_displayed": null,
+        "create_cycle_form_visible": null,
+        "date_pickers_present": null,
+        "required_hc_field": null,
+        "create_button_present": null,
+        "can_select_cycle": null,
+        "status_transition_button": null,
+        "advance_status_works": null
+      },
+      "cycles_count": 0,
+      "created_test_cycle": false,
+      "tested_status_transition": false,
+      "screenshot": "test7_roster_planning.png",
+      "issues": [],
+      "notes": ""
+    },
+
+    "test_8_roster_assignment": {
+      "status": "not_tested",
+      "passed": null,
+      "url": "http://localhost:8080/wfm/roster",
+      "role": "admin",
+      "checks": {
+        "draft_allocations_section": null,
+        "json_textarea_visible": null,
+        "save_assignments_button": null,
+        "roster_assignments_table": null,
+        "assignments_display_correctly": null,
+        "validation_works": null
+      },
+      "submitted_test_assignments": false,
+      "assignments_count": 0,
+      "screenshot": "test8_roster_assignment.png",
+      "issues": [],
+      "notes": ""
+    },
+
+    "test_9_my_roster": {
+      "status": "not_tested",
+      "passed": null,
+      "url": "http://localhost:8080/my-roster",
+      "role": "nixon.sethi@teammas.in OR RUPALI.CHOPRA@TEAMMAS.IN",
+      "checks": {
+        "page_loads": null,
+        "weekly_calendar_visible": null,
+        "current_week_highlighted": null,
+        "seven_day_columns": null,
+        "shift_names_displayed": null,
+        "shift_timings_displayed": null,
+        "week_off_marked": null,
+        "holiday_marked": null,
+        "leave_overlay_works": null,
+        "navigation_arrows_work": null,
+        "week_changes_on_navigation": null,
+        "acknowledge_button_if_pending": null,
+        "shows_own_roster_only": null
+      },
+      "roster_days_visible": 0,
+      "acknowledged_roster": false,
+      "screenshot": "test9_my_roster.png",
+      "issues": [],
+      "notes": ""
+    },
+
+    "test_10_live_dashboard": {
+      "status": "not_tested",
+      "passed": null,
+      "url": "http://localhost:8080/wfm/live-tracker",
+      "role": "admin",
+      "checks": {
+        "page_loads": null,
+        "is_placeholder_or_implemented": "",
+        "date_selector_visible": null,
+        "summary_stats_cards": null,
+        "total_rostered_shown": null,
+        "logged_in_count": null,
+        "logged_out_count": null,
+        "absent_count": null,
+        "adherence_percentage": null,
+        "employee_list_table": null,
+        "status_badges_colored": null,
+        "filters_work": null,
+        "auto_refresh_works": null
+      },
+      "stats": {
+        "total_rostered": 0,
+        "logged_in": 0,
+        "logged_out": 0,
+        "absent": 0,
+        "adherence_pct": 0
+      },
+      "screenshot": "test10_live_dashboard.png",
+      "issues": [],
+      "notes": ""
+    },
+
+    "test_11_attendance_reports": {
+      "status": "not_tested",
+      "passed": null,
+      "url": "http://localhost:8080/attendance",
+      "role": "admin",
+      "checks": {
+        "reports_section_visible": null,
+        "date_range_picker": null,
+        "employee_filter": null,
+        "department_filter": null,
+        "branch_filter": null,
+        "report_type_dropdown": null,
+        "generate_button": null,
+        "report_displays_data": null,
+        "data_accurate": null,
+        "export_csv_works": null,
+        "export_pdf_works": null,
+        "manager_sees_team_only": null
+      },
+      "report_generated": false,
+      "export_tested": false,
+      "screenshot": "test11_reports.png",
+      "issues": [],
+      "notes": ""
+    }
+  },
+
+  "security_tests": {
+    "security_1_employee_cannot_mark_others": {
+      "status": "not_tested",
+      "passed": null,
+      "test_description": "Employee A tries to clock in for Employee B",
+      "method": "API manipulation",
+      "expected_result": "403 Forbidden",
+      "actual_result": "",
+      "api_response_code": null,
+      "error_message": "",
+      "blocked_correctly": null,
+      "severity": "CRITICAL",
+      "evidence": ""
+    },
+
+    "security_2_cannot_approve_own_regularization": {
+      "status": "not_tested",
+      "passed": null,
+      "test_description": "Employee submits and tries to approve own regularization",
+      "method": "API call with employee token",
+      "expected_result": "403 Forbidden",
+      "actual_result": "",
+      "api_response_code": null,
+      "error_message": "",
+      "blocked_correctly": null,
+      "severity": "CRITICAL",
+      "evidence": ""
+    },
+
+    "security_3_rbac_enforcement": {
+      "status": "not_tested",
+      "passed": null,
+      "test_description": "Non-manager tries to access team attendance",
+      "method": "API call with employee token",
+      "expected_result": "403 Forbidden",
+      "actual_result": "",
+      "api_response_code": null,
+      "error_message": "",
+      "blocked_correctly": null,
+      "severity": "CRITICAL",
+      "evidence": ""
+    },
+
+    "security_4_wfm_gate_protection": {
+      "status": "not_tested",
+      "passed": null,
+      "test_description": "Non-admin tries to access WFM roster page",
+      "method": "UI navigation as employee",
+      "expected_result": "Access denied page or gate blocks",
+      "actual_result": "",
+      "page_content_visible": null,
+      "blocked_correctly": null,
+      "severity": "CRITICAL",
+      "evidence": ""
+    },
+
+    "security_5_roster_immutability": {
+      "status": "not_tested",
+      "passed": null,
+      "test_description": "Try to modify published roster",
+      "method": "API call to modify assignments",
+      "expected_result": "400 Bad Request",
+      "actual_result": "",
+      "api_response_code": null,
+      "error_message": "",
+      "blocked_correctly": null,
+      "severity": "CRITICAL",
+      "evidence": ""
+    }
+  },
+
+  "database_validation": {
+    "query_1_today_attendance": {
+      "query": "SELECT COUNT(*) FROM attendance_log WHERE punch_date = CURDATE();",
+      "executed": false,
+      "expected": "> 0 if any employee clocked in",
+      "actual": null,
+      "passed": null
+    },
+
+    "query_2_nixon_attendance": {
+      "query": "SELECT * FROM attendance_log WHERE employee_id = (SELECT id FROM employee WHERE employee_code = 'MAS00176') ORDER BY punch_date DESC LIMIT 5;",
+      "executed": false,
+      "expected": "At least 1 record if Nixon has attendance",
+      "actual": null,
+      "records_found": 0,
+      "passed": null
+    },
+
+    "query_3_pending_regularizations": {
+      "query": "SELECT COUNT(*) FROM employee_request WHERE request_type_code = 'ATTENDANCE_REGULARIZATION' AND current_status IN ('submitted', 'pending_manager', 'pending_admin');",
+      "executed": false,
+      "expected": ">= 0",
+      "actual": null,
+      "passed": null
+    },
+
+    "query_4_active_shifts": {
+      "query": "SELECT COUNT(*) FROM wfm_shift WHERE active_status = 1;",
+      "executed": false,
+      "expected": "> 0",
+      "actual": null,
+      "passed": null
+    },
+
+    "query_5_current_roster": {
+      "query": "SELECT COUNT(*) FROM roster_assignment WHERE roster_date >= CURDATE();",
+      "executed": false,
+      "expected": ">= 0",
+      "actual": null,
+      "passed": null
+    }
+  },
+
+  "issues": [
+    {
+      "id": "ISSUE-001",
+      "title": "",
+      "severity": "critical|high|medium|low",
+      "category": "security|ui|data|functional",
+      "test_case": "",
+      "description": "",
+      "steps_to_reproduce": [],
+      "expected_behavior": "",
+      "actual_behavior": "",
+      "screenshot": "",
+      "browser_console_errors": [],
+      "api_response": {},
+      "database_state": "",
+      "impact": "",
+      "suggested_fix": "",
+      "blocking": false
+    }
+  ],
+
+  "summary": {
+    "total_tests": 21,
+    "functional_tests": {
+      "total": 11,
+      "passed": 0,
+      "failed": 0,
+      "not_tested": 11
+    },
+    "security_tests": {
+      "total": 5,
+      "passed": 0,
+      "failed": 0,
+      "not_tested": 5
+    },
+    "database_validation": {
+      "total": 5,
+      "passed": 0,
+      "failed": 0,
+      "not_tested": 5
+    },
+    "issues": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0,
+      "total": 0
+    },
+    "security_gaps": 0,
+    "blocking_issues": [],
+    "overall_status": "not_started",
+    "pass_rate_percentage": 0,
+    "recommended_actions": []
+  },
+
+  "screenshots": {
+    "directory": "./screenshots/",
+    "files": []
+  },
+
+  "performance_metrics": {
+    "page_load_times": {},
+    "api_response_times": {},
+    "issues": []
+  },
+
+  "recommendations": [
+    {
+      "priority": "high|medium|low",
+      "category": "security|performance|ux|data",
+      "description": "",
+      "impact": "",
+      "effort": "low|medium|high"
+    }
+  ],
+
+  "sign_off": {
+    "tester": "",
+    "date": "",
+    "approved_for_production": false,
+    "conditional_approval": false,
+    "conditions": []
+  }
+}
