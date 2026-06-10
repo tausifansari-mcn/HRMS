@@ -696,9 +696,10 @@ UPDATE ats_candidate SET recruiter_assigned_name = 'John Doe'
 ## Documentation Checklist
 
 - [x] INTERVIEWER_E2E_RESUME.md - Current state audit
-- [ ] docs/INTERVIEWER_ROLE_E2E_SPECIFICATION.md - Specification (what exists vs what's missing)
-- [ ] docs/INTERVIEWER_E2E_TEST_MATRIX.md - Test coverage matrix
-- [ ] docs/INTERVIEWER_SCOPE_MATRIX.md - RBAC and scope rules
+- [x] docs/INTERVIEWER_ROLE_E2E_SPECIFICATION.md - Specification (what exists vs what's missing)
+- [x] docs/INTERVIEWER_E2E_TEST_MATRIX.md - Test coverage matrix
+- [x] docs/INTERVIEWER_SCOPE_MATRIX.md - RBAC and scope rules
+- [x] PHASE2_ASSIGNMENT_AUDIT.md - Phase 2 audit (10 issues found)
 
 ---
 

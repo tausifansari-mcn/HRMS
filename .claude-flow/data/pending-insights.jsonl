@@ -271,3 +271,15 @@
 {"type":"edit","file":"/home/shuvam/hrms-audit/src/App.tsx","timestamp":1780800397555,"sessionId":null}
 {"type":"edit","file":"/home/shuvam/hrms-audit/backend/src/app.ts","timestamp":1780807148223,"sessionId":null}
 {"type":"edit","file":"/home/shuvam/hrms-audit/backend/src/modules/auth/auth.service.ts","timestamp":1780807159797,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/.claude/HRMS1-interviewer-e2e/INTERVIEWER_E2E_RESUME.md","timestamp":1781115291832,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/.claude/HRMS1-interviewer-e2e/docs/INTERVIEWER_ROLE_E2E_SPECIFICATION.md","timestamp":1781115392455,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/.claude/HRMS1-interviewer-e2e/docs/INTERVIEWER_E2E_TEST_MATRIX.md","timestamp":1781115508096,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/.claude/HRMS1-interviewer-e2e/docs/INTERVIEWER_SCOPE_MATRIX.md","timestamp":1781115601613,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/.claude/HRMS1-interviewer-e2e/backend/sql/132_email_sms_notification_system.sql","timestamp":1781116224350,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/.claude/HRMS1-interviewer-e2e/backend/src/services/notification.service.ts","timestamp":1781116267579,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/.claude/HRMS1-interviewer-e2e/backend/src/services/ats-notification.helper.ts","timestamp":1781116305805,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/.claude/HRMS1-interviewer-e2e/backend/src/workers/sla-breach-worker.ts","timestamp":1781116332094,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/.claude/HRMS1-interviewer-e2e/docs/EMAIL_SMS_NOTIFICATION_INTEGRATION.md","timestamp":1781116426052,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/.claude/HRMS1-interviewer-e2e/NOTIFICATION_SYSTEM_COMPLETE.md","timestamp":1781116991396,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/.claude/HRMS1-interviewer-e2e/PHASE2_ASSIGNMENT_AUDIT.md","timestamp":1781118292239,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/.claude/HRMS1-interviewer-e2e/INTERVIEWER_E2E_RESUME.md","timestamp":1781118305926,"sessionId":null}
