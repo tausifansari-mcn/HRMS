@@ -1,9 +1,9 @@
 # ATS E2E Test Matrix
 
-> Version: 2.0.0  
+> Version: 3.0.0  
 > Date: 2026-06-10  
-> Commit: `e7f5bd5a0c21c9a5e433561612230ddffc4b960d`  
-> Session: 2 — Scope enforcement tests added; convert mock gap identified
+> Commit: post-S3 (see git log)
+> Session: 3 — Convert mock fix applied; 19/19 ATS tests passing; CI-001 gap added
 
 ---
 
@@ -40,7 +40,7 @@
 | 1.1.11b | `POST /api/ats/candidates/:id/move-stage` returns 403 when scope denied | `ats.routes.test.ts` | 🟢 | S2: added |
 | 1.1.12 | `POST /api/ats/candidates/:id/move-stage` returns 400 when toStage missing | `ats.routes.test.ts` | 🟢 | |
 | 1.1.13 | `GET /api/ats/candidates/:id/stage-logs` returns logs | `ats.routes.test.ts` | 🟢 | |
-| 1.1.14 | `POST /api/ats/convert/:id` converts candidate to employee | `ats.routes.test.ts` | 🔴 **FAILING** | S2: 500 vs 201 — `convertCandidateToEmployee` not mocked |
+| 1.1.14 | `POST /api/ats/convert/:id` converts candidate to employee | `ats.routes.test.ts` | 🟢 | S3: fix applied — mock added, 201 confirmed |
 | 1.1.15 | `POST /api/ats/convert/:id` returns 403 for unauthorized actor | `ats.routes.test.ts` | 🟢 | S2: added |
 
 ### 1.2 Service Layer
@@ -165,6 +165,9 @@
 | 3.7 | SQL injection via `search` param in `listCandidates` | — | 🔴 | Parameterized; needs explicit test |
 | 3.8 | SQL injection via `upload` `type` param | — | 🔴 | Hard-coded whitelist; needs test |
 | 3.9 | Path traversal via `upload` filename | — | 🔴 | `randomUUID()` filename; low risk |
+| 3.10 | CI-001: `POST /onboarding/submit-profile` — Aadhaar/PAN stored unmasked | — | 🔴 **CRITICAL** | No test; fix required first |
+| 3.11 | BGV `GET /candidates/:id` cross-branch scope denied → 403 | — | 🔴 | No row-scope on BGV routes |
+| 3.12 | Offer approve by branch_head of wrong branch → 403 | — | 🔴 | branchId param unused |
 
 ---
 
@@ -186,6 +189,7 @@
 |---------|------|--------|---------|
 | 1.0.0 | 2026-06-10 | Audit Agent | Initial test matrix |
 | 2.0.0 | 2026-06-10 | Audit Agent | Session 2: scope enforcement tests reflected; convert mock gap flagged |
+| 3.0.0 | 2026-06-10 | Audit Agent | Session 3: convert mock fix applied (19/19 green); CI-001, BGV, offer scope tests added as gaps |
 
 ---
 

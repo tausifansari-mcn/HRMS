@@ -1,9 +1,9 @@
 # ATS Route ↔ API ↔ Database Matrix
 
-> Version: 2.0.0  
+> Version: 3.0.0  
 > Date: 2026-06-10  
-> Commit: `e7f5bd5a0c21c9a5e433561612230ddffc4b960d`  
-> Session: 2 — Scope enforcement applied
+> Commit: post-S3 (see git log)
+> Session: 3 — BGV, onboarding-full, extensions, full-parity routes added
 
 ---
 
@@ -82,12 +82,62 @@
 | `/ats/form-config` | `PATCH /api/ats/recruiters/:id` | 200 | `ats_recruiters*` | ✅ | HR/Admin |
 | `/ats/form-config` | `DELETE /api/ats/recruiters/:id` | 200 | `ats_recruiters*` | ✅ | HR/Admin |
 
-### 6. BGV & Extensions
+### 6. BGV (Audited S3)
 
 | Frontend Route | Backend API | HTTP | DB Tables | Status | Notes |
 |----------------|-------------|------|-----------|--------|-------|
-| `/ats/bgv` | `/api/ats/bgv/...` | — | — | 🟡 | External router; not audited in this baseline |
-| `/ats/extensions` | `/api/ats-ext/...` | — | — | 🟡 | External module; not audited in this baseline |
+| `/ats/bgv` | `GET /api/ats/bgv/queue` | 200 | `ats_candidate`, `candidate_bgv_check` | 🟡 | Role-gated; ⚠ no row-scope |
+| `/ats/bgv` | `GET /api/ats/bgv/candidates/:id` | 200 | `candidate_bgv_consent`, `candidate_bgv_check`, `candidate_onboarding_document`, `candidate_bank_verification` | 🟡 | Role-gated; ⚠ no row-scope |
+| `/ats/bgv` | `POST /api/ats/bgv/candidates/:id/manual-review` | 200 | `candidate_bgv_check` | 🟡 | admin/hr; ⚠ no row-scope |
+| `/ats/bgv` | `POST /api/ats/bgv/candidates/:id/waive` | 200 | `candidate_bgv_exception` | 🟡 | admin/hr; ⚠ no row-scope |
+| `/onboard-full` | `POST /api/ats/bgv/consent` | 200 | `candidate_bgv_consent` | ✅ | Token-based public |
+| `/onboard-full` | `POST /api/ats/bgv/verify/pan` | 200 | `candidate_bgv_check`, `candidate_onboarding_profile` | ✅ | Token-based public |
+| `/onboard-full` | `POST /api/ats/bgv/verify/bank` | 200 | `candidate_bank_verification`, `candidate_onboarding_bank_detail` | ✅ | Token-based public |
+| `/onboard-full` | `POST /api/ats/bgv/verify/aadhaar-offline` | 200 | `candidate_bgv_check`, `candidate_onboarding_document` | ✅ | Token-based public |
+| `/onboard-full` | `POST /api/ats/bgv/digilocker/start` | 200 | `candidate_digilocker_session` | ✅ | Token-based public |
+
+### 7. Onboarding Full Profile (Audited S3)
+
+| Frontend Route | Backend API | HTTP | DB Tables | Status | Notes |
+|----------------|-------------|------|-----------|--------|-------|
+| `/onboard-full` | `GET /api/ats/onboarding-full/validate-token` | 200 | `ats_onboarding_bridge`, `ats_candidate` | ✅ | Public token |
+| `/onboard-full` | `GET /api/ats/onboarding-full/status` | 200 | All candidate_onboarding_* tables | ✅ | Full status |
+| `/onboard-full` | `POST /api/ats/onboarding-full/employee-details` | 200 | `candidate_onboarding_profile`, `ats_candidate` | ✅ | Hashed PII |
+| `/onboard-full` | `POST /api/ats/onboarding-full/bank-details` | 200 | `candidate_onboarding_bank_detail` | ✅ | |
+| `/onboard-full` | `POST /api/ats/onboarding-full/qualification` | 200 | `candidate_onboarding_qualification` | ✅ | |
+| `/onboard-full` | `POST /api/ats/onboarding-full/family` | 200 | `candidate_onboarding_family` | ✅ | |
+| `/onboard-full` | `POST /api/ats/onboarding-full/experience` | 200 | `candidate_onboarding_experience` | ✅ | |
+| `/onboard-full` | `POST /api/ats/onboarding-full/final` | 200 | `candidate_onboarding_profile` | ✅ | |
+| `/onboard-full` | `POST /api/ats/onboarding-full/submit` | 200 | `candidate_onboarding_submission_log` | ✅ | |
+| `/onboard-full` | `POST /api/ats/onboarding-full/documents` | 200 | `candidate_onboarding_document` | ✅ | File upload |
+
+### 8. Extensions / Requisitions (Audited S3)
+
+| Frontend Route | Backend API | HTTP | DB Tables | Status | Notes |
+|----------------|-------------|------|-----------|--------|-------|
+| `/ats/extensions` | `GET /api/ats-ext/requisitions` | 200 | `manpower_requisition` | 🟡 | Role-gated; scope unclear |
+| `/ats/extensions` | `POST /api/ats-ext/requisitions` | 201 | `manpower_requisition` | 🟡 | |
+| `/ats/extensions` | `PUT /api/ats-ext/requisitions/:id` | 200 | `manpower_requisition` | 🟡 | |
+| `/ats/extensions` | `DELETE /api/ats-ext/requisitions/:id` | 200 | `manpower_requisition` | 🟡 | |
+
+### 9. Full Parity Command Center (Audited S3)
+
+| Frontend Route | Backend API | HTTP | DB Tables | Status | Notes |
+|----------------|-------------|------|-----------|--------|-------|
+| `/ats/command-center` | `GET /api/ats-full-parity/web-data` | 200 | `ats_candidate`, multiple | 🟡 | Diagnostics; scope unclear |
+| `/ats/command-center` | `GET /api/ats-full-parity/journey` | 200 | `ats_candidate`, logs | 🟡 | By candidate code/name |
+| `/ats/command-center` | `GET /api/ats-full-parity/health` | 200 | Multiple | 🟡 | System health |
+| `/ats/command-center` | `POST /api/ats-full-parity/jobs/sla-check` | 200 | — | 🟡 | Admin job |
+| `/ats/command-center` | `POST /api/ats-full-parity/jobs/repair` | 200 | `ats_candidate`, bridgess | 🟡 | Repair/sync job |
+| `/ats/command-center` | `GET /api/ats-full-parity/daily-report/snapshot` | 200 | `ats_candidate` | 🟡 | Daily snapshot |
+
+### 10. PII / Security Audit
+
+| Issue | Endpoint | Risk | Status |
+|-------|----------|------|--------|
+| **CI-001** | `POST /api/ats/onboarding/submit-profile` | ⚠ Aadhaar/PAN/bank written as plain text to `ats_candidate` | **🔴 CRITICAL — not fixed** |
+| Safe | `POST /api/ats/onboarding-full/employee-details` | ✅ hashed/masked via `candidate_onboarding_profile` | ✅ |
+| Medium | `POST /api/ats/candidates/:id/upload` | Column name interpolated but hard-coded to `resume_url`/`selfie_url` | 🟡 Monitor |
 
 ---
 
@@ -110,6 +160,7 @@
 |---------|------|--------|---------|
 | 1.0.0 | 2026-06-10 | Audit Agent | Initial matrix |
 | 2.0.0 | 2026-06-10 | Audit Agent | Session 2: scope enforcement applied to 6 endpoints; matrix statuses updated |
+| 3.0.0 | 2026-06-10 | Audit Agent | Session 3: BGV, onboarding-full, extensions, full-parity routes added; CI-001 PII issue recorded |
 
 ---
 

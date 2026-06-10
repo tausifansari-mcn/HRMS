@@ -9,6 +9,9 @@ vi.mock("../src/db/mysql.js", () => ({
   db: { execute: vi.fn().mockResolvedValue([[], []]) },
   pingDb: vi.fn(),
 }));
+vi.mock("../src/modules/ats/ats.convert.service.js", () => ({
+  convertCandidateToEmployee: vi.fn().mockResolvedValue({ employee_id: "emp-1", employee_code: "MAS00001" }),
+}));
 vi.mock("../src/modules/ats/ats.service.js", () => ({
   atsService: {
     listCandidates: vi.fn(),
@@ -50,6 +53,7 @@ vi.mock("../src/middleware/scopeMiddleware.js", () => ({
 
 import { supabaseAuthClient } from "../src/db/supabaseAdmin.js";
 import { atsService } from "../src/modules/ats/ats.service.js";
+import { hasScopedAccess } from "../src/shared/scopeAccess.js";
 import { app } from "../src/app.js";
 
 const mockGetUser = supabaseAuthClient.auth.getUser as ReturnType<typeof vi.fn>;
@@ -66,6 +70,7 @@ const fakeCandidate = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetUser.mockResolvedValue({ data: { user: { id: "user-1", email: "hr@mcn.com" } }, error: null });
+  svc.getCandidate.mockResolvedValue(fakeCandidate);
 });
 
 describe("GET /api/ats/candidates", () => {
@@ -184,5 +189,78 @@ describe("GET /api/ats/stats", () => {
     const res = await request(app).get("/api/ats/stats").set(AUTH);
     expect(res.status).toBe(200);
     expect(res.body.data.total).toBe(42);
+  });
+});
+
+// ─── Scope Enforcement Tests ──────────────────────────────────────────────────
+
+describe("GET /api/ats/candidates/:id", () => {
+  it("returns candidate when scope allows", async () => {
+    svc.getCandidate.mockResolvedValueOnce(fakeCandidate);
+    const res = await request(app).get("/api/ats/candidates/cand-1").set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body.data.id).toBe("cand-1");
+  });
+
+  it("returns 403 when scope is denied", async () => {
+    svc.getCandidate.mockResolvedValueOnce(fakeCandidate);
+    (hasScopedAccess as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
+    const res = await request(app).get("/api/ats/candidates/cand-1").set(AUTH);
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+  });
+});
+
+describe("PUT /api/ats/candidates/:id", () => {
+  it("updates candidate when scope allows", async () => {
+    svc.getCandidate.mockResolvedValueOnce(fakeCandidate);
+    svc.updateCandidate.mockResolvedValueOnce({ ...fakeCandidate, full_name: "Updated" });
+    const res = await request(app)
+      .put("/api/ats/candidates/cand-1")
+      .set(AUTH)
+      .send({ fullName: "Updated" });
+    expect(res.status).toBe(200);
+    expect(res.body.data.full_name).toBe("Updated");
+  });
+
+  it("returns 403 when scope is denied", async () => {
+    svc.getCandidate.mockResolvedValueOnce(fakeCandidate);
+    (hasScopedAccess as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
+    const res = await request(app)
+      .put("/api/ats/candidates/cand-1")
+      .set(AUTH)
+      .send({ fullName: "Updated" });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("POST /api/ats/candidates/:id/move-stage", () => {
+  it("returns 403 when scope is denied", async () => {
+    svc.getCandidate.mockResolvedValueOnce(fakeCandidate);
+    (hasScopedAccess as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
+    const res = await request(app)
+      .post("/api/ats/candidates/cand-1/move-stage")
+      .set(AUTH)
+      .send({ toStage: "Screened" });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("POST /api/ats/convert/:candidateId", () => {
+  it("converts candidate when scope allows", async () => {
+    svc.getCandidate.mockResolvedValueOnce(fakeCandidate);
+    const res = await request(app)
+      .post("/api/ats/convert/cand-1")
+      .set(AUTH);
+    expect(res.status).toBe(201);
+  });
+
+  it("returns 403 when scope is denied", async () => {
+    svc.getCandidate.mockResolvedValueOnce(fakeCandidate);
+    (hasScopedAccess as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
+    const res = await request(app)
+      .post("/api/ats/convert/cand-1")
+      .set(AUTH);
+    expect(res.status).toBe(403);
   });
 });

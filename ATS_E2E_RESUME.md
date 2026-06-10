@@ -1,8 +1,9 @@
 # ATS E2E Audit — Session Resume
 
-> Session: HRMS1 ATS End-to-End Audit (Session 2)
+> Session: HRMS1 ATS End-to-End Audit (Session 3)
 > Date: 2026-06-10
-> Commit: `e7f5bd5a0c21c9a5e433561612230ddffc4b960d`
+> Commit: `f095cbe3651b8f9845256d88213f30594aed4ade` (docs S2)
+> Working HEAD (after test fix): see git log
 > Scope: ATS module + directly dependent onboarding / BGV / offer / training flows
 
 ---
@@ -11,65 +12,50 @@
 
 | Property | Value |
 |----------|-------|
-| **SHA** | `e7f5bd5a0c21c9a5e433561612230ddffc4b960d` |
-| **Message** | `Merge remote main into local docs branch` |
+| **SHA** | see `git rev-parse HEAD` — post-S3 commit after test fix + docs |
 | **Branch** | `main` |
-| **Working tree** | 2 modified files (scope enforcement changes, pending commit) |
-| **Modified** | `backend/src/modules/ats/ats.routes.ts`, `backend/tests/ats.routes.test.ts` |
+| **Working tree** | `backend/tests/ats.routes.test.ts` modified (test fix applied, not yet committed) |
 
 ---
 
-## 2. Scope Enforcement Changes Applied (Session 2)
+## 2. Session 3 — Test Fix Applied
 
-The following issues from the Session 1 open-issues list have been **implemented in working tree** (not yet committed):
+### Fix: `convertCandidateToEmployee` mock added
 
-| Issue | Description | Status |
-|-------|-------------|--------|
-| #1 | `GET /api/ats/candidates/:id` — row-scope via `hasScopedAccess` | ✅ Implemented |
-| #1 | `PUT /api/ats/candidates/:id` — row-scope via `hasScopedAccess` | ✅ Implemented |
-| #1 | `POST /api/ats/candidates/:id/move-stage` — row-scope via `hasScopedAccess` | ✅ Implemented |
-| #2 | `GET /api/ats/walkin-queue` — `buildScopeWhereClause` injected | ✅ Implemented |
-| #2 | `GET /api/ats/waiting-queue` — `buildScopeWhereClause` injected | ✅ Implemented |
-| #5 | `POST /api/ats/convert/:candidateId` — `hasScopedAccess` before conversion | ✅ Implemented |
+**File**: `backend/tests/ats.routes.test.ts`
+**Change**: Added `vi.mock("../src/modules/ats/ats.convert.service.js", ...)` block returning `{ employee_id: "emp-1", employee_code: "MAS00001" }`.
+
+**Result**: `tests/ats.routes.test.ts` — 19/19 passing (was 18 pass + 1 fail).
 
 ---
 
-## 3. Baseline Results (Session 2)
+## 3. Baseline Results (Session 3)
 
 ### 3.1 Frontend (Root)
 
 | Command | Exit | Errors | Notes |
 |---------|------|--------|-------|
 | `npx tsc --noEmit` | 0 | 0 | TypeScript clean |
-| `npm run build` | — | — | Not re-run this session (no frontend changes) |
-
-**Frontend Verdict**: Frontend unchanged. No new TS errors.
+| `npm run build` | — | — | Not re-run (no frontend changes) |
 
 ### 3.2 Backend (`/backend`)
 
-| Command | Exit | Errors | Notes |
+| Command | Exit | Result | Notes |
 |---------|------|--------|-------|
-| `npm run typecheck` | 1 | 1 | `leave.routes.ts:134` — `leaveService` undefined (non-ATS; pre-existing) |
-| `npm test -- --run` | 1 | 26 | 5 files failed, 26 tests failed (up from 25 in session 1) |
+| `npm run typecheck` | 1 | 1 error | `leave.routes.ts:134` — `leaveService` undefined (non-ATS, pre-existing) |
+| `npm test -- --run` | 1 | **25 failed / 1155 total** | Down from 26 (ATS convert fix) |
+| `npm run build` | — | — | Not re-run (type-clean as of S2) |
 
-**Backend Test Run Summary** (session 2):
+**Failing test files (all non-ATS, pre-existing)**:
 
-| File | Fail | Pattern |
-|------|------|---------|
-| `tests/ats.routes.test.ts` | **1 NEW** | `POST /api/ats/convert/:candidateId` — 500 vs expected 201 |
-| `tests/integrationHub.service.test.ts` | 3 | Integration hub field-map / suggestion / run creation (pre-existing) |
-| `tests/leave.routes.test.ts` | 4 | Leave submission & balance 403 vs 200/400 (pre-existing) |
-| `tests/routes.integration.test.ts` | 1 | Health endpoint DB-error mock returns 503 vs 200 (pre-existing) |
-| `src/modules/customization/__tests__/customization-api.test.ts` | 17 | All 401 Unauthorized — JWT mock mismatch (pre-existing) |
+| File | Count | Pattern |
+|------|-------|---------|
+| `tests/integrationHub.service.test.ts` | 3 | Integration hub field-map / suggestion / run creation |
+| `tests/leave.routes.test.ts` | 4 | Leave request submission & balance (403 vs 200/400) |
+| `tests/routes.integration.test.ts` | 1 | Health endpoint DB-error mock returns 503 vs 200 |
+| `src/modules/customization/__tests__/customization-api.test.ts` | 17 | All 401 Unauthorized — test JWT mock mismatch |
 
-**New ATS Failure Root Cause**:
-
-`POST /api/ats/convert/cand-1` → 500 because:
-1. Route now calls `atsService.getCandidate(req.params.candidateId)` — **this is correctly mocked** (`svc.getCandidate.mockResolvedValue(fakeCandidate)`)
-2. After scope check passes, route calls `convertCandidateToEmployee(req.params.candidateId, req.authUser!.id)`
-3. `convertCandidateToEmployee` is **not mocked** — it imports and calls the real `ats.convert.service.ts`, which attempts a real DB query → `Error: Candidate not found`
-
-**Fix required**: Mock `convertCandidateToEmployee` in `ats.routes.test.ts` vi.mock block.
+**ATS test suite**: All tests passing.
 
 ---
 
@@ -83,7 +69,7 @@ The following issues from the Session 1 open-issues list have been **implemented
 | 2 | `/candidate-registration` | → `/interview-registration` | Public | — |
 | 3 | `/walkin-registration` | → `/interview-registration` | Public | — |
 | 4 | `/onboard` | `CandidateOnboardingPage` | Public (token) | — |
-| 5 | `/onboard-full` | `CandidateOnboardingFullPage` | Public | — |
+| 5 | `/onboard-full` | `CandidateOnboardingFullPage` | Public (token) | — |
 | 6 | `/ats/dashboard` | `NativeATSDashboardReplica` | Protected | `ATS_DASHBOARD` |
 | 7 | `/ats/candidate-registration` | `NativeATSCandidateRegistration` | Protected | — |
 | 8 | `/ats/recruiter/my-candidates` | `NativeATSRecruiterDashboard` | Protected | `ATS_RECRUITER_QUEUE` |
@@ -103,69 +89,115 @@ The following issues from the Session 1 open-issues list have been **implemented
 
 ### 4.2 Backend API Routes (Express — mounted at `/api/ats`)
 
-| # | Method | Route | Auth | Roles | Scope Enforced | Notes |
-|---|--------|-------|------|-------|----------------|-------|
+| # | Method | Route | Auth | Roles | Scope | Notes |
+|---|--------|-------|------|-------|-------|-------|
 | 1 | POST | `/api/ats/candidates` | None | Public | N/A | Self-registration |
-| 2 | GET | `/api/ats/candidates` | JWT | admin, hr, recruiter, manager | ✅ `buildScopeWhereClause` | Scoped list |
-| 3 | GET | `/api/ats/candidates/:id` | JWT | admin, hr, recruiter, manager | ✅ `hasScopedAccess` | Row-scope added S2 |
-| 4 | PUT | `/api/ats/candidates/:id` | JWT | admin, recruiter | ✅ `hasScopedAccess` | Row-scope added S2 |
-| 5 | POST | `/api/ats/candidates/:id/move-stage` | JWT | admin, recruiter, manager | ✅ `hasScopedAccess` | Row-scope added S2 |
-| 6 | GET | `/api/ats/candidates/:id/stage-logs` | JWT | admin, hr, recruiter, manager | ❌ None | Audit trail; low risk |
-| 7 | POST | `/api/ats/convert/:candidateId` | JWT | admin, hr | ✅ `hasScopedAccess` | Row-scope added S2 |
-| 8 | POST | `/api/ats/onboarding-bridge` | JWT | admin, hr | ❌ None | Creates bridge |
-| 9 | PATCH | `/api/ats/onboarding-bridge/:id` | JWT | admin, hr | ❌ None | Updates bridge |
-| 10 | GET | `/api/ats/sourcing-channels` | JWT | admin, hr, recruiter | N/A | Reference data |
-| 11 | GET | `/api/ats/stats` | JWT | admin, hr, recruiter, manager | 🟡 Partial | Scoped via query params |
-| 12 | GET | `/api/ats/walkin-queue` | JWT | admin, hr, recruiter | ✅ `buildScopeWhereClause` | Scope added S2 |
-| 13 | GET | `/api/ats/waiting-queue` | JWT | admin, hr, recruiter, manager | ✅ `buildScopeWhereClause` | Scope added S2 |
-| 14 | POST | `/api/ats/candidates/:id/upload` | None | Public (1-hr window) | N/A | Resume/selfie upload |
+| 2 | GET | `/api/ats/candidates` | JWT | admin,hr,recruiter,manager | ✅ `buildScopeWhereClause` | Scoped list |
+| 3 | GET | `/api/ats/candidates/:id` | JWT | admin,hr,recruiter,manager | ✅ `hasScopedAccess` | Row-scope S2 |
+| 4 | PUT | `/api/ats/candidates/:id` | JWT | admin,recruiter | ✅ `hasScopedAccess` | Row-scope S2 |
+| 5 | POST | `/api/ats/candidates/:id/move-stage` | JWT | admin,recruiter,manager | ✅ `hasScopedAccess` | Row-scope S2 |
+| 6 | GET | `/api/ats/candidates/:id/stage-logs` | JWT | admin,hr,recruiter,manager | ❌ None | Audit trail |
+| 7 | POST | `/api/ats/convert/:candidateId` | JWT | admin,hr | ✅ `hasScopedAccess` | Row-scope S2 |
+| 8 | POST | `/api/ats/onboarding-bridge` | JWT | admin,hr | ❌ None | |
+| 9 | PATCH | `/api/ats/onboarding-bridge/:id` | JWT | admin,hr | ❌ None | |
+| 10 | GET | `/api/ats/sourcing-channels` | JWT | admin,hr,recruiter | N/A | Reference |
+| 11 | GET | `/api/ats/stats` | JWT | admin,hr,recruiter,manager | 🟡 Partial | Query-param scope |
+| 12 | GET | `/api/ats/walkin-queue` | JWT | admin,hr,recruiter | ✅ `buildScopeWhereClause` | S2 |
+| 13 | GET | `/api/ats/waiting-queue` | JWT | admin,hr,recruiter,manager | ✅ `buildScopeWhereClause` | S2 |
+| 14 | POST | `/api/ats/candidates/:id/upload` | None | Public (1-hr window) | N/A | |
 | 15 | GET | `/api/ats/onboarding-full/...` | None | Public | N/A | External router |
-| 16 | GET | `/api/ats/bgv/...` | None | Public | N/A | BGV router |
+| 16 | GET | `/api/ats/bgv/...` | JWT/None | Mixed | ⚠ No row-scope | BGV router |
 
 **Onboarding Sub-Router** (`/api/ats/onboarding`)
 
-| # | Method | Route | Auth | Roles | Scope Enforced | Notes |
-|---|--------|-------|------|-------|----------------|-------|
-| 17 | GET | `/validate-token` | None | Public | N/A | Token validation |
-| 18 | POST | `/submit-profile` | None | Public | N/A | Profile submission |
-| 19 | POST | `/send-token/:candidateId` | JWT | hr, recruiter, admin | ❌ None | Send onboarding token |
-| 20 | GET | `/requests` | JWT | hr, recruiter, admin | 🟡 Partial | `branchId` param unused |
-| 21 | POST | `/calculate-salary` | JWT | hr, recruiter, admin | N/A | Salary calculator |
-| 22 | POST | `/requests/:id/offer` | JWT | hr, recruiter, admin | ❌ None | Save/submit offer |
-| 23 | PATCH | `/requests/:id/offer` | JWT | hr, recruiter, admin | ❌ None | Update offer draft |
-| 24 | GET | `/pending-approval` | JWT | branch_head, admin | 🟡 Partial | `branchId` param unused |
-| 25 | POST | `/offers/:id/approve` | JWT | branch_head, admin | ❌ None | Approve offer |
-| 26 | POST | `/offers/:id/reject` | JWT | branch_head, admin | ❌ None | Reject offer |
+| # | Method | Route | Auth | Roles | Scope | Notes |
+|---|--------|-------|------|-------|-------|-------|
+| 17 | GET | `/validate-token` | None | Public | N/A | |
+| 18 | POST | `/submit-profile` | None | Public | N/A | ⚠ PII CI-001 |
+| 19 | POST | `/send-token/:candidateId` | JWT | hr,recruiter,admin | ❌ None | |
+| 20 | GET | `/requests` | JWT | hr,recruiter,admin | ⚠ branchId=undefined | |
+| 21 | POST | `/calculate-salary` | JWT | hr,recruiter,admin | N/A | |
+| 22 | POST | `/requests/:id/offer` | JWT | hr,recruiter,admin | ❌ None | |
+| 23 | PATCH | `/requests/:id/offer` | JWT | hr,recruiter,admin | ❌ None | |
+| 24 | GET | `/pending-approval` | JWT | branch_head,admin | ⚠ branchId=undefined | |
+| 25 | POST | `/offers/:id/approve` | JWT | branch_head,admin | ❌ None | |
+| 26 | POST | `/offers/:id/reject` | JWT | branch_head,admin | ❌ None | |
+
+**BGV Sub-Router** (`/api/ats/bgv`)
+
+| # | Method | Route | Auth | Scope | Notes |
+|---|--------|-------|------|-------|-------|
+| 27 | POST | `/consent` | None (token) | N/A | |
+| 28 | GET | `/status` | None (token) | N/A | |
+| 29 | POST | `/verify/pan` | None (token) | N/A | |
+| 30 | POST | `/verify/bank` | None (token) | N/A | |
+| 31 | POST | `/verify/aadhaar-offline` | None (token) | N/A | |
+| 32 | POST | `/digilocker/start` | None (token) | N/A | |
+| 33 | POST | `/provider/callback` | None | N/A | Webhook |
+| 34 | GET | `/queue` | JWT | ⚠ No row-scope | admin,hr,recruiter |
+| 35 | GET | `/candidates/:id` | JWT | ⚠ No row-scope | admin,hr,recruiter |
+| 36 | POST | `/candidates/:id/verify/pan` | JWT | ⚠ No row-scope | admin,hr |
+| 37 | POST | `/candidates/:id/verify/bank` | JWT | ⚠ No row-scope | admin,hr |
+| 38 | POST | `/candidates/:id/manual-review` | JWT | ⚠ No row-scope | admin,hr |
+| 39 | POST | `/candidates/:id/waive` | JWT | ⚠ No row-scope | admin,hr |
 
 ---
 
-## 5. Open Issues (Updated Session 2)
+## 5. First Confirmed Critical Issue
+
+**CI-001 — PII Stored Unmasked on ats_candidate**
+
+| Attribute | Value |
+|-----------|-------|
+| **ID** | CI-001 |
+| **Severity** | P0 — Critical |
+| **Type** | Data Security / PII Exposure |
+| **File** | `backend/src/modules/ats/ats.onboarding.service.ts` (submitProfile, ~line 60–100) |
+| **Columns** | `ats_candidate.aadhar_number`, `ats_candidate.pan_number`, `ats_candidate.bank_account_no` |
+| **What happens** | `submitProfile()` writes Aadhaar, PAN, bank account numbers as **plain text** to `ats_candidate` |
+| **Contrast** | `onboarding-full.service.ts` correctly stores hashed/masked versions in `candidate_onboarding_profile` |
+| **Exposure** | Any `GET /api/ats/candidates/:id` caller (scope-gated) sees raw PII in response |
+| **Regulatory** | DPDP Act 2023 data minimisation; potential PCI-DSS if bank data in scope |
+| **Fix** | Hash/mask before writing OR stop writing PII to `ats_candidate`, use `candidate_onboarding_profile` exclusively |
+| **Status** | 🔴 Not fixed — record only per session rules |
+
+---
+
+## 6. Open Issues (Cumulative)
 
 | # | Priority | Description | Location | Status |
 |---|----------|-------------|----------|--------|
-| 1 | P1 | `GET /api/ats/candidates/:id` — row-scope missing | `ats.routes.ts` | ✅ Fixed S2 |
-| 2 | P1 | `walkin-queue` / `waiting-queue` — no scope in SQL | `ats.routes.ts` | ✅ Fixed S2 |
+| 1 | P1 | `GET /api/ats/candidates/:id` — row-scope | `ats.routes.ts` | ✅ Fixed S2 |
+| 2 | P1 | walkin-queue / waiting-queue — no scope in SQL | `ats.routes.ts` | ✅ Fixed S2 |
 | 3 | P1 | Onboarding token expiry — timezone risk | `ats.onboarding.service.ts:84` | 🔴 Open |
-| 4 | P2 | Upload endpoint — no candidate ownership check | `ats.routes.ts:135-190` | 🔴 Open |
-| 5 | P2 | `convertCandidateToEmployee` — no actor scope check | `ats.convert.service.ts:25` | ✅ Fixed S2 |
-| 6 | P2 | `listOnboardingRequests` — `branchId` param always undefined | `ats.onboarding.service.ts:137` | 🔴 Open |
-| 7 | P2 | `listPendingApprovals` — `branchId` param always undefined | `ats.onboarding.service.ts:280` | 🔴 Open |
-| 8 | P3 | SMTP silently skips when env missing | `ats.email.service.ts:41` | 🔴 Open (acceptable dev) |
-| 9 | P3 | Duplicate `normalizeSourceChannel` in controller + service | `ats.controller.ts:87`, `ats.service.ts:22` | 🔴 Open |
+| 4 | P2 | Upload — no candidate ownership check | `ats.routes.ts:135` | 🔴 Open |
+| 5 | P2 | `convertCandidateToEmployee` — no actor scope | `ats.convert.service.ts` | ✅ Fixed S2 |
+| 6 | P2 | `listOnboardingRequests` — branchId undefined | `ats.onboarding.service.ts:137` | 🔴 Open |
+| 7 | P2 | `listPendingApprovals` — branchId undefined | `ats.onboarding.service.ts:280` | 🔴 Open |
+| 8 | P3 | SMTP silently skips when env missing | `ats.email.service.ts:41` | 🔴 Open (dev ok) |
+| 9 | P3 | Duplicate `normalizeSourceChannel` | `ats.controller.ts:87`, `ats.service.ts:22` | 🔴 Open |
 | 10 | P3 | Frontend has no `test` script | `package.json` | 🔴 Open |
-| **11** | **P1** | **New ATS test failure: `POST /convert/:candidateId` — `convertCandidateToEmployee` not mocked, returns 500** | `tests/ats.routes.test.ts` | **🔴 Open** |
-| **12** | **P2** | **Backend typecheck: `leave.routes.ts:134` — `leaveService` not in scope** | `backend/src/modules/leave/leave.routes.ts:134` | **🔴 Open (non-ATS)** |
+| **CI-001** | **P0** | **PII (Aadhaar/PAN/bank) stored unmasked on ats_candidate** | `ats.onboarding.service.ts:submitProfile` | **🔴 Open — CRITICAL** |
+| 11 | P2 | BGV endpoints — no row-scope (`hasScopedAccess`) | `bgv-verification.routes.ts` | 🔴 Open |
+| 12 | P2 | onboarding/send-token — no row-scope | `ats.onboarding.routes.ts` | 🔴 Open |
+| 13 | P2 | offer approve/reject — no row-scope on branch_head | `ats.onboarding.routes.ts` | 🔴 Open |
+| 14 | P3 | `/ats/recruiter/my-candidates` — placeholder stub component | `NativeATSRecruiterDashboard.tsx` | 🔴 Open |
+| 15 | P3 | Multiple dashboard pages fetch same 1500-candidate list | `NativeATSDashboardReplica`, `DashboardV2`, `CommandCenter` | 🔴 Open (performance) |
 
 ---
 
-## 6. Exact Next Task
+## 7. Exact Next Task
 
-**Task**: Fix Issue #11 — Mock `convertCandidateToEmployee` in test to allow the "converts candidate when scope allows" test to pass.
+**Task**: Fix CI-001 — mask/hash Aadhaar, PAN, bank account number before writing to `ats_candidate.aadhar_number`, `pan_number`, `bank_account_no` in `submitProfile`.
 
-**Root Cause**: `ats.routes.ts` calls `convertCandidateToEmployee` from `ats.convert.service.ts`. This function is not mocked in `ats.routes.test.ts`. When the test runs, the real service tries to query the (mocked) DB and throws `Error: Candidate not found`.
+**Approach**: Use same masking pattern as `onboarding-full.service.ts`:
+- Aadhaar: store last-4 visible, hash full number (`SHA-256` or `crypto.createHash`)
+- PAN: store as-is or mask middle chars
+- Bank account: store last-4, hash full
 
-**Files to Modify**:
-1. `backend/tests/ats.routes.test.ts` — add `vi.mock("../src/modules/ats/ats.convert.service.js", ...)` with a mock of `convertCandidateToEmployee` returning a fake employee object.
+**OR**: Stop writing these fields to `ats_candidate` entirely — all PII already collected and properly handled via `candidate_onboarding_profile`.
+
+**Files to Modify**: `backend/src/modules/ats/ats.onboarding.service.ts`
 
 **Exact Next Command**:
 ```bash
@@ -173,11 +205,9 @@ cd /c/Users/shivamg/HRMS1-ats-e2e/backend
 npx vitest run tests/ats.routes.test.ts
 ```
 
-**Expected result after fix**: All 19 tests in `ats.routes.test.ts` pass.
-
 ---
 
-## 7. Preservation Rules
+## 8. Preservation Rules
 
 - **Employee fixes**: Do not modify `employees`, `leave`, `attendance`, `payroll` modules.
 - **Admin fixes**: Do not modify `scopeAccess.ts` default `allowAdminBypass` logic unless explicitly requested.
@@ -186,14 +216,15 @@ npx vitest run tests/ats.routes.test.ts
 
 ---
 
-## 8. Document Control
+## 9. Document Control
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0.0 | 2026-06-10 | Audit Agent | Initial ATS E2E baseline |
-| 2.0.0 | 2026-06-10 | Audit Agent | Session 2: scope enforcement implemented, new ATS test failure identified |
+| 2.0.0 | 2026-06-10 | Audit Agent | Session 2: scope enforcement, new test failure documented |
+| 3.0.0 | 2026-06-10 | Audit Agent | Session 3: test fix applied, full journey map completed, CI-001 identified |
 
 ---
 
-**AUDIT STATUS**: 🟡 Scope Enforcement Applied — 1 New Test Failure to Fix
-**NEXT ACTION**: Fix Issue #11 — Mock `convertCandidateToEmployee` in `ats.routes.test.ts`
+**AUDIT STATUS**: 🟡 Journey Map Complete — 1 Critical PII Issue (CI-001) Recorded
+**NEXT ACTION**: Fix CI-001 — Mask PII before writing to ats_candidate in submitProfile

@@ -1,10 +1,10 @@
 # ATS E2E Specification
 
-> Version: 2.0.0  
+> Version: 3.0.0  
 > Date: 2026-06-10  
-> Commit: `e7f5bd5a0c21c9a5e433561612230ddffc4b960d`  
+> Commit: post-S3 (see git log)
 > Scope: ATS module + onboarding / BGV / offer / training dependency flows  
-> Session: 2 — Scope enforcement applied
+> Session: 3 — Full journey map complete, CI-001 PII issue recorded
 
 ---
 
@@ -181,12 +181,14 @@ Before any ATS production deployment:
 - [x] Candidate detail/update/move-stage endpoints have row-scope enforcement
 - [x] walkin-queue + waiting-queue have branch/process scope SQL injection
 - [x] convert endpoint has actor scope check
-- [ ] `convertCandidateToEmployee` mock added to test — 1 failing ATS test must be fixed
+- [x] `convertCandidateToEmployee` mock added — ATS tests 19/19 passing (fixed S3)
+- [ ] CI-001 resolved — PII (Aadhaar/PAN/bank) masked before writing to ats_candidate
 - [ ] Onboarding `requests` + `pending-approval` endpoints have branch scope enforced
+- [ ] BGV endpoints have row-scope enforcement
 - [ ] Offer approval passes branch-head scope negative tests
 - [ ] Frontend build passes (`npm run build`)
 - [ ] Backend typecheck clean — `leave.routes.ts:134` `leaveService` error must be fixed
-- [ ] Backend test pass rate >= 95 % (current session 2: 26 failures / 1155 tests = 97.7 % pass rate excluding known pre-existing)
+- [ ] Backend test pass rate >= 95 % (current S3: 25 failures / 1155 tests = 97.8 % pass rate)
 - [ ] Manual E2E smoke of registration → stage move → onboarding → conversion
 
 ---
@@ -197,6 +199,7 @@ Before any ATS production deployment:
 |---------|------|--------|---------|
 | 1.0.0 | 2026-06-10 | Audit Agent | Initial ATS E2E specification |
 | 2.0.0 | 2026-06-10 | Audit Agent | Session 2: scope enforcement status updated, new test failure recorded |
+| 3.0.0 | 2026-06-10 | Audit Agent | Session 3: test fix confirmed, CI-001 PII issue added, approval gate updated |
 
 ---
 

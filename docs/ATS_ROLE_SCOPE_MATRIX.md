@@ -1,9 +1,9 @@
 # ATS Role ↔ Scope Matrix
 
-> Version: 2.0.0  
+> Version: 3.0.0  
 > Date: 2026-06-10  
-> Commit: `e7f5bd5a0c21c9a5e433561612230ddffc4b960d`  
-> Session: 2 — Scope enforcement applied to 6 endpoints
+> Commit: post-S3 (see git log)
+> Session: 3 — BGV, onboarding, offer routes added to scope gap table
 
 ---
 
@@ -102,6 +102,16 @@
 | `POST /api/ats/onboarding/offers/:id/reject` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
 | `GET /api/ats/stats` | ✅ | ❌ | ❌ | N/A | **Missing** (aggregates) | — |
 | `GET /api/ats/sourcing-channels` | ✅ | N/A | N/A | N/A | N/A | — |
+| `GET /api/ats/bgv/queue` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
+| `GET /api/ats/bgv/candidates/:id` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
+| `POST /api/ats/bgv/candidates/:id/manual-review` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
+| `POST /api/ats/bgv/candidates/:id/waive` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
+| `POST /api/ats/onboarding/send-token/:id` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
+| `GET /api/ats/onboarding/requests` | ✅ | 🟡 (branchId=undefined) | ❌ | ❌ | **Missing** | — |
+| `POST /api/ats/onboarding/requests/:id/offer` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
+| `GET /api/ats/onboarding/pending-approval` | ✅ | 🟡 (branchId=undefined) | ❌ | ❌ | **Missing** | — |
+| `POST /api/ats/onboarding/offers/:id/approve` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
+| `POST /api/ats/onboarding/offers/:id/reject` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
 
 ---
 
@@ -154,6 +164,10 @@ export async function requireCandidateScope(
 | P2 | `GET /api/ats/onboarding/requests` | HR views all branches | 🔴 Open |
 | P2 | `GET /api/ats/onboarding/pending-approval` | Branch head views all branches | 🔴 Open |
 | P2 | Offer approve/reject | Must verify branch_head matches candidate branch | 🔴 Open |
+| P2 | `GET /api/ats/bgv/queue` | HR/recruiter views all-branch BGV queue | 🔴 Open |
+| P2 | `GET /api/ats/bgv/candidates/:id` | HR reads BGV details cross-branch | 🔴 Open |
+| P2 | `POST /api/ats/bgv/candidates/:id/waive` / `manual-review` | Admin overrides BGV cross-branch | 🔴 Open |
+| **P0** | **CI-001: `submit-profile` writes Aadhaar/PAN/bank unmasked** | **PII exposure in ats_candidate** | **🔴 Open — CRITICAL** |
 
 ---
 
@@ -163,6 +177,7 @@ export async function requireCandidateScope(
 |---------|------|--------|---------|
 | 1.0.0 | 2026-06-10 | Audit Agent | Initial role scope matrix |
 | 2.0.0 | 2026-06-10 | Audit Agent | Session 2: 6 P0/P1 endpoints fixed; priority table status updated |
+| 3.0.0 | 2026-06-10 | Audit Agent | Session 3: BGV, onboarding, offer scope gaps added; CI-001 PII issue added to priority table |
 
 ---
 
