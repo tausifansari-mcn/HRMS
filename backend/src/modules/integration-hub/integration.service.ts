@@ -138,9 +138,9 @@ export const integrationService = {
          FROM integration_connector_run icr
          LEFT JOIN integration_config ic ON ic.integration_key = icr.integration_key
          ${where}
-        ORDER BY icr.started_at DESC
-        LIMIT ? OFFSET ?`,
-      [...params, limit, offset],
+         ORDER BY icr.started_at DESC
+        LIMIT ${limit} OFFSET ${offset}`,
+      params,
     );
 
     const [countRows] = await db.execute<RowDataPacket[]>(
