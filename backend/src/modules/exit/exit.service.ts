@@ -59,8 +59,8 @@ export const exitService = {
          ) clearance ON clearance.exit_request_id = er.id
          ${where}
         ORDER BY er.created_at DESC
-        LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+        LIMIT ${limit} OFFSET ${offset}`,
+      params
     );
     const [countRows] = await db.execute<RowDataPacket[]>(
       `SELECT COUNT(*) AS total FROM exit_request er LEFT JOIN employees e ON e.id = er.employee_id ${where}`,
