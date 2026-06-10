@@ -1,10 +1,10 @@
 # ATS E2E Specification
 
-> Version: 9.0.0  
+> Version: 10.0.0  
 > Date: 2026-06-10  
-> Commit: post-S9 (see git log)
+> Commit: post-S10 (see git log)
 > Scope: ATS module + onboarding / BGV / offer / training dependency flows  
-> Session: 9 — Upload ownership check (mobile verification); send-token row-scope; validateToken timezone safety
+> Session: 10 — All P3 issues closed; stage-logs scope; frontend upload mobile; candidate list cache; normalizeSourceChannel dedup; SMTP warn; test script
 
 ---
 
@@ -228,6 +228,7 @@ Before any ATS production deployment:
 | 7.0.0 | 2026-06-10 | Audit Agent | Session 7: CI-BGV-01 HMAC webhook validation; BGV queue+candidate row-scope; onboarding bridge scope; validateToken/ensureConsent statusCode fix; 15 new BGV security tests; 123 total ATS tests |
 | 8.0.0 | 2026-06-10 | Audit Agent | Session 8: BGV multi-provider adapter infra (InfinityAiBgvAdapter + DigioBgvAdapter + singleton factory); CI-FP-01/02/03/04 fixed (requireFormApiKey on 5 public form endpoints); 23 new tests (126 ATS total) |
 | 9.0.0 | 2026-06-10 | Audit Agent | Session 9: Issue 4 upload ownership (mobile); Issue 17 send-token row-scope; Issue 3 validateToken timezone safety; 13 new tests (139 ATS total) |
+| 10.0.0 | 2026-06-10 | Audit Agent | Session 10: All P3 issues closed (8/9/10/19/20); stage-logs scope; frontend upload mobile; candidate list cache; SMTP warn; dedup normalizeSourceChannel; test script |
 
 ---
 

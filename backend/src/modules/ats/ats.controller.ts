@@ -13,7 +13,6 @@ import {
 export const atsController = {
   async listCandidates(req: AuthenticatedRequest, res: Response) {
     const filters = candidateFiltersSchema.parse(req.query);
-    // Pass scopeFilter from middleware
     const filtersWithScope = { ...filters, scopeFilter: (req as any).scopeFilter };
     const result  = await atsService.listCandidates(filtersWithScope);
     return res.json({ success: true, ...result });
@@ -26,13 +25,7 @@ export const atsController = {
 
   async createCandidate(req: AuthenticatedRequest, res: Response) {
     const input = createCandidateSchema.parse(req.body);
-
-    // Normalize sourcing channel to canonical format
-    if (input.sourcingChannel) {
-      input.sourcingChannel = normalizeSourceChannel(input.sourcingChannel);
-    }
-
-    // Public endpoint — authUser may be null for self-registering walk-in candidates
+    // Normalization handled inside atsService.createCandidate
     const data  = await atsService.createCandidate(input, req.authUser?.id ?? null);
     return res.status(201).json({ success: true, data, message: "Candidate registered" });
   },
@@ -84,27 +77,3 @@ export const atsController = {
     return res.json({ success: true, data });
   },
 };
-
-/**
- * Normalize sourcing channel input to canonical format.
- * Prevents case mismatch issues between frontend ('walk-in') and backend ('Walk-In').
- */
-function normalizeSourceChannel(channel: string): string {
-  const normalized = channel.trim().toLowerCase();
-  const mapping: Record<string, string> = {
-    "walk-in": "Walk-In",
-    "walkin": "Walk-In",
-    "walk_in": "Walk-In",
-    "employee-referral": "Employee Referral",
-    "employee referral": "Employee Referral",
-    "referral": "Employee Referral",
-    "job-portal": "Job Portal",
-    "job portal": "Job Portal",
-    "portal": "Job Portal",
-    "social-media": "Social Media",
-    "social media": "Social Media",
-    "linkedin": "Social Media",
-    "facebook": "Social Media",
-  };
-  return mapping[normalized] || channel; // Return normalized or original if no match
-}

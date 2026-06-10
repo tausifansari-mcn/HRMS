@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, BarChart3, CalendarDays, CheckCircle2, Clock, Filter, RefreshCcw, Search, TrendingUp, UserCheck, Users } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { hrmsApi } from "@/lib/hrmsApi";
+import { getCachedCandidateList } from "@/lib/atsDashboardReplicaAdapter";
 
 
 type Candidate = {
@@ -162,10 +162,7 @@ export default function NativeATSDashboardV2() {
     setLoading(true);
     setMessage("");
     try {
-      const res = await hrmsApi.get<{ success: boolean; data: any[] }>(
-        "/api/ats/candidates?limit=1500&page=1"
-      );
-      const enriched = (res.data ?? []).map((c: any) => ({
+      const enriched = (await getCachedCandidateList(1500)).map((c: any) => ({
         id: c.id,
         candidate_code: c.candidate_code,
         q_token: c.candidate_code,

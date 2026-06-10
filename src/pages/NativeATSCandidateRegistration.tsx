@@ -541,6 +541,8 @@ export default function NativeATSCandidateRegistration() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("type", type);
+    // Backend requires mobile to verify upload ownership
+    formData.append("mobile", String(form.mobile || "").replace(/\D/g, ""));
 
     const apiBase = import.meta.env.VITE_HRMS_API_URL || (import.meta.env.DEV ? "http://localhost:5055" : "");
     const res = await fetch(`${apiBase}/api/ats/candidates/${candidateId}/upload`, {

@@ -1,5 +1,28 @@
 import { hrmsApi } from "@/lib/hrmsApi";
 
+// Module-level cache for the candidate list shared by DashboardReplica, DashboardV2, and CommandCenter.
+// Prevents each page mount from issuing a separate 3000-row query within a short window.
+const _candidateListCache: { data: any[] | null; fetchedAt: number } = { data: null, fetchedAt: 0 };
+const CANDIDATE_LIST_STALE_MS = 60_000; // 1 minute
+
+export async function getCachedCandidateList(limit = 3000): Promise<any[]> {
+  const now = Date.now();
+  if (_candidateListCache.data && now - _candidateListCache.fetchedAt < CANDIDATE_LIST_STALE_MS) {
+    return _candidateListCache.data;
+  }
+  const res = await hrmsApi.get<{ success: boolean; data: any[] }>(
+    `/api/ats/candidates?limit=${limit}&page=1`
+  );
+  _candidateListCache.data = res.data ?? [];
+  _candidateListCache.fetchedAt = now;
+  return _candidateListCache.data;
+}
+
+export function invalidateCandidateListCache(): void {
+  _candidateListCache.data = null;
+  _candidateListCache.fetchedAt = 0;
+}
+
 export type AtsDashQueueRow = {
   QToken: string;
   CandidateID: string;
@@ -236,10 +259,7 @@ function uniq(values: string[]): string[] {
 
 export async function getAtsDashboardReplicaData(): Promise<AtsDashPayload> {
   try {
-    const res = await hrmsApi.get<{ success: boolean; data: any[] }>(
-      "/api/ats/candidates?limit=3000&page=1"
-    );
-    const candidates = (res.data ?? []) as RawCandidate[];
+    const candidates = (await getCachedCandidateList(3000)) as RawCandidate[];
 
     // No legacy assignment/submission tables in MySQL — use stage logs as proxy
     const assignmentById = new Map<string, RawAssignment>();

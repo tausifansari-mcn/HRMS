@@ -81,7 +81,17 @@ atsRouter.post("/candidates/:id/move-stage",     requireRole("admin", "recruiter
   if (!allowed) return res.status(403).json({ success: false, message: "Access denied" });
   return c.moveStage.bind(c)(req, res);
 }));
-atsRouter.get("/candidates/:id/stage-logs",      requireRole("admin", "hr", "recruiter", "manager"), h(c.listStageLogs.bind(c)));
+atsRouter.get("/candidates/:id/stage-logs",      requireRole("admin", "hr", "recruiter", "manager"), h(async (req: any, res: any) => {
+  const candidate = await atsService.getCandidate(req.params.id);
+  const allowed = await hasScopedAccess(
+    req.authUser!.id,
+    ["admin", "hr", "recruiter", "manager"],
+    { branchId: candidate.applied_for_branch, processId: candidate.applied_for_process },
+    { allowAdminBypass: true }
+  );
+  if (!allowed) return res.status(403).json({ success: false, message: "Access denied" });
+  return c.listStageLogs.bind(c)(req, res);
+}));
 
 // Candidate → Employee conversion
 atsRouter.post(

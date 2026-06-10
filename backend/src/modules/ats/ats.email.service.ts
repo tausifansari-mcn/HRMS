@@ -39,6 +39,7 @@ async function send(
   type: EmailType,
 ): Promise<SendResult> {
   if (!env.SMTP_USER || !env.SMTP_PASS) {
+    console.warn(`[ATS-EMAIL] SMTP not configured — skipping ${type} to ${to} (candidate ${candidateId})`);
     await logEmail(candidateId, type, to, 'skipped', 'SMTP not configured');
     return { ok: true };
   }
