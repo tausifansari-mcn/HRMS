@@ -1,9 +1,8 @@
 # ATS E2E Audit — Session Resume
 
-> Session: HRMS1 ATS End-to-End Audit (Session 3)
+> Session: HRMS1 ATS End-to-End Audit (Session 4)
 > Date: 2026-06-10
-> Commit: `f095cbe3651b8f9845256d88213f30594aed4ade` (docs S2)
-> Working HEAD (after test fix): see git log
+> Commit: see git log (post-S4)
 > Scope: ATS module + directly dependent onboarding / BGV / offer / training flows
 
 ---
@@ -18,14 +17,22 @@
 
 ---
 
-## 2. Session 3 — Test Fix Applied
+## 2. Session 4 — CI-001 PII Fix Applied
 
-### Fix: `convertCandidateToEmployee` mock added
+### Fix: Aadhaar / PAN / bank account masked + hashed before writing to `ats_candidate`
 
-**File**: `backend/tests/ats.routes.test.ts`
-**Change**: Added `vi.mock("../src/modules/ats/ats.convert.service.js", ...)` block returning `{ employee_id: "emp-1", employee_code: "MAS00001" }`.
+**File modified**: `backend/src/modules/ats/ats.onboarding.service.ts`
 
-**Result**: `tests/ats.routes.test.ts` — 19/19 passing (was 18 pass + 1 fail).
+**Changes**:
+1. Import `createHash` from `'crypto'` (alongside existing `randomUUID`).
+2. Added four pure helpers: `hashPii`, `maskAadhaar`, `maskPan`, `maskBankAccount`.
+3. In `submitProfile()`: compute masked display string and SHA-256 hash for each PII field before SQL.
+4. SQL now writes `aadhar_number` (masked), `aadhar_number_hash`, `pan_number` (masked), `pan_number_hash`, `bank_account_no` (masked), `bank_account_no_hash`.
+
+**Migration created**: `backend/sql/126_ats_candidate_pii_hash_columns.sql`
+- Adds `aadhar_number_hash CHAR(64)`, `pan_number_hash CHAR(64)`, `bank_account_no_hash CHAR(64)` to `ats_candidate` (additive, `IF NOT EXISTS`).
+
+**Result**: `tests/ats.routes.test.ts` — 19/19 passing (unchanged). Typecheck: same pre-existing `leave.routes.ts:134` error only.
 
 ---
 
@@ -177,7 +184,7 @@
 | 8 | P3 | SMTP silently skips when env missing | `ats.email.service.ts:41` | 🔴 Open (dev ok) |
 | 9 | P3 | Duplicate `normalizeSourceChannel` | `ats.controller.ts:87`, `ats.service.ts:22` | 🔴 Open |
 | 10 | P3 | Frontend has no `test` script | `package.json` | 🔴 Open |
-| **CI-001** | **P0** | **PII (Aadhaar/PAN/bank) stored unmasked on ats_candidate** | `ats.onboarding.service.ts:submitProfile` | **🔴 Open — CRITICAL** |
+| **CI-001** | **P0** | **PII (Aadhaar/PAN/bank) stored unmasked on ats_candidate** | `ats.onboarding.service.ts:submitProfile` | **✅ Fixed S4** |
 | 11 | P2 | BGV endpoints — no row-scope (`hasScopedAccess`) | `bgv-verification.routes.ts` | 🔴 Open |
 | 12 | P2 | onboarding/send-token — no row-scope | `ats.onboarding.routes.ts` | 🔴 Open |
 | 13 | P2 | offer approve/reject — no row-scope on branch_head | `ats.onboarding.routes.ts` | 🔴 Open |
@@ -188,16 +195,15 @@
 
 ## 7. Exact Next Task
 
-**Task**: Fix CI-001 — mask/hash Aadhaar, PAN, bank account number before writing to `ats_candidate.aadhar_number`, `pan_number`, `bank_account_no` in `submitProfile`.
+**CI-001 is resolved.** Next priority is the first remaining P2 scope gap:
 
-**Approach**: Use same masking pattern as `onboarding-full.service.ts`:
-- Aadhaar: store last-4 visible, hash full number (`SHA-256` or `crypto.createHash`)
-- PAN: store as-is or mask middle chars
-- Bank account: store last-4, hash full
+**Task**: Fix scope gap — `GET /api/ats/onboarding/requests` and `GET /api/ats/onboarding/pending-approval` receive `branchId = undefined` because the caller never passes it from `req.authUser`.
 
-**OR**: Stop writing these fields to `ats_candidate` entirely — all PII already collected and properly handled via `candidate_onboarding_profile`.
+**Approach**:
+1. In `ats.onboarding.routes.ts`, extract `branchId` from `req.authUser` (e.g. `req.authUser!.branchId`) and pass it to `listOnboardingRequests` / `listPendingApprovals`.
+2. For `branch_head` role the user's own `branchId` is the correct scope. For `admin` role, `branchId` may be `null` (all branches).
 
-**Files to Modify**: `backend/src/modules/ats/ats.onboarding.service.ts`
+**Files to Modify**: `backend/src/modules/ats/ats.onboarding.routes.ts`
 
 **Exact Next Command**:
 ```bash
@@ -223,8 +229,9 @@ npx vitest run tests/ats.routes.test.ts
 | 1.0.0 | 2026-06-10 | Audit Agent | Initial ATS E2E baseline |
 | 2.0.0 | 2026-06-10 | Audit Agent | Session 2: scope enforcement, new test failure documented |
 | 3.0.0 | 2026-06-10 | Audit Agent | Session 3: test fix applied, full journey map completed, CI-001 identified |
+| 4.0.0 | 2026-06-10 | Audit Agent | Session 4: CI-001 fixed — PII masked/hashed, migration 126 added |
 
 ---
 
-**AUDIT STATUS**: 🟡 Journey Map Complete — 1 Critical PII Issue (CI-001) Recorded
-**NEXT ACTION**: Fix CI-001 — Mask PII before writing to ats_candidate in submitProfile
+**AUDIT STATUS**: 🟡 CI-001 Fixed — P2 Scope Gaps Remain
+**NEXT ACTION**: Fix branchId=undefined in onboarding/requests + pending-approval endpoints

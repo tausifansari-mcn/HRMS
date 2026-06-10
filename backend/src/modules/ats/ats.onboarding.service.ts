@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import bcrypt from 'bcryptjs';
 import { RowDataPacket, PoolConnection } from 'mysql2/promise';
 import { db } from '../../db/mysql.js';
@@ -9,6 +9,32 @@ import {
   sendOfferReviewEmail,
   sendWelcomeEmail,
 } from './ats.email.service.js';
+
+// ── PII Helpers ───────────────────────────────────────────────────────────────
+
+function hashPii(value: unknown): string | null {
+  if (value == null || value === '') return null;
+  return createHash('sha256').update(String(value)).digest('hex');
+}
+
+function maskAadhaar(value: unknown): string | null {
+  if (value == null || value === '') return null;
+  const s = String(value).replace(/\D/g, '');
+  return s.length >= 4 ? `XXXX-XXXX-${s.slice(-4)}` : 'XXXX-XXXX-XXXX';
+}
+
+function maskPan(value: unknown): string | null {
+  if (value == null || value === '') return null;
+  const s = String(value).toUpperCase();
+  // PAN format ABCDE1234F — mask middle 5 digits: AB***1234F
+  return s.length === 10 ? `${s.slice(0, 2)}XXXXX${s.slice(7)}` : 'XXXXXXXXXX';
+}
+
+function maskBankAccount(value: unknown): string | null {
+  if (value == null || value === '') return null;
+  const s = String(value).replace(/\s/g, '');
+  return s.length >= 4 ? `XXXXXX${s.slice(-4)}` : 'XXXXXXXXXX';
+}
 
 // ── Token Generation ──────────────────────────────────────────────────────────
 
@@ -93,12 +119,20 @@ export async function submitProfile(token: string, profile: Record<string, unkno
   const tokenData = await validateToken(token);
   const candidateId: string = tokenData.candidate_id;
 
+  // CI-001 fix: store masked display values and SHA-256 hashes; never write raw PII to ats_candidate
+  const aadharMasked = maskAadhaar(profile.aadhar_number);
+  const aadharHash = hashPii(profile.aadhar_number);
+  const panMasked = maskPan(profile.pan_number);
+  const panHash = hashPii(profile.pan_number);
+  const bankMasked = maskBankAccount(profile.bank_account_no);
+  const bankHash = hashPii(profile.bank_account_no);
+
   await db.execute(
     `UPDATE ats_candidate SET
        father_name = ?, current_address = ?, permanent_address = ?,
        date_of_birth = ?,
-       aadhar_number = ?, pan_number = ?, uan_number = ?,
-       bank_account_no = ?, bank_ifsc = ?, bank_name = ?,
+       aadhar_number = ?, aadhar_number_hash = ?, pan_number = ?, pan_number_hash = ?, uan_number = ?,
+       bank_account_no = ?, bank_account_no_hash = ?, bank_ifsc = ?, bank_name = ?,
        emergency_contact_name = ?, emergency_contact_mobile = ?,
        resume_url = ?, selfie_url = ?,
        profile_status = 'profile_submitted', profile_submitted_at = NOW(),
@@ -109,10 +143,13 @@ export async function submitProfile(token: string, profile: Record<string, unkno
       profile.current_address ?? null,
       profile.permanent_address ?? null,
       profile.date_of_birth ?? null,
-      profile.aadhar_number ?? null,
-      profile.pan_number ?? null,
+      aadharMasked,
+      aadharHash,
+      panMasked,
+      panHash,
       profile.uan_number ?? null,
-      profile.bank_account_no ?? null,
+      bankMasked,
+      bankHash,
       profile.bank_ifsc ?? null,
       profile.bank_name ?? null,
       profile.emergency_contact_name ?? null,

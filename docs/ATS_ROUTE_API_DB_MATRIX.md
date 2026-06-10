@@ -135,7 +135,7 @@
 
 | Issue | Endpoint | Risk | Status |
 |-------|----------|------|--------|
-| **CI-001** | `POST /api/ats/onboarding/submit-profile` | ⚠ Aadhaar/PAN/bank written as plain text to `ats_candidate` | **🔴 CRITICAL — not fixed** |
+| **CI-001** | `POST /api/ats/onboarding/submit-profile` | ⚠ Aadhaar/PAN/bank written as plain text to `ats_candidate` | **✅ Fixed S4 — masked display + SHA-256 hash stored; migration 126 adds hash columns** |
 | Safe | `POST /api/ats/onboarding-full/employee-details` | ✅ hashed/masked via `candidate_onboarding_profile` | ✅ |
 | Medium | `POST /api/ats/candidates/:id/upload` | Column name interpolated but hard-coded to `resume_url`/`selfie_url` | 🟡 Monitor |
 
@@ -161,6 +161,7 @@
 | 1.0.0 | 2026-06-10 | Audit Agent | Initial matrix |
 | 2.0.0 | 2026-06-10 | Audit Agent | Session 2: scope enforcement applied to 6 endpoints; matrix statuses updated |
 | 3.0.0 | 2026-06-10 | Audit Agent | Session 3: BGV, onboarding-full, extensions, full-parity routes added; CI-001 PII issue recorded |
+| 4.0.0 | 2026-06-10 | Audit Agent | Session 4: CI-001 fixed; migration 126 created for hash columns |
 
 ---
 

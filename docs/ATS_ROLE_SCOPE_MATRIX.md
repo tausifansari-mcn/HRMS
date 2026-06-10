@@ -167,7 +167,7 @@ export async function requireCandidateScope(
 | P2 | `GET /api/ats/bgv/queue` | HR/recruiter views all-branch BGV queue | 🔴 Open |
 | P2 | `GET /api/ats/bgv/candidates/:id` | HR reads BGV details cross-branch | 🔴 Open |
 | P2 | `POST /api/ats/bgv/candidates/:id/waive` / `manual-review` | Admin overrides BGV cross-branch | 🔴 Open |
-| **P0** | **CI-001: `submit-profile` writes Aadhaar/PAN/bank unmasked** | **PII exposure in ats_candidate** | **🔴 Open — CRITICAL** |
+| **P0** | **CI-001: `submit-profile` writes Aadhaar/PAN/bank unmasked** | **PII exposure in ats_candidate** | **✅ Fixed S4** |
 
 ---
 
@@ -178,6 +178,7 @@ export async function requireCandidateScope(
 | 1.0.0 | 2026-06-10 | Audit Agent | Initial role scope matrix |
 | 2.0.0 | 2026-06-10 | Audit Agent | Session 2: 6 P0/P1 endpoints fixed; priority table status updated |
 | 3.0.0 | 2026-06-10 | Audit Agent | Session 3: BGV, onboarding, offer scope gaps added; CI-001 PII issue added to priority table |
+| 4.0.0 | 2026-06-10 | Audit Agent | Session 4: CI-001 fixed — Aadhaar/PAN/bank masked+hashed before writing to ats_candidate |
 
 ---
 

@@ -165,7 +165,7 @@
 | 3.7 | SQL injection via `search` param in `listCandidates` | — | 🔴 | Parameterized; needs explicit test |
 | 3.8 | SQL injection via `upload` `type` param | — | 🔴 | Hard-coded whitelist; needs test |
 | 3.9 | Path traversal via `upload` filename | — | 🔴 | `randomUUID()` filename; low risk |
-| 3.10 | CI-001: `POST /onboarding/submit-profile` — Aadhaar/PAN stored unmasked | — | 🔴 **CRITICAL** | No test; fix required first |
+| 3.10 | CI-001: `POST /onboarding/submit-profile` — Aadhaar/PAN/bank masked before write | — | 🟡 | Fix applied S4; unit test for masking helpers pending |
 | 3.11 | BGV `GET /candidates/:id` cross-branch scope denied → 403 | — | 🔴 | No row-scope on BGV routes |
 | 3.12 | Offer approve by branch_head of wrong branch → 403 | — | 🔴 | branchId param unused |
 
@@ -190,6 +190,7 @@
 | 1.0.0 | 2026-06-10 | Audit Agent | Initial test matrix |
 | 2.0.0 | 2026-06-10 | Audit Agent | Session 2: scope enforcement tests reflected; convert mock gap flagged |
 | 3.0.0 | 2026-06-10 | Audit Agent | Session 3: convert mock fix applied (19/19 green); CI-001, BGV, offer scope tests added as gaps |
+| 4.0.0 | 2026-06-10 | Audit Agent | Session 4: CI-001 fixed; 3.10 updated to reflect fix applied |
 
 ---
 
