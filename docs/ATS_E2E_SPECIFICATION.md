@@ -1,9 +1,10 @@
 # ATS E2E Specification
 
-> Version: 1.0.0  
+> Version: 2.0.0  
 > Date: 2026-06-10  
-> Commit: `5488cef4805fd5fc41b3b77e9a802ab11b37ed26`  
-> Scope: ATS module + onboarding / BGV / offer / training dependency flows
+> Commit: `e7f5bd5a0c21c9a5e433561612230ddffc4b960d`  
+> Scope: ATS module + onboarding / BGV / offer / training dependency flows  
+> Session: 2 — Scope enforcement applied
 
 ---
 
@@ -112,8 +113,11 @@ Converted employee → LMS integration layer → learner mapping
 | Requirement | Priority | Status |
 |-------------|----------|--------|
 | Public registration endpoints must not leak existing candidate data | P0 | ✅ Verified (duplicate mobile check returns generic error) |
-| Candidate detail GET must enforce row-scope (branch/process) | P1 | 🔴 Missing |
-| List endpoints must use `buildScopeWhereClause` | P1 | 🟡 Partial (candidates list uses it; walkin/waiting queue does not) |
+| Candidate detail GET must enforce row-scope (branch/process) | P1 | ✅ Fixed S2 — `hasScopedAccess` added |
+| Candidate PUT must enforce row-scope | P1 | ✅ Fixed S2 — `hasScopedAccess` added |
+| Candidate move-stage must enforce row-scope | P1 | ✅ Fixed S2 — `hasScopedAccess` added |
+| List endpoints must use `buildScopeWhereClause` | P1 | ✅ Fixed S2 — walkin-queue + waiting-queue now scoped |
+| Convert endpoint must verify actor scope | P1 | ✅ Fixed S2 — `hasScopedAccess` added |
 | Offer approval must verify approver is branch_head of candidate's branch | P1 | 🟡 Partial (role check exists; row-scope verification not explicit) |
 | File upload window must be strictly 1 hour | P2 | ✅ Enforced |
 | Token expiry must be validated server-side | P0 | ✅ Enforced (7 days) |
@@ -135,11 +139,15 @@ Converted employee → LMS integration layer → learner mapping
 
 | Suite | File | Pass | Fail | Skip | Coverage |
 |-------|------|------|------|------|----------|
-| ATS Routes | `backend/tests/ats.routes.test.ts` | 8 | 0 | 0 | Candidates CRUD, move-stage, stage-logs, onboarding-bridge, sourcing-channels, stats |
+| ATS Routes | `backend/tests/ats.routes.test.ts` | 18 | **1** | 0 | Candidates CRUD, move-stage, stage-logs, onboarding-bridge, sourcing-channels, stats, scope 403 tests |
 | ATS Service | `backend/tests/ats.service.test.ts` | 10 | 0 | 0 | listCandidates filters, getCandidate, createCandidate duplicate guard, moveStage, listStageLogs, createOnboardingBridge, listSourcingChannels |
 | ATS WFM Completion | `backend/tests/ats.wfm.completion.test.ts` | — | — | — | Not executed in this baseline (assumed preserved) |
 
-**Gaps**:
+**Session 2 New Test Failures**:
+- `POST /api/ats/convert/:candidateId` (converts candidate when scope allows) — 500 vs 201  
+  Root cause: `convertCandidateToEmployee` not mocked; real service calls DB which throws `Candidate not found`.
+
+**Remaining Gaps**:
 - No tests for `ats.onboarding.service.ts` (token generation, profile submission, offer save/approve/reject).
 - No tests for `ats.convert.service.ts` (candidate → employee conversion).
 - No tests for `ats.email.service.ts`.
@@ -170,13 +178,25 @@ Converted employee → LMS integration layer → learner mapping
 ## 10. Approval Gate
 
 Before any ATS production deployment:
-- [ ] All P1 scope issues resolved and tested
-- [ ] Candidate detail endpoint passes cross-branch negative tests
+- [x] Candidate detail/update/move-stage endpoints have row-scope enforcement
+- [x] walkin-queue + waiting-queue have branch/process scope SQL injection
+- [x] convert endpoint has actor scope check
+- [ ] `convertCandidateToEmployee` mock added to test — 1 failing ATS test must be fixed
+- [ ] Onboarding `requests` + `pending-approval` endpoints have branch scope enforced
 - [ ] Offer approval passes branch-head scope negative tests
 - [ ] Frontend build passes (`npm run build`)
-- [ ] Backend build + typecheck passes (`npm run build`, `npm run typecheck`)
-- [ ] Backend test pass rate >= 95 % (current: 93 %, 25 non-ATS failures)
+- [ ] Backend typecheck clean — `leave.routes.ts:134` `leaveService` error must be fixed
+- [ ] Backend test pass rate >= 95 % (current session 2: 26 failures / 1155 tests = 97.7 % pass rate excluding known pre-existing)
 - [ ] Manual E2E smoke of registration → stage move → onboarding → conversion
+
+---
+
+## Document Control
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 1.0.0 | 2026-06-10 | Audit Agent | Initial ATS E2E specification |
+| 2.0.0 | 2026-06-10 | Audit Agent | Session 2: scope enforcement status updated, new test failure recorded |
 
 ---
 

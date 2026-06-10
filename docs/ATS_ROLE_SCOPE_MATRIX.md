@@ -1,8 +1,9 @@
 # ATS Role ↔ Scope Matrix
 
-> Version: 1.0.0  
+> Version: 2.0.0  
 > Date: 2026-06-10  
-> Commit: `5488cef4805fd5fc41b3b77e9a802ab11b37ed26`
+> Commit: `e7f5bd5a0c21c9a5e433561612230ddffc4b960d`  
+> Session: 2 — Scope enforcement applied to 6 endpoints
 
 ---
 
@@ -84,23 +85,23 @@
 
 ## 3. Row-Scope Enforcement Status
 
-| Endpoint | Role Check | Branch Scope | Process Scope | Row-Level | Status |
-|----------|------------|--------------|---------------|-----------|--------|
-| `GET /api/ats/candidates` | ✅ | 🟡 (via `buildScopeWhereClause`) | 🟡 (via `buildScopeWhereClause`) | — | **Partial** |
-| `GET /api/ats/candidates/:id` | ✅ | ❌ | ❌ | ❌ | **Missing** |
-| `PUT /api/ats/candidates/:id` | ✅ | ❌ | ❌ | ❌ | **Missing** |
-| `POST /api/ats/candidates/:id/move-stage` | ✅ | ❌ | ❌ | ❌ | **Missing** |
-| `GET /api/ats/walkin-queue` | ✅ | ❌ | ❌ | ❌ | **Missing** |
-| `GET /api/ats/waiting-queue` | ✅ | ❌ | ❌ | ❌ | **Missing** |
-| `POST /api/ats/convert/:id` | ✅ | ❌ | ❌ | ❌ | **Missing** |
-| `POST /api/ats/onboarding-bridge` | ✅ | ❌ | ❌ | ❌ | **Missing** |
-| `PATCH /api/ats/onboarding-bridge/:id` | ✅ | ❌ | ❌ | ❌ | **Missing** |
-| `GET /api/ats/onboarding/requests` | ✅ | ❌ | ❌ | ❌ | **Missing** |
-| `GET /api/ats/onboarding/pending-approval` | ✅ | ❌ | ❌ | ❌ | **Missing** |
-| `POST /api/ats/onboarding/offers/:id/approve` | ✅ | ❌ | ❌ | ❌ | **Missing** |
-| `POST /api/ats/onboarding/offers/:id/reject` | ✅ | ❌ | ❌ | ❌ | **Missing** |
-| `GET /api/ats/stats` | ✅ | ❌ | ❌ | N/A | **Missing** (aggregates) |
-| `GET /api/ats/sourcing-channels` | ✅ | N/A | N/A | N/A | N/A |
+| Endpoint | Role Check | Branch Scope | Process Scope | Row-Level | Status | Session |
+|----------|------------|--------------|---------------|-----------|--------|---------|
+| `GET /api/ats/candidates` | ✅ | ✅ `buildScopeWhereClause` | ✅ `buildScopeWhereClause` | — | **Partial** | S1 |
+| `GET /api/ats/candidates/:id` | ✅ | ✅ `hasScopedAccess` | ✅ `hasScopedAccess` | ✅ | **✅ Fixed** | S2 |
+| `PUT /api/ats/candidates/:id` | ✅ | ✅ `hasScopedAccess` | ✅ `hasScopedAccess` | ✅ | **✅ Fixed** | S2 |
+| `POST /api/ats/candidates/:id/move-stage` | ✅ | ✅ `hasScopedAccess` | ✅ `hasScopedAccess` | ✅ | **✅ Fixed** | S2 |
+| `GET /api/ats/walkin-queue` | ✅ | ✅ `buildScopeWhereClause` | ✅ `buildScopeWhereClause` | — | **✅ Fixed** | S2 |
+| `GET /api/ats/waiting-queue` | ✅ | ✅ `buildScopeWhereClause` | ✅ `buildScopeWhereClause` | — | **✅ Fixed** | S2 |
+| `POST /api/ats/convert/:id` | ✅ | ✅ `hasScopedAccess` | ✅ `hasScopedAccess` | ✅ | **✅ Fixed** | S2 |
+| `POST /api/ats/onboarding-bridge` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
+| `PATCH /api/ats/onboarding-bridge/:id` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
+| `GET /api/ats/onboarding/requests` | ✅ | 🟡 (param present but caller passes undefined) | ❌ | ❌ | **Missing** | — |
+| `GET /api/ats/onboarding/pending-approval` | ✅ | 🟡 (param present but caller passes undefined) | ❌ | ❌ | **Missing** | — |
+| `POST /api/ats/onboarding/offers/:id/approve` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
+| `POST /api/ats/onboarding/offers/:id/reject` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
+| `GET /api/ats/stats` | ✅ | ❌ | ❌ | N/A | **Missing** (aggregates) | — |
+| `GET /api/ats/sourcing-channels` | ✅ | N/A | N/A | N/A | N/A | — |
 
 ---
 
@@ -142,17 +143,26 @@ export async function requireCandidateScope(
 
 ### 4.3 Priority Order for Fixes
 
-| Priority | Endpoint | Rationale |
-|----------|----------|-----------|
-| P0 | `GET /api/ats/candidates/:id` | Direct PII exposure risk |
-| P0 | `POST /api/ats/convert/:id` | Creates employee — must verify actor authority |
-| P1 | `PUT /api/ats/candidates/:id` | Mutation without scope check |
-| P1 | `POST /api/ats/candidates/:id/move-stage` | State mutation without scope check |
-| P1 | `GET /api/ats/walkin-queue` | Queue may expose cross-branch candidates |
-| P1 | `GET /api/ats/waiting-queue` | Queue may expose cross-branch candidates |
-| P2 | `GET /api/ats/onboarding/requests` | HR views all branches |
-| P2 | `GET /api/ats/onboarding/pending-approval` | Branch head views all branches |
-| P2 | Offer approve/reject | Must verify branch_head matches candidate branch |
+| Priority | Endpoint | Rationale | Status |
+|----------|----------|-----------|--------|
+| P0 | `GET /api/ats/candidates/:id` | Direct PII exposure risk | ✅ Fixed S2 |
+| P0 | `POST /api/ats/convert/:id` | Creates employee — must verify actor authority | ✅ Fixed S2 |
+| P1 | `PUT /api/ats/candidates/:id` | Mutation without scope check | ✅ Fixed S2 |
+| P1 | `POST /api/ats/candidates/:id/move-stage` | State mutation without scope check | ✅ Fixed S2 |
+| P1 | `GET /api/ats/walkin-queue` | Queue may expose cross-branch candidates | ✅ Fixed S2 |
+| P1 | `GET /api/ats/waiting-queue` | Queue may expose cross-branch candidates | ✅ Fixed S2 |
+| P2 | `GET /api/ats/onboarding/requests` | HR views all branches | 🔴 Open |
+| P2 | `GET /api/ats/onboarding/pending-approval` | Branch head views all branches | 🔴 Open |
+| P2 | Offer approve/reject | Must verify branch_head matches candidate branch | 🔴 Open |
+
+---
+
+## Document Control
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 1.0.0 | 2026-06-10 | Audit Agent | Initial role scope matrix |
+| 2.0.0 | 2026-06-10 | Audit Agent | Session 2: 6 P0/P1 endpoints fixed; priority table status updated |
 
 ---
 

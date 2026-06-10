@@ -1,8 +1,9 @@
 # ATS E2E Test Matrix
 
-> Version: 1.0.0  
+> Version: 2.0.0  
 > Date: 2026-06-10  
-> Commit: `5488cef4805fd5fc41b3b77e9a802ab11b37ed26`
+> Commit: `e7f5bd5a0c21c9a5e433561612230ddffc4b960d`  
+> Session: 2 — Scope enforcement tests added; convert mock gap identified
 
 ---
 
@@ -29,15 +30,18 @@
 | 1.1.4 | `POST /api/ats/candidates` returns 400 when fullName missing | `ats.routes.test.ts` | 🟢 | |
 | 1.1.5 | `POST /api/ats/candidates` returns 400 when mobile too short | `ats.routes.test.ts` | 🟢 | |
 | 1.1.6 | `POST /api/ats/candidates` rejects duplicate mobile | `ats.service.test.ts` | 🟢 | |
-| 1.1.7 | `GET /api/ats/candidates/:id` returns candidate | `ats.routes.test.ts` | 🟡 | Mocked; no scope negative test |
+| 1.1.7 | `GET /api/ats/candidates/:id` returns candidate when scope allows | `ats.routes.test.ts` | 🟢 | S2: scope-allow path tested |
+| 1.1.7b | `GET /api/ats/candidates/:id` returns 403 when scope denied | `ats.routes.test.ts` | 🟢 | S2: added |
 | 1.1.8 | `GET /api/ats/candidates/:id` returns 404 for missing | — | 🔴 | |
-| 1.1.9 | `GET /api/ats/candidates/:id` returns 403 for cross-branch | — | 🔴 | **Critical gap** |
-| 1.1.10 | `PUT /api/ats/candidates/:id` updates candidate | — | 🔴 | |
+| 1.1.9 | `GET /api/ats/candidates/:id` returns 403 for cross-branch | `ats.routes.test.ts` | 🟢 | S2: added via `hasScopedAccess` mock |
+| 1.1.10 | `PUT /api/ats/candidates/:id` updates candidate when scope allows | `ats.routes.test.ts` | 🟢 | S2: added |
+| 1.1.10b | `PUT /api/ats/candidates/:id` returns 403 when scope denied | `ats.routes.test.ts` | 🟢 | S2: added |
 | 1.1.11 | `POST /api/ats/candidates/:id/move-stage` moves stage | `ats.routes.test.ts` | 🟢 | |
+| 1.1.11b | `POST /api/ats/candidates/:id/move-stage` returns 403 when scope denied | `ats.routes.test.ts` | 🟢 | S2: added |
 | 1.1.12 | `POST /api/ats/candidates/:id/move-stage` returns 400 when toStage missing | `ats.routes.test.ts` | 🟢 | |
 | 1.1.13 | `GET /api/ats/candidates/:id/stage-logs` returns logs | `ats.routes.test.ts` | 🟢 | |
-| 1.1.14 | `POST /api/ats/convert/:id` converts candidate to employee | — | 🔴 | |
-| 1.1.15 | `POST /api/ats/convert/:id` returns 403 for unauthorized actor | — | 🔴 | |
+| 1.1.14 | `POST /api/ats/convert/:id` converts candidate to employee | `ats.routes.test.ts` | 🔴 **FAILING** | S2: 500 vs 201 — `convertCandidateToEmployee` not mocked |
+| 1.1.15 | `POST /api/ats/convert/:id` returns 403 for unauthorized actor | `ats.routes.test.ts` | 🟢 | S2: added |
 
 ### 1.2 Service Layer
 
@@ -156,7 +160,7 @@
 | 3.2 | Unauthenticated `POST /api/ats/onboarding-bridge` → 401 | — | 🔴 |
 | 3.3 | Employee role `POST /api/ats/candidates/:id/move-stage` → 403 | — | 🔴 |
 | 3.4 | Recruiter role `POST /api/ats/convert/:id` → 403 | — | 🔴 |
-| 3.5 | Manager `GET /api/ats/candidates/:id` cross-branch → 403 | — | 🔴 | **Critical** |
+| 3.5 | Manager `GET /api/ats/candidates/:id` cross-branch → 403 | `ats.routes.test.ts` | 🟢 | S2: added via `hasScopedAccess` mock |
 | 3.6 | HR `GET /api/ats/onboarding/pending-approval` → 403 | — | 🔴 | Role check exists but not tested |
 | 3.7 | SQL injection via `search` param in `listCandidates` | — | 🔴 | Parameterized; needs explicit test |
 | 3.8 | SQL injection via `upload` `type` param | — | 🔴 | Hard-coded whitelist; needs test |
@@ -173,6 +177,15 @@
 | 4.3 | `GET /api/ats/walkin-queue` < 100ms | — | 🔴 |
 | 4.4 | Concurrent candidate creation does not duplicate mobile | — | 🔴 | Race condition risk |
 | 4.5 | Concurrent offer approval does not duplicate employee code | — | 🔴 | `FOR UPDATE` lock present but untested |
+
+---
+
+## Document Control
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 1.0.0 | 2026-06-10 | Audit Agent | Initial test matrix |
+| 2.0.0 | 2026-06-10 | Audit Agent | Session 2: scope enforcement tests reflected; convert mock gap flagged |
 
 ---
 
