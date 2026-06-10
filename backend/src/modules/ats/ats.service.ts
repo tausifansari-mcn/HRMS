@@ -178,6 +178,13 @@ export const atsService = {
     return rows as AtsCandidateStageLog[];
   },
 
+  async listOnboardingBridges(): Promise<AtsOnboardingBridge[]> {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      "SELECT * FROM ats_onboarding_bridge ORDER BY created_at DESC"
+    );
+    return rows as AtsOnboardingBridge[];
+  },
+
   async createOnboardingBridge(
     input: CreateOnboardingBridgeInput,
     userId: string
