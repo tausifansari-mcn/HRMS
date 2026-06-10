@@ -222,9 +222,9 @@ export const reconciliationService = {
        JOIN employees e ON e.id = r.employee_id
        LEFT JOIN wfm_roster_assignment ra ON ra.employee_id = r.employee_id AND ra.roster_date = r.roster_date
        WHERE ${where}
-       ORDER BY r.roster_date DESC, e.employee_code
-       LIMIT ? OFFSET ?`,
-      [...params, filters.limit, offset]
+        ORDER BY r.roster_date DESC, e.employee_code
+        LIMIT ${filters.limit} OFFSET ${offset}`,
+      params
     );
 
     const [cnt] = await db.execute<RowDataPacket[]>(
@@ -416,8 +416,8 @@ export const alertService = {
     const offset = (filters.page - 1) * filters.limit;
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT * FROM adherence_alert WHERE ${conds.join(" AND ")}
-       ORDER BY alert_date DESC, severity DESC LIMIT ? OFFSET ?`,
-      [...params, filters.limit, offset]
+       ORDER BY alert_date DESC, severity DESC LIMIT ${filters.limit} OFFSET ${offset}`,
+      params
     );
     return rows as AdherenceAlert[];
   },
@@ -508,8 +508,8 @@ export const payrollReadinessService = {
        JOIN employees e ON e.id = prf.employee_id
        WHERE ${conds.join(" AND ")}
        ORDER BY prf.period_start DESC, e.employee_code
-       LIMIT ? OFFSET ?`,
-      [...params, filters.limit, offset]
+        LIMIT ${filters.limit} OFFSET ${offset}`,
+      params
     );
     return rows as (PayrollReadinessFlag & { employee_name: string; employee_code: string })[];
   },
