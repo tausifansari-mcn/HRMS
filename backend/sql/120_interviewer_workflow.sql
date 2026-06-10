@@ -7,20 +7,28 @@ INSERT INTO workforce_role_catalog (id, role_key, role_name, description, active
 SELECT UUID(), 'interviewer', 'Interviewer', 'Conducts candidate interviews and submits results', 1, NOW()
 WHERE NOT EXISTS (SELECT 1 FROM workforce_role_catalog WHERE role_key = 'interviewer');
 
--- 2. Add page access for interviewer role
+-- 2. Add page_catalog entries for interviewer pages
+INSERT INTO page_catalog (page_code, page_name, module, route, description)
+VALUES
+('ATS_INTERVIEW_QUEUE', 'My Interviews', 'ATS', '/interviewer/dashboard', 'View and manage assigned interview tasks'),
+('ATS_INTERVIEW_SUBMIT', 'Submit Interview Result', 'ATS', '/interviewer/submit', 'Submit interview results and feedback'),
+('ATS_INTERVIEW_APPROVALS', 'Interview Approvals', 'ATS', '/branch-head/interview-approvals', 'Branch head interview approval queue')
+ON DUPLICATE KEY UPDATE page_name = VALUES(page_name), description = VALUES(description);
+
+-- 3. Add page access for interviewer role
 INSERT INTO role_page_access (id, role_key, page_code, can_view, can_create, can_edit, can_delete, can_export)
 VALUES
 (UUID(), 'interviewer', 'ATS_INTERVIEW_QUEUE', 1, 0, 1, 0, 0),
 (UUID(), 'interviewer', 'ATS_INTERVIEW_SUBMIT', 1, 1, 1, 0, 0)
 ON DUPLICATE KEY UPDATE can_view = VALUES(can_view), can_edit = VALUES(can_edit);
 
--- 3. Add page access for branch_head (if needed)
+-- 4. Add page access for branch_head (if needed)
 INSERT INTO role_page_access (id, role_key, page_code, can_view, can_create, can_edit, can_delete, can_export)
 VALUES
 (UUID(), 'branch_head', 'ATS_INTERVIEW_APPROVALS', 1, 0, 1, 0, 0)
 ON DUPLICATE KEY UPDATE can_view = VALUES(can_view), can_edit = VALUES(can_edit);
 
--- 4. Create interview assignment table
+-- 5. Create interview assignment table
 CREATE TABLE IF NOT EXISTS ats_interview_assignment (
   id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
   candidate_id CHAR(36) NOT NULL,
@@ -52,7 +60,7 @@ CREATE TABLE IF NOT EXISTS ats_interview_assignment (
   INDEX idx_assigned_at (assigned_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 5. Create interview approval log (for branch head approvals)
+-- 6. Create interview approval log (for branch head approvals)
 CREATE TABLE IF NOT EXISTS ats_interview_approval_log (
   id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
   assignment_id CHAR(36) NOT NULL,
@@ -69,7 +77,7 @@ CREATE TABLE IF NOT EXISTS ats_interview_approval_log (
   INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 6. Add indexes to ats_candidate for interview result queries
+-- 7. Add indexes to ats_candidate for interview result queries
 -- Check and add indexes only if they don't exist
 SET @exist_idx1 = (SELECT COUNT(*) FROM information_schema.statistics
   WHERE table_schema = 'mas_hrms' AND table_name = 'ats_candidate' AND index_name = 'idx_round1_result');

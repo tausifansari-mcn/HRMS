@@ -45,6 +45,7 @@ const navGroups: NavGroup[] = [
     { label: "ATS Command", href: "/ats/command-center", icon: <Briefcase className="h-4 w-4" />, pageCode: "ATS_DASHBOARD", description: "ATS" },
     { label: "Walk-in Queue", href: "/ats/walkin-queue", icon: <Users className="h-4 w-4" />, pageCode: "ATS_WAITING_QUEUE", description: "Queue" },
     { label: "My Candidates", href: "/ats/recruiter/my-candidates", icon: <ClipboardList className="h-4 w-4" />, pageCode: "ATS_RECRUITER_QUEUE", description: "Candidates" },
+    { label: "My Interviews", href: "/interviewer/dashboard", icon: <ClipboardList className="h-4 w-4" />, pageCode: "ATS_INTERVIEW_QUEUE", description: "Interviews" },
     { label: "Jobs Portal", href: "/jobs", icon: <Briefcase className="h-4 w-4" />, pageCode: "JOBS_PORTAL", description: "Jobs" },
   ]},
   { title: "Workforce", items: [
