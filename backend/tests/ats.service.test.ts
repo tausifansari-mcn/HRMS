@@ -109,24 +109,34 @@ describe("atsService.getCandidate", () => {
 
 // ─── createCandidate ──────────────────────────────────────────────────────────
 
+const fullCandidateInput = {
+  fullName: "Rahul Sharma",
+  mobile: "9876543210",
+  email: "rahul@example.com",
+  education: "Graduate",
+  experience: "1 year",
+  appliedForProcess: "Inbound",
+  appliedForBranch: "Mumbai",
+  sourcingChannel: "Walk-In",
+  walkInDate: "2026-05-20",
+};
+
 describe("atsService.createCandidate", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("throws when mobile already exists", async () => {
-    mockExecute.mockResolvedValueOnce([[fakeCandidate]]); // duplicate check by mobile
+    mockExecute.mockResolvedValueOnce([[{ id: fakeCandidate.id, current_stage: "Applied", active_status: 1 }]]);
     await expect(
-      atsService.createCandidate({ fullName: "Test", mobile: "9876543210", walkInDate: "2026-05-20" }, "user-1")
-    ).rejects.toThrow("mobile already registered");
+      atsService.createCandidate(fullCandidateInput, "user-1")
+    ).rejects.toThrow("mobile");
   });
 
   it("inserts candidate and returns it", async () => {
     mockExecute.mockResolvedValueOnce([[]]); // no duplicate mobile
+    mockExecute.mockResolvedValueOnce([[]]); // no duplicate email
     mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }]); // INSERT
     mockExecute.mockResolvedValueOnce([[fakeCandidate]]); // re-fetch by id
-    const result = await atsService.createCandidate(
-      { fullName: "Rahul Sharma", mobile: "9876543210", walkInDate: "2026-05-20" },
-      "user-1"
-    );
+    const result = await atsService.createCandidate(fullCandidateInput, "user-1");
     expect(result.full_name).toBe("Rahul Sharma");
   });
 });

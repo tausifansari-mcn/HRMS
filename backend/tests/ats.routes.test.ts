@@ -88,13 +88,25 @@ describe("GET /api/ats/candidates", () => {
   });
 });
 
+const validCandidateBody = {
+  fullName: "Rahul Sharma",
+  mobile: "9876543210",
+  email: "rahul@example.com",
+  education: "Graduate",
+  experience: "1 year",
+  appliedForProcess: "Inbound",
+  appliedForBranch: "Mumbai",
+  sourcingChannel: "Walk-In",
+  walkInDate: "2026-05-20",
+};
+
 describe("POST /api/ats/candidates", () => {
   it("creates candidate and returns 201", async () => {
     svc.createCandidate.mockResolvedValueOnce(fakeCandidate);
     const res = await request(app)
       .post("/api/ats/candidates")
       .set(AUTH)
-      .send({ fullName: "Rahul Sharma", mobile: "9876543210", walkInDate: "2026-05-20" });
+      .send(validCandidateBody);
     expect(res.status).toBe(201);
     expect(res.body.data.candidate_code).toBe("ATS-20260001");
   });
@@ -103,7 +115,7 @@ describe("POST /api/ats/candidates", () => {
     const res = await request(app)
       .post("/api/ats/candidates")
       .set(AUTH)
-      .send({ mobile: "9876543210" });
+      .send({ ...validCandidateBody, fullName: undefined });
     expect(res.status).toBe(400);
   });
 
@@ -111,7 +123,52 @@ describe("POST /api/ats/candidates", () => {
     const res = await request(app)
       .post("/api/ats/candidates")
       .set(AUTH)
-      .send({ fullName: "Test", mobile: "123" });
+      .send({ ...validCandidateBody, mobile: "123" });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when email missing", async () => {
+    const { email: _omit, ...body } = validCandidateBody as any;
+    const res = await request(app)
+      .post("/api/ats/candidates")
+      .set(AUTH)
+      .send(body);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when education missing", async () => {
+    const { education: _omit, ...body } = validCandidateBody as any;
+    const res = await request(app)
+      .post("/api/ats/candidates")
+      .set(AUTH)
+      .send(body);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when appliedForBranch missing", async () => {
+    const { appliedForBranch: _omit, ...body } = validCandidateBody as any;
+    const res = await request(app)
+      .post("/api/ats/candidates")
+      .set(AUTH)
+      .send(body);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when appliedForProcess missing", async () => {
+    const { appliedForProcess: _omit, ...body } = validCandidateBody as any;
+    const res = await request(app)
+      .post("/api/ats/candidates")
+      .set(AUTH)
+      .send(body);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when sourcingChannel missing", async () => {
+    const { sourcingChannel: _omit, ...body } = validCandidateBody as any;
+    const res = await request(app)
+      .post("/api/ats/candidates")
+      .set(AUTH)
+      .send(body);
     expect(res.status).toBe(400);
   });
 });
