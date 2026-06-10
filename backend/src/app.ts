@@ -18,6 +18,7 @@ import { kpiProcessRoleRouter } from "./modules/kpi/kpi.process-role.routes.js";
 import { portalRouter } from "./modules/portal/portal.routes.js";
 import { atsRouter } from "./modules/ats/ats.routes.js";
 import { atsFormConfigRouter } from "./modules/ats/ats-form-config.routes.js";
+import { interviewerRouter } from "./modules/ats/interviewer.routes.js";
 import { exitRouter } from "./modules/exit/exit.routes.js";
 import { migrationRouter } from "./modules/migration/migration.routes.js";
 import { accessRouter } from "./modules/access/access.routes.js";
@@ -139,6 +140,7 @@ app.use("/api/portal", portalRouter);
 app.use("/api", clientRouter); // Client management + enhanced portal user routes
 app.use("/api/ats", atsFormConfigRouter);
 app.use("/api/ats", atsRouter);
+app.use("/api/ats/interviewer", interviewerRouter);
 app.use("/api/ats-full-parity", atsFullParityRouter); // Google Sheets App Script parity
 app.use("/api/exit", exitRouter);
 app.use("/api/migration", migrationRouter);
