@@ -171,7 +171,7 @@ export async function submitProfile(token: string, profile: Record<string, unkno
 
 // ── HR: List Onboarding Requests ──────────────────────────────────────────────
 
-export async function listOnboardingRequests(branchId?: string) {
+export async function listOnboardingRequests(scopeFilter: { sql: string; params: unknown[] }) {
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT r.id, r.status, r.created_at,
             c.id AS candidate_id, c.candidate_code, c.full_name, c.mobile,
@@ -182,9 +182,9 @@ export async function listOnboardingRequests(branchId?: string) {
      JOIN ats_candidate c ON c.id = r.candidate_id
      LEFT JOIN branch_master b ON b.id = r.branch_id
      LEFT JOIN ats_employment_offer o ON o.onboarding_request_id = r.id
-     WHERE (? IS NULL OR r.branch_id = ?)
+     WHERE (${scopeFilter.sql})
      ORDER BY r.created_at DESC`,
-    [branchId ?? null, branchId ?? null],
+    scopeFilter.params,
   );
   return rows;
 }
@@ -314,7 +314,7 @@ export async function saveOffer(
 
 // ── Branch Head: List Pending Approvals ───────────────────────────────────────
 
-export async function listPendingApprovals(branchId?: string) {
+export async function listPendingApprovals(scopeFilter: { sql: string; params: unknown[] }) {
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT o.id AS offer_id, o.offered_ctc, o.gross, o.net_in_hand,
             o.emp_type, o.date_of_joining, o.salary_band, o.status AS offer_status,
@@ -327,9 +327,9 @@ export async function listPendingApprovals(branchId?: string) {
      JOIN ats_candidate c ON c.id = r.candidate_id
      LEFT JOIN branch_master b ON b.id = r.branch_id
      WHERE o.status = 'submitted'
-       AND (? IS NULL OR r.branch_id = ?)
+       AND (${scopeFilter.sql})
      ORDER BY o.submitted_at ASC`,
-    [branchId ?? null, branchId ?? null],
+    scopeFilter.params,
   );
   return rows;
 }

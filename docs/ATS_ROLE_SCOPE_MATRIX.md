@@ -96,8 +96,8 @@
 | `POST /api/ats/convert/:id` | ✅ | ✅ `hasScopedAccess` | ✅ `hasScopedAccess` | ✅ | **✅ Fixed** | S2 |
 | `POST /api/ats/onboarding-bridge` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
 | `PATCH /api/ats/onboarding-bridge/:id` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
-| `GET /api/ats/onboarding/requests` | ✅ | 🟡 (param present but caller passes undefined) | ❌ | ❌ | **Missing** | — |
-| `GET /api/ats/onboarding/pending-approval` | ✅ | 🟡 (param present but caller passes undefined) | ❌ | ❌ | **Missing** | — |
+| `GET /api/ats/onboarding/requests` | ✅ | ✅ `buildScopeWhereClause` on `r.branch_id` | ❌ | — | **✅ Fixed S4** | — |
+| `GET /api/ats/onboarding/pending-approval` | ✅ | ✅ `buildScopeWhereClause` on `r.branch_id` | ❌ | — | **✅ Fixed S4** | — |
 | `POST /api/ats/onboarding/offers/:id/approve` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
 | `POST /api/ats/onboarding/offers/:id/reject` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
 | `GET /api/ats/stats` | ✅ | ❌ | ❌ | N/A | **Missing** (aggregates) | — |
@@ -107,9 +107,9 @@
 | `POST /api/ats/bgv/candidates/:id/manual-review` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
 | `POST /api/ats/bgv/candidates/:id/waive` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
 | `POST /api/ats/onboarding/send-token/:id` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
-| `GET /api/ats/onboarding/requests` | ✅ | 🟡 (branchId=undefined) | ❌ | ❌ | **Missing** | — |
+| `GET /api/ats/onboarding/requests` | ✅ | ✅ `buildScopeWhereClause` | ❌ | — | **✅ Fixed S4** | — |
 | `POST /api/ats/onboarding/requests/:id/offer` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
-| `GET /api/ats/onboarding/pending-approval` | ✅ | 🟡 (branchId=undefined) | ❌ | ❌ | **Missing** | — |
+| `GET /api/ats/onboarding/pending-approval` | ✅ | ✅ `buildScopeWhereClause` | ❌ | — | **✅ Fixed S4** | — |
 | `POST /api/ats/onboarding/offers/:id/approve` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
 | `POST /api/ats/onboarding/offers/:id/reject` | ✅ | ❌ | ❌ | ❌ | **Missing** | — |
 
@@ -161,8 +161,8 @@ export async function requireCandidateScope(
 | P1 | `POST /api/ats/candidates/:id/move-stage` | State mutation without scope check | ✅ Fixed S2 |
 | P1 | `GET /api/ats/walkin-queue` | Queue may expose cross-branch candidates | ✅ Fixed S2 |
 | P1 | `GET /api/ats/waiting-queue` | Queue may expose cross-branch candidates | ✅ Fixed S2 |
-| P2 | `GET /api/ats/onboarding/requests` | HR views all branches | 🔴 Open |
-| P2 | `GET /api/ats/onboarding/pending-approval` | Branch head views all branches | 🔴 Open |
+| P2 | `GET /api/ats/onboarding/requests` | HR views all branches | ✅ Fixed S4 |
+| P2 | `GET /api/ats/onboarding/pending-approval` | Branch head views all branches | ✅ Fixed S4 |
 | P2 | Offer approve/reject | Must verify branch_head matches candidate branch | 🔴 Open |
 | P2 | `GET /api/ats/bgv/queue` | HR/recruiter views all-branch BGV queue | 🔴 Open |
 | P2 | `GET /api/ats/bgv/candidates/:id` | HR reads BGV details cross-branch | 🔴 Open |

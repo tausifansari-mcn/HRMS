@@ -179,8 +179,8 @@
 | 3 | P1 | Onboarding token expiry — timezone risk | `ats.onboarding.service.ts:84` | 🔴 Open |
 | 4 | P2 | Upload — no candidate ownership check | `ats.routes.ts:135` | 🔴 Open |
 | 5 | P2 | `convertCandidateToEmployee` — no actor scope | `ats.convert.service.ts` | ✅ Fixed S2 |
-| 6 | P2 | `listOnboardingRequests` — branchId undefined | `ats.onboarding.service.ts:137` | 🔴 Open |
-| 7 | P2 | `listPendingApprovals` — branchId undefined | `ats.onboarding.service.ts:280` | 🔴 Open |
+| 6 | P2 | `listOnboardingRequests` — branchId undefined | `ats.onboarding.service.ts` | ✅ Fixed S4 |
+| 7 | P2 | `listPendingApprovals` — branchId undefined | `ats.onboarding.service.ts` | ✅ Fixed S4 |
 | 8 | P3 | SMTP silently skips when env missing | `ats.email.service.ts:41` | 🔴 Open (dev ok) |
 | 9 | P3 | Duplicate `normalizeSourceChannel` | `ats.controller.ts:87`, `ats.service.ts:22` | 🔴 Open |
 | 10 | P3 | Frontend has no `test` script | `package.json` | 🔴 Open |
@@ -195,15 +195,16 @@
 
 ## 7. Exact Next Task
 
-**CI-001 is resolved.** Next priority is the first remaining P2 scope gap:
+**Next open P2 issue: offer approve/reject — no row-scope on branch_head**
 
-**Task**: Fix scope gap — `GET /api/ats/onboarding/requests` and `GET /api/ats/onboarding/pending-approval` receive `branchId = undefined` because the caller never passes it from `req.authUser`.
+**Task**: `POST /api/ats/onboarding/offers/:id/approve` and `.../reject` must verify the acting `branch_head`'s assigned branch matches `r.branch_id` on the offer's request record before approving/rejecting.
 
 **Approach**:
-1. In `ats.onboarding.routes.ts`, extract `branchId` from `req.authUser` (e.g. `req.authUser!.branchId`) and pass it to `listOnboardingRequests` / `listPendingApprovals`.
-2. For `branch_head` role the user's own `branchId` is the correct scope. For `admin` role, `branchId` may be `null` (all branches).
+1. In `approveOffer` / `rejectOffer` in `ats.onboarding.service.ts`, after fetching the offer row (which already joins `ats_onboarding_request r`), call `hasScopedAccess(approverId, ['branch_head'], { branchId: offer.applied_for_branch }, { allowAdminBypass: true })`.
+2. Throw 403 if not allowed.
+3. The offer row already contains `applied_for_branch` from the JOIN so no extra DB call is needed.
 
-**Files to Modify**: `backend/src/modules/ats/ats.onboarding.routes.ts`
+**Files to Modify**: `backend/src/modules/ats/ats.onboarding.service.ts` (approveOffer + rejectOffer)
 
 **Exact Next Command**:
 ```bash
@@ -229,9 +230,9 @@ npx vitest run tests/ats.routes.test.ts
 | 1.0.0 | 2026-06-10 | Audit Agent | Initial ATS E2E baseline |
 | 2.0.0 | 2026-06-10 | Audit Agent | Session 2: scope enforcement, new test failure documented |
 | 3.0.0 | 2026-06-10 | Audit Agent | Session 3: test fix applied, full journey map completed, CI-001 identified |
-| 4.0.0 | 2026-06-10 | Audit Agent | Session 4: CI-001 fixed — PII masked/hashed, migration 126 added |
+| 4.0.0 | 2026-06-10 | Audit Agent | Session 4: CI-001 fixed; requests+pending-approval scope fixed via buildScopeWhereClause |
 
 ---
 
-**AUDIT STATUS**: 🟡 CI-001 Fixed — P2 Scope Gaps Remain
-**NEXT ACTION**: Fix branchId=undefined in onboarding/requests + pending-approval endpoints
+**AUDIT STATUS**: 🟡 CI-001 + requests/pending-approval scope fixed — offer approve/reject row-scope remains
+**NEXT ACTION**: Add hasScopedAccess check to approveOffer + rejectOffer for branch_head row-scope

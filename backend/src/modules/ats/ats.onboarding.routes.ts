@@ -8,6 +8,7 @@ import {
   listPendingApprovals, approveOffer, rejectOffer,
 } from './ats.onboarding.service.js';
 import { calculateSalary } from './salary.calculator.js';
+import { buildScopeWhereClause } from '../../shared/scopeAccess.js';
 import { db } from '../../db/mysql.js';
 import { RowDataPacket } from 'mysql2';
 
@@ -51,9 +52,13 @@ router.get(
   requireAuth,
   requireRole('hr', 'recruiter', 'admin'),
   h(async (req: AuthenticatedRequest, res) => {
-    // branch_id filtering can be added once it is exposed on authUser;
-    // for now, HR admin sees all requests across branches.
-    const rows = await listOnboardingRequests(undefined);
+    const scopeFilter = await buildScopeWhereClause(
+      req.authUser!.id,
+      ['hr', 'recruiter'],
+      { branchId: 'r.branch_id' },
+      { allowAdminBypass: true },
+    );
+    const rows = await listOnboardingRequests(scopeFilter);
     res.json({ ok: true, data: rows });
   }),
 );
@@ -101,8 +106,14 @@ router.get(
   '/pending-approval',
   requireAuth,
   requireRole('branch_head', 'admin'),
-  h(async (_req: AuthenticatedRequest, res) => {
-    const rows = await listPendingApprovals(undefined);
+  h(async (req: AuthenticatedRequest, res) => {
+    const scopeFilter = await buildScopeWhereClause(
+      req.authUser!.id,
+      ['branch_head'],
+      { branchId: 'r.branch_id' },
+      { allowAdminBypass: true },
+    );
+    const rows = await listPendingApprovals(scopeFilter);
     res.json({ ok: true, data: rows });
   }),
 );
