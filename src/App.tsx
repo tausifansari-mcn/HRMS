@@ -56,6 +56,10 @@ const NativeBGVVerificationCenter   = lazy(() => import("./pages/NativeBGVVerifi
 const NativeATSDashboardReplica     = lazy(() => import("./pages/NativeATSDashboardReplica"));
 const NativeATSCandidateRegistration = lazy(() => import("./pages/NativeATSCandidateRegistration"));
 const NativeATSRecruiterDashboard   = lazy(() => import("./pages/NativeATSRecruiterDashboard"));
+
+// Interviewer
+const InterviewerDashboard          = lazy(() => import("./pages/InterviewerDashboard"));
+const InterviewSubmitResult         = lazy(() => import("./pages/InterviewSubmitResult"));
 const NativeATSOnboardingBridge     = lazy(() => import("./pages/NativeATSOnboardingBridge"));
 const NativeATSWaitingQueue         = lazy(() => import("./pages/NativeATSWaitingQueue"));
 const NativeATSCandidateMaster      = lazy(() => import("./pages/NativeATSCandidateMaster"));
@@ -254,6 +258,10 @@ const App = () => (
               <Route path="/ats/form-config" element={<ProtectedRoute><NativeATSFormConfig /></ProtectedRoute>} />
               <Route path="/ats/command-center" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativeATSFullParityCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/ats/onboarding-requests" element={<ProtectedRoute><NativeHROnboardingRequests /></ProtectedRoute>} />
+
+              {/* Interviewer Routes */}
+              <Route path="/interviewer/dashboard" element={<ProtectedRoute><Gate pageCode="ATS_INTERVIEW_QUEUE"><InterviewerDashboard /></Gate></ProtectedRoute>} />
+              <Route path="/interviewer/submit/:assignmentId" element={<ProtectedRoute><Gate pageCode="ATS_INTERVIEW_SUBMIT"><InterviewSubmitResult /></Gate></ProtectedRoute>} />
               <Route path="/ats/offer-approvals" element={<ProtectedRoute><NativeBranchHeadApproval /></ProtectedRoute>} />
               <Route path="/onboard-full" element={<CandidateOnboardingFullPage />} />
               <Route path="/ats/bgv" element={<ProtectedRoute><Gate pageCode="ATS_BGV"><NativeBGVVerificationCenter /></Gate></ProtectedRoute>} />
