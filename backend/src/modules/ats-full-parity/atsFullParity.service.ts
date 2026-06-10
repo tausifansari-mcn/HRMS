@@ -415,7 +415,11 @@ export const atsFullParityService = {
     if (filters.toDate) { conds.push("COALESCE(c.created_date, DATE(c.created_at)) <= ?"); params.push(filters.toDate); }
     if (filters.branch) { conds.push("COALESCE(c.branch_text, c.applied_for_branch) = ?"); params.push(filters.branch); }
     if (filters.process) { conds.push("COALESCE(c.process_text, c.applied_for_process) = ?"); params.push(filters.process); }
-    if (filters.recruiter) { conds.push("COALESCE(c.recruiter_assigned_name, c.recruiter_name) = ?"); params.push(filters.recruiter); }
+    if (filters.recruiter) {
+      // Support both FK (recommended) and legacy string match for backward compatibility
+      conds.push("(c.recruiter_id = ? OR COALESCE(c.recruiter_assigned_name, c.recruiter_name) = ?)");
+      params.push(filters.recruiter, filters.recruiter);
+    }
     if (filters.actorId && !filters.bypassScope) {
       const scope = await buildScopeWhereClause(
         filters.actorId,
@@ -511,8 +515,8 @@ export const atsFullParityService = {
     if ((existing as any[]).length) {
       const rec = (existing as any[])[0];
       await db.execute(
-        `UPDATE ats_candidate SET full_name=?, email=?, address=?, education=?, experience=?, gender=?, role_applied=?, branch_text=?, applied_for_branch=?, applied_for_process=?, recruiter_selected=?, recruiter_assigned_id=?, recruiter_assigned_name=?, recruiter_email=?, recruiter_mobile=?, q_token=COALESCE(q_token, ?), status=COALESCE(status, 'Waiting'), updated_at=NOW() WHERE id=?`,
-        [fullName || rec.full_name, input.email || input.Email || rec.email, input.address || input.Address || rec.address, input.education || input.Education || rec.education, input.experience || input.Experience || rec.experience, input.gender || input.Gender || rec.gender, role, branch, branch, role, input.recruiterSelected || input.RecruiterSelected || null, recruiter?.recruiter_code ?? null, recruiter?.name ?? null, recruiter?.email ?? null, recruiter?.mobile ?? null, qToken, rec.id]
+        `UPDATE ats_candidate SET full_name=?, email=?, address=?, education=?, experience=?, gender=?, role_applied=?, branch_text=?, applied_for_branch=?, applied_for_process=?, recruiter_selected=?, recruiter_id=?, recruiter_assigned_name=?, recruiter_email=?, recruiter_mobile=?, q_token=COALESCE(q_token, ?), status=COALESCE(status, 'Waiting'), updated_at=NOW() WHERE id=?`,
+        [fullName || rec.full_name, input.email || input.Email || rec.email, input.address || input.Address || rec.address, input.education || input.Education || rec.education, input.experience || input.Experience || rec.experience, input.gender || input.Gender || rec.gender, role, branch, branch, role, input.recruiterSelected || input.RecruiterSelected || null, recruiter?.id ?? null, recruiter?.name ?? null, recruiter?.email ?? null, recruiter?.mobile ?? null, qToken, rec.id]
       );
       await audit("INTAKE_DUPLICATE_UPDATED", rec.candidate_code || rec.id, `Existing active candidate updated by ${actor}`);
       return (await candidateSelect("c.id = ?", [rec.id]))[0];
@@ -521,12 +525,27 @@ export const atsFullParityService = {
     const code = `CND-${Date.now().toString(36).toUpperCase()}`;
     await db.execute(
       `INSERT INTO ats_candidate
-        (id, candidate_code, full_name, mobile, email, address, education, experience, gender, applied_for_branch, applied_for_process, branch_text, role_applied, recruiter_selected, q_token, created_date, created_time, sourcing_channel, recruiter_assigned_id, recruiter_assigned_name, recruiter_email, recruiter_mobile, status, current_stage, profile_status, created_by)
+        (id, candidate_code, full_name, mobile, email, address, education, experience, gender, applied_for_branch, applied_for_process, branch_text, role_applied, recruiter_selected, q_token, created_date, created_time, sourcing_channel, recruiter_id, recruiter_assigned_name, recruiter_email, recruiter_mobile, status, current_stage, profile_status, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), CURTIME(), 'Walk-In', ?, ?, ?, ?, 'Waiting', 'New', 'registered', NULL)`,
-      [id, code, fullName, mobile, input.email || input.Email || null, input.address || input.Address || null, input.education || input.Education || null, input.experience || input.Experience || null, input.gender || input.Gender || null, branch, role, branch, role, input.recruiterSelected || input.RecruiterSelected || null, qToken, recruiter?.recruiter_code ?? null, recruiter?.name ?? null, recruiter?.email ?? null, recruiter?.mobile ?? null]
+      [id, code, fullName, mobile, input.email || input.Email || null, input.address || input.Address || null, input.education || input.Education || null, input.experience || input.Experience || null, input.gender || input.Gender || null, branch, role, branch, role, input.recruiterSelected || input.RecruiterSelected || null, qToken, recruiter?.id ?? null, recruiter?.name ?? null, recruiter?.email ?? null, recruiter?.mobile ?? null]
     );
     if (recruiter?.id) {
-      await db.execute(`UPDATE ats_recruiter_roster SET assigned_today = assigned_today + 1, last_assigned_at = NOW() WHERE id = ?`, [recruiter.id]);
+      // Optimistic locking: only increment if under capacity
+      const [result] = await db.execute(
+        `UPDATE ats_recruiter_roster
+         SET assigned_today = assigned_today + 1,
+             last_assigned_at = NOW(),
+             capacity_lock_version = capacity_lock_version + 1
+         WHERE id = ? AND assigned_today < daily_capacity`,
+        [recruiter.id]
+      );
+
+      // If 0 rows affected, capacity was exceeded (race condition)
+      if ((result as any).affectedRows === 0) {
+        console.warn(`[Capacity] Recruiter ${recruiter.id} exceeded capacity during concurrent assignment`);
+        // Log to audit for monitoring
+        await audit("CAPACITY_EXCEEDED", code, `Recruiter ${recruiter.name} (${recruiter.id}) capacity exceeded - candidate ${code} assigned but counter not incremented`);
+      }
     }
     await audit("INTAKE_CREATED", code, `Recruiter=${recruiter?.name || "Unassigned"}; Branch=${branch}; Role=${role}`);
     return (await candidateSelect("c.id = ?", [id]))[0];
