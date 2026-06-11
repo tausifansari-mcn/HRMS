@@ -37,36 +37,43 @@ type MetricCardProps = {
   tone: "rose" | "emerald" | "blue" | "amber" | "violet" | "slate";
 };
 
+// SmartHR-inspired tone mapping with primary blue (#4361ee)
 const toneMap = {
   rose: {
-    card: "from-rose-50 to-white border-rose-100",
-    icon: "bg-rose-500 text-white shadow-rose-500/25",
-    text: "text-rose-600",
+    card: "from-red-50 to-white border-red-100",
+    icon: "bg-[#ef4444] text-white shadow-red-500/20",
+    text: "text-[#ef4444]",
+    bgLight: "bg-red-50",
   },
   emerald: {
-    card: "from-emerald-50 to-white border-emerald-100",
-    icon: "bg-emerald-500 text-white shadow-emerald-500/25",
-    text: "text-emerald-600",
+    card: "from-green-50 to-white border-green-100",
+    icon: "bg-[#10b981] text-white shadow-green-500/20",
+    text: "text-[#10b981]",
+    bgLight: "bg-green-50",
   },
   blue: {
     card: "from-blue-50 to-white border-blue-100",
-    icon: "bg-blue-500 text-white shadow-blue-500/25",
-    text: "text-blue-600",
+    icon: "bg-[#4361ee] text-white shadow-blue-500/20",
+    text: "text-[#4361ee]",
+    bgLight: "bg-blue-50",
   },
   amber: {
-    card: "from-amber-50 to-white border-amber-100",
-    icon: "bg-amber-500 text-white shadow-amber-500/25",
-    text: "text-amber-600",
+    card: "from-orange-50 to-white border-orange-100",
+    icon: "bg-[#f59e0b] text-white shadow-orange-500/20",
+    text: "text-[#f59e0b]",
+    bgLight: "bg-orange-50",
   },
   violet: {
-    card: "from-violet-50 to-white border-violet-100",
-    icon: "bg-violet-500 text-white shadow-violet-500/25",
-    text: "text-violet-600",
+    card: "from-purple-50 to-white border-purple-100",
+    icon: "bg-[#8b5cf6] text-white shadow-purple-500/20",
+    text: "text-[#8b5cf6]",
+    bgLight: "bg-purple-50",
   },
   slate: {
     card: "from-slate-50 to-white border-slate-100",
     icon: "bg-slate-900 text-white shadow-slate-900/20",
     text: "text-slate-700",
+    bgLight: "bg-slate-50",
   },
 };
 
@@ -74,21 +81,23 @@ function MetricCard({ label, value, helper, icon, tone }: MetricCardProps) {
   const style = toneMap[tone];
 
   return (
-    <Card className={`overflow-hidden border bg-gradient-to-br ${style.card} shadow-sm`}>
-      <CardContent className="p-5">
+    <Card className={`smarthr-stat-card overflow-hidden border bg-gradient-to-br ${style.card} transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer`}>
+      <CardContent className="p-6">
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+          <div className="flex-1">
+            <p className="smarthr-stat-label text-slate-500">
               {label}
             </p>
             <div className="mt-3 flex items-end gap-2">
-              <p className="text-3xl font-black tracking-tight text-slate-950">{value}</p>
-              <TrendingUp className={`mb-1 h-4 w-4 ${style.text}`} />
+              <p className="smarthr-stat-value" style={{ fontFamily: "'Fira Code', monospace" }}>
+                {value}
+              </p>
+              <TrendingUp className={`mb-1.5 h-4 w-4 ${style.text}`} />
             </div>
-            <p className="mt-2 text-sm font-semibold text-slate-500">{helper}</p>
+            <p className="mt-2 text-xs font-medium text-slate-600">{helper}</p>
           </div>
 
-          <div className={`flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg ${style.icon}`}>
+          <div className={`flex h-14 w-14 items-center justify-center rounded-xl shadow-md ${style.icon}`}>
             {icon}
           </div>
         </div>
