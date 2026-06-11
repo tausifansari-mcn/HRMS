@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { hrmsApi } from "@/lib/hrmsApi";
-import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
 type RequestStatus =
@@ -100,7 +99,6 @@ const emptyForm = {
 };
 
 export default function AttendanceRegularization() {
-  const { user } = useAuth();
   const [requests, setRequests] = useState<EmployeeRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -132,27 +130,9 @@ export default function AttendanceRegularization() {
   async function loadRequests() {
     setIsLoading(true);
     setActionError(null);
-
     try {
-      // employee_requests is an extended table not yet in the base schema.
-      // Attempt a generic query; if the table doesn't exist, fall back to an empty list.
-      const { data, error } = await ({ from: (t: string) => ({ select: (...a: any[]) => ({ eq: () => ({ order: () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), data: [], error: null }), in: () => ({ data: [], error: null }), is: () => ({ data: [], error: null }), data: [], error: null }), insert: (...a: any[]) => ({ select: () => ({ single: async () => ({ data: { id: "stub" }, error: null }) }), data: null, error: null }), update: (...a: any[]) => ({ eq: () => ({ select: () => ({ single: async () => ({ data: null, error: null }) }), data: null, error: null }) }), delete: () => ({ eq: () => ({ data: null, error: null }) }) }) })
-        .from("employee_requests")
-        .select(
-          `*,
-          regularization_request_detail(*),
-          request_approval_stage(*),
-          request_action_log(*)`
-        )
-        .eq("request_type_code", "REGULARIZATION")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        // Table may not exist yet — show empty state, not a crash
-        setRequests([]);
-      } else {
-        setRequests((data || []) as EmployeeRequest[]);
-      }
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>('/api/wfm/regularizations/mine');
+      setRequests((res.data ?? []) as EmployeeRequest[]);
     } catch {
       setRequests([]);
     } finally {
@@ -174,132 +154,33 @@ export default function AttendanceRegularization() {
       setIsSubmitting(false);
       return;
     }
-
     if (!form.requestedLoginTime && !form.requestedLogoutTime) {
       setActionError("Requested login or logout time is required.");
       setIsSubmitting(false);
       return;
     }
 
-    if (!form.reason.trim()) {
-      setActionError("Reason is required.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Try to insert into employee_requests; fall back gracefully if table doesn't exist yet.
     try {
-      const requestNo = `REG-${Date.now()}`;
-      const { error } = await ({ from: (t: string) => ({ select: (...a: any[]) => ({ eq: () => ({ order: () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), data: [], error: null }), in: () => ({ data: [], error: null }), is: () => ({ data: [], error: null }), data: [], error: null }), insert: (...a: any[]) => ({ select: () => ({ single: async () => ({ data: { id: "stub" }, error: null }) }), data: null, error: null }), update: (...a: any[]) => ({ eq: () => ({ select: () => ({ single: async () => ({ data: null, error: null }) }), data: null, error: null }) }), delete: () => ({ eq: () => ({ data: null, error: null }) }) }) })
-        .from("employee_requests")
-        .insert({
-          request_no: requestNo,
-          employee_id: null,
-          submitted_by: user?.id || null,
-          request_type_code: "REGULARIZATION",
-          title: `Regularization for ${form.attendanceDate}`,
-          reason: form.reason.trim(),
-          current_status: "submitted",
-          current_stage_no: 1,
-          current_stage_name: "Manager Review",
-          current_owner_role: "manager",
-          source_module: "attendance",
-          source_date: form.attendanceDate,
-          payroll_impact_status: "not_required",
-          submitted_at: new Date().toISOString(),
-        });
-
-      if (error) {
-        setActionError(
-          error.code === "42P01"
-            ? "Regularization feature coming soon — database tables not yet provisioned."
-            : error.message
-        );
-        setIsSubmitting(false);
-        return;
-      }
-    } catch {
-      setActionError("Regularization feature coming soon — database tables not yet provisioned.");
+      await hrmsApi.post('/api/wfm/regularizations', {
+        sessionDate: form.attendanceDate,
+        reason: (form.reason ?? '').trim() || `Login: ${form.requestedLoginTime ?? ''} Logout: ${form.requestedLogoutTime ?? ''}`.trim(),
+        supportingNote: (form.reason ?? '').trim() || null,
+      });
+      setForm(emptyForm);
+      setActionMessage("Regularization request submitted successfully.");
+      await loadRequests();
+    } catch (err: any) {
+      setActionError(err?.response?.data?.error ?? err?.message ?? "Failed to submit regularization.");
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    setForm(emptyForm);
-    setActionMessage("Attendance regularization request submitted successfully.");
-    setIsSubmitting(false);
-    await loadRequests();
   }
 
-  async function approveRequest(request: EmployeeRequest) {
-    setActionMessage(null);
-    setActionError(null);
-
-    try {
-      const nextStatus: RequestStatus =
-        request.current_status === "pending_manager" ? "pending_admin" : "approved";
-
-      const { error } = await ({ from: (t: string) => ({ select: (...a: any[]) => ({ eq: () => ({ order: () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), data: [], error: null }), in: () => ({ data: [], error: null }), is: () => ({ data: [], error: null }), data: [], error: null }), insert: (...a: any[]) => ({ select: () => ({ single: async () => ({ data: { id: "stub" }, error: null }) }), data: null, error: null }), update: (...a: any[]) => ({ eq: () => ({ select: () => ({ single: async () => ({ data: null, error: null }) }), data: null, error: null }) }), delete: () => ({ eq: () => ({ data: null, error: null }) }) }) })
-        .from("employee_requests")
-        .update({
-          current_status: nextStatus,
-          final_decision_at: nextStatus === "approved" ? new Date().toISOString() : null,
-        })
-        .eq("id", request.id);
-
-      if (error) {
-        setActionError(
-          error.code === "42P01"
-            ? "Regularization feature coming soon — database tables not yet provisioned."
-            : error.message
-        );
-        return;
-      }
-    } catch {
-      setActionError("Regularization feature coming soon — database tables not yet provisioned.");
-      return;
-    }
-
-    setActionMessage("Request approved successfully.");
-    await loadRequests();
+  async function approveRequest(_request: EmployeeRequest) {
+    setActionError("Only managers can approve regularization requests.");
   }
-
   async function confirmRejectRequest() {
-    if (!rejectRequest) return;
-
-    setActionMessage(null);
-    setActionError(null);
-
-    if (!rejectRemarks.trim()) {
-      setActionError("Rejection remarks are mandatory.");
-      return;
-    }
-
-    try {
-      const { error } = await ({ from: (t: string) => ({ select: (...a: any[]) => ({ eq: () => ({ order: () => ({ data: [], error: null }), maybeSingle: async () => ({ data: null, error: null }), data: [], error: null }), in: () => ({ data: [], error: null }), is: () => ({ data: [], error: null }), data: [], error: null }), insert: (...a: any[]) => ({ select: () => ({ single: async () => ({ data: { id: "stub" }, error: null }) }), data: null, error: null }), update: (...a: any[]) => ({ eq: () => ({ select: () => ({ single: async () => ({ data: null, error: null }) }), data: null, error: null }) }), delete: () => ({ eq: () => ({ data: null, error: null }) }) }) })
-        .from("employee_requests")
-        .update({
-          current_status: "rejected",
-          final_decision_at: new Date().toISOString(),
-        })
-        .eq("id", rejectRequest.id);
-
-      if (error) {
-        setActionError(
-          error.code === "42P01"
-            ? "Regularization feature coming soon — database tables not yet provisioned."
-            : error.message
-        );
-        return;
-      }
-    } catch {
-      setActionError("Regularization feature coming soon — database tables not yet provisioned.");
-      return;
-    }
-
-    setActionMessage("Request rejected successfully.");
-    setRejectRequest(null);
-    setRejectRemarks("");
-    await loadRequests();
+    setActionError("Only managers can reject regularization requests.");
   }
 
   function getDetail(request: EmployeeRequest) {

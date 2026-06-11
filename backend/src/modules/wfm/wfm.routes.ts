@@ -38,6 +38,13 @@ wfmRouter.post("/sessions/break",     h(wfmController.logBreak.bind(wfmControlle
 
 // Regularization
 wfmRouter.post("/regularizations",              h(wfmController.submitRegularization.bind(wfmController)));  // Employee can submit own
+// GET /api/wfm/regularizations/mine — employee sees own regularization requests
+wfmRouter.get("/regularizations/mine", h(async (req: any, res: any) => {
+  const emp = await getEmployeeForUser(req.authUser.id);
+  if (!emp) return res.status(403).json({ success: false, message: "No employee record" });
+  const data = await wfmService.listRegularizations({ employeeId: emp.id });
+  return res.json({ success: true, data });
+}));
 wfmRouter.get("/regularizations",               requireRole("admin", "wfm", "manager"), h(wfmController.listRegularizations.bind(wfmController)));
 wfmRouter.patch("/regularizations/:id/review",  requireRole("admin", "wfm", "manager"), h(wfmController.reviewRegularization.bind(wfmController)));
 
