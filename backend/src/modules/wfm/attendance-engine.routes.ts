@@ -102,10 +102,11 @@ router.get('/daily', h(async (req: AuthenticatedRequest, res: Response) => {
     toDate:           req.query.toDate as string | undefined,
     attendanceStatus: req.query.attendanceStatus as string | undefined,
     page:             req.query.page ? Number(req.query.page) : undefined,
-    limit:            req.query.limit ? Number(req.query.limit) : undefined,
+    limit:            req.query.limit ? Math.min(Number(req.query.limit), 200) : undefined,
   };
   if (isPrivileged) {
-    filters.employeeId = req.query.employeeId as string | undefined;
+    const qEmpId = req.query.employeeId as string | undefined;
+    filters.employeeId = qEmpId && /^[0-9a-f-]{36}$/i.test(qEmpId) ? qEmpId : undefined;
   } else {
     const emp = await getEmployeeForUser(userId);
     if (!emp) return res.status(403).json({ success: false, error: 'No employee record' });
@@ -192,15 +193,16 @@ router.post('/clock-in', h(async (req: AuthenticatedRequest, res: Response) => {
   const employee_id = emp.id;
 
   const { work_mode, latitude, longitude, location_name } = req.body;
-  const today = new Date().toISOString().slice(0, 10);
-  const now = new Date().toISOString();
+  const nowDate = new Date();
+  const today = nowDate.toISOString().slice(0, 10);
+  const now   = nowDate.toISOString();
   const id = randomUUID();
   const [existing] = await db.execute<RowDataPacket[]>(
     'SELECT id FROM attendance_daily_record WHERE employee_id = ? AND record_date = ? LIMIT 1',
     [employee_id, today]
   );
   if ((existing as RowDataPacket[]).length > 0) {
-    return res.status(409).json({ error: 'Already clocked in today' });
+    return res.status(409).json({ success: false, error: 'Already clocked in today' });
   }
   await db.execute(
     `INSERT INTO attendance_daily_record
@@ -218,7 +220,7 @@ router.post('/clock-in', h(async (req: AuthenticatedRequest, res: Response) => {
 router.post('/clock-out', h(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.authUser!.id;
   const { record_id, latitude, longitude, location_name } = req.body;
-  if (!record_id) return res.status(400).json({ error: 'record_id required' });
+  if (!record_id) return res.status(400).json({ success: false, error: 'record_id required' });
 
   const emp = await getEmployeeForUser(userId);
   if (!emp) return res.status(403).json({ success: false, error: 'No employee record' });
