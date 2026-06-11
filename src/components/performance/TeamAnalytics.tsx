@@ -217,11 +217,12 @@ export function TeamAnalytics({ isManager, managerId }: TeamAnalyticsProps) {
     on_hold: "On Hold",
   };
 
+  // SmartHR color palette for status visualization
   const statusColors: Record<string, string> = {
-    not_started: "hsl(var(--muted-foreground))",
-    in_progress: "hsl(var(--primary))",
-    completed: "hsl(142 76% 36%)",
-    on_hold: "hsl(38 92% 50%)",
+    not_started: "hsl(215 16% 47%)",      // Gray (neutral)
+    in_progress: "hsl(223 81% 61%)",      // SmartHR Blue (#4361ee)
+    completed: "hsl(142 76% 36%)",        // SmartHR Green (#10b981)
+    on_hold: "hsl(38 92% 50%)",           // SmartHR Orange (#f59e0b)
   };
 
   // Export functions

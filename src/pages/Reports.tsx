@@ -237,8 +237,8 @@ const Reports = () => {
                           }}
                         />
                         <Legend />
-                        <Bar dataKey="hires" name="New Hires" fill="hsl(142, 76%, 36%)" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="terminations" name="Terminations" fill="hsl(0, 84%, 60%)" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="hires" name="New Hires" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="terminations" name="Terminations" fill="hsl(var(--chart-8))" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
