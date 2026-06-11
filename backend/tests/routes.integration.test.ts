@@ -81,7 +81,7 @@ describe("GET /api/health", () => {
   it("returns db error when ping fails", async () => {
     mockPingDb.mockRejectedValueOnce(new Error("connection refused"));
     const res = await request(app).get("/api/health");
-    expect(res.status).toBe(200); // health endpoint stays up
+    expect(res.status).toBe(503); // health endpoint returns 503 when db is down
     expect(res.body.db).toBe("error");
   });
 });

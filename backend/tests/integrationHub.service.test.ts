@@ -175,6 +175,7 @@ describe("integrationService.confirmFieldMap", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("upserts field map and returns it", async () => {
+    mockExecute.mockResolvedValueOnce([[fakeConfig], []]); // getByKey (confirmFieldMap calls this.getByKey first)
     mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }, []]); // UPSERT
     mockExecute.mockResolvedValueOnce([[fakeFieldMap], []]); // re-fetch
     const result = await integrationService.confirmFieldMap(
@@ -215,6 +216,7 @@ describe("integrationService.createRun", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("inserts a new run and returns it", async () => {
+    mockExecute.mockResolvedValueOnce([[fakeConfig], []]); // getByKey (createRun checks active_status)
     mockExecute.mockResolvedValueOnce([{ affectedRows: 1 }, []]); // INSERT
     mockExecute.mockResolvedValueOnce([[fakeRun], []]); // re-fetch by id
     const result = await integrationService.createRun("dialer_1", "manual", "user-1");
