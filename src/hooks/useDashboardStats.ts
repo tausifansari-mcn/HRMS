@@ -91,10 +91,10 @@ export function useDashboardStats() {
         myAssetsCount = (assetsRes.data ?? []).length;
       } catch { /* non-fatal */ }
 
-      // Pending leave approvals (manager's direct reports)
+      // Pending leave approvals (scoped to the logged-in employee)
       let pendingApprovals = 0;
       try {
-        const pendingRes = await hrmsApi.get<{ data: any[] }>("/api/leave/requests?status=pending");
+        const pendingRes = await hrmsApi.get<{ data: any[] }>(`/api/leave/requests?status=pending&employeeId=${myEmployee.id}`);
         pendingApprovals = (pendingRes.data ?? []).length;
       } catch { /* non-fatal */ }
 
