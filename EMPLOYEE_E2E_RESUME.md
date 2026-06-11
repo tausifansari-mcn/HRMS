@@ -316,6 +316,11 @@ Playwright: No employee.smoke.ts exists. Admin/manager/team-leader only.
 | 5a9ba6a | fix(regularization): replace dead Supabase stub with hrmsApi REST; add GET /mine (P1) |
 | e75644c | fix(leave+dashboard): restore balance on rejection; validate totalDays; scope pending (P1) |
 | c6c02ee | fix(profile): call /me for self-view; add PATCH /me self-edit with field whitelist (P1) |
+| aad449e | docs(resume): first resume update |
+| ad391e2 | test(leave+customization): add accessGuard mock + INTERNAL_DEMO_BYPASS fix (21 tests) |
+| efd92d0 | test(integration): fix db mock order + health status assertion (4 tests) |
+| 7f2d66e | test(perf-feedback): token-aware requireRole mock (6 tests) |
+| a79560a | fix(security): rate limiting on auth; block admin routes; password min 8 chars (P1) |
 
 ### Final Test Counts (after all fixes)
 | Test | Result |
@@ -324,32 +329,34 @@ Playwright: No employee.smoke.ts exists. Admin/manager/team-leader only.
 | Frontend build | Passed |
 | Frontend lint | 1343 errors (pre-existing, no regression) |
 | Backend typecheck | Passed (0 new errors) |
-| Backend tests | **1195 passed, 31 failed, 56 skipped** (79 test files) |
+| Backend tests | **1226 passed, 0 failed, 56 skipped** (79 test files) |
 | Backend build | Passed |
 | Playwright Employee E2E | Not created |
 
-**31 remaining failures** are all pre-existing in these 5 areas:
-- `customization-api.test.ts` — 401 vs 403 discrepancy (17 tests)
-- `performance-feedback.integration.test.ts` — test fixture gaps from requireRole addition (6 tests)
-- `leave.routes.test.ts` — auth mock mismatch in test setup (4 tests)
-- `integrationHub.service.test.ts` — DB stub issues (3 tests)
-- `routes.integration.test.ts` — health check mock (1 test)
+**0 remaining failures.** All 31 were test fixture gaps (not real bugs) — fixed in second pass:
+- `customization-api.test.ts` — added `INTERNAL_DEMO_BYPASS=true` in beforeAll (17 tests)
+- `performance-feedback.integration.test.ts` — token-aware requireRole mock (6 tests)
+- `leave.routes.test.ts` — added missing `accessGuard.js` mock (4 tests)
+- `integrationHub.service.test.ts` — fixed db mock call order (3 tests)
+- `routes.integration.test.ts` — corrected health endpoint status assertion (1 test)
 
 ### Attendance Note
 Attendance payroll is driven by **Biometric** (support staff) and **APR report** (analysts).
 Clock-in/clock-out is informational only — no payroll impact. IDOR fixes in the clock-in/out
 routes remain (security hardening) but those endpoints do not affect payroll calculations.
 
-## Current Test Results
+## Current Test Results (final — 2026-06-11)
 | Test | Result |
 |---|---|
 | Frontend typecheck | Passed |
 | Frontend build | Passed |
-| Frontend lint | 1343 errors (pre-existing) |
-| Backend typecheck | Passed |
-| Backend tests | **1195 passed, 31 failed, 56 skipped** |
+| Frontend lint | 1343 errors (pre-existing, no regression) |
+| Backend typecheck | Passed (0 new errors) |
+| Backend tests | **1226 passed, 0 failed, 56 skipped** |
 | Backend build | Passed |
 | Playwright Employee E2E | Not created |
+
+**56 skipped** = intentional: 20 live-DB client portal tests, 30 live-DB roster/communication integration tests, 3 manager-scope-not-yet-enforced tests, 1 tombstoned Supabase-reconciliation test, 2 test files skipped at file level.
 
 ## Important Decisions
 1. MySQL RBAC is authoritative; Supabase is tombstoned (`supabaseAdmin.ts` returns no-ops).
@@ -403,10 +410,17 @@ All P0 and critical P1 employee journey fixes are complete as of 2026-06-11.
 6. Create Playwright employee E2E smoke test (`e2e/employee.smoke.ts`)
 
 **Remaining P1 items NOT yet fixed:**
-- P1-13: /super-admin/page-access reachable by any employee
-- P1-14: /migration-console reachable by any employee
 - P1-15: Frontend demo — stale session accepted on reload
-- P1-16: No rate limiting on auth endpoints
-- P1-17: Password length mismatch (frontend 8 chars, backend 6 chars)
 - P1-18: No future-date guard on regularization requests
-- P1-19: /communication/dispatch reachable by any employee
+
+**Remaining P2 items NOT yet fixed:**
+- P2-1: No employee "My Payslips" self-service page
+- P2-2: No PDF payslip download
+- P2-3: No employee "My Assets" UI (backend supports it)
+
+**P1 items FIXED in this session:**
+- ✅ P1-13: /super-admin/page-access — now requires admin role
+- ✅ P1-14: /migration-console — now requires admin role  
+- ✅ P1-16: Rate limiting added to login + forgot-password (10 req/15 min)
+- ✅ P1-17: Password minimum synced to 8 chars on both frontend and backend
+- ✅ P1-19: /communication/dispatch — now requires admin or hr role
