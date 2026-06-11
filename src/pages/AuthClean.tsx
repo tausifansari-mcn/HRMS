@@ -62,8 +62,8 @@ export default function AuthClean() {
           <Card className="overflow-hidden rounded-[2rem] border border-white bg-white/95 shadow-2xl shadow-slate-200/80 backdrop-blur">
             <CardHeader className="space-y-5 px-7 pb-4 pt-8 text-center">
               <div className="mx-auto w-full max-w-[315px] rounded-2xl border border-white/10 bg-white/[0.04] p-3 shadow-xl shadow-slate-950/10">
-                <div className="flex h-[82px] items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 px-4 py-3 shadow-lg">
-                  <img src={companyLogo} alt="Mas Callnet Logo" className="block h-16 w-full max-w-[215px] object-contain drop-shadow-md" />
+                <div className="flex h-[78px] items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 px-3 py-2 shadow-lg">
+                  <img src={companyLogo} alt="MAS Callnet" className="block h-14 w-full max-w-[190px] object-contain drop-shadow-md" />
                 </div>
               </div>
               <div>
