@@ -1,8 +1,17 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { authService } from "./auth.service.js";
 import { requireAuth } from "../../middleware/authMiddleware.js";
 import { emailService } from "../communication/email.service.js";
 import { env } from "../../config/env.js";
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 attempts per window per IP
+  message: { success: false, message: "Too many attempts, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const router = Router();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -33,9 +42,9 @@ function resetEmailText(link: string) {
   return `Reset your MAS Callnet HRMS password\n\nUse this secure link to reset your password: ${link}\n\nThis link is valid for 1 hour. If you did not request this, ignore this email.`;
 }
 
-// POST /api/auth/login — public
+// POST /api/auth/login — public (rate limited)
 // Accepts: { identifier: "email or employee code", password } OR legacy { email, password }
-router.post("/login", h(async (req: any, res: any) => {
+router.post("/login", authLimiter, h(async (req: any, res: any) => {
   const identifier = req.body.identifier || req.body.email;
   const { password } = req.body;
   if (!identifier || !password) return res.status(400).json({ error: "identifier (email or employee code) and password required" });
@@ -51,8 +60,8 @@ router.post("/login", h(async (req: any, res: any) => {
 // POST /api/auth/register — public
 router.post("/register", h(async (req: any, res: any) => {
   const { email, password, onboardingToken } = req.body;
-  if (!email || !password || password.length < 6) {
-    return res.status(400).json({ error: "email and password (min 6 chars) required" });
+  if (!email || !password || password.length < 8) {
+    return res.status(400).json({ error: "email and password (min 8 chars) required" });
   }
 
   try {
@@ -90,8 +99,8 @@ router.post("/logout", requireAuth, h(async (req: any, res: any) => {
   return res.json({ success: true });
 }));
 
-// POST /api/auth/forgot-password — public
-router.post("/forgot-password", h(async (req: any, res: any) => {
+// POST /api/auth/forgot-password — public (rate limited)
+router.post("/forgot-password", authLimiter, h(async (req: any, res: any) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "email required" });
 
@@ -126,7 +135,7 @@ router.post("/forgot-password", h(async (req: any, res: any) => {
 router.post("/reset-password", h(async (req: any, res: any) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ error: "token and password required" });
-  if (password.length < 6) return res.status(400).json({ error: "password must be at least 6 characters" });
+  if (password.length < 8) return res.status(400).json({ error: "password must be at least 8 characters" });
 
   try {
     await authService.resetPassword(token, password);

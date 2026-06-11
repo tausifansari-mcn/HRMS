@@ -278,7 +278,7 @@ const App = () => (
               {/* Performance */}
               <Route path="/performance/command-center" element={<ProtectedRoute><Gate pageCode="WORKFORCE_COMMAND_CENTER"><UnifiedPerformanceCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/settings/access-control" element={<ProtectedRoute><Gate pageCode="ACCESS_CONTROL"><UnifiedAccessControl /></Gate></ProtectedRoute>} />
-              <Route path="/super-admin/page-access" element={<ProtectedRoute><SuperAdminAccessControl /></ProtectedRoute>} />
+              <Route path="/super-admin/page-access" element={<ProtectedRoute roles={['admin']}><SuperAdminAccessControl /></ProtectedRoute>} />
               <Route path="/settings/call-centre-config" element={<ProtectedRoute><NativeCallCentreConfig /></ProtectedRoute>} />
 
               {/* Performance Feedback */}
@@ -348,7 +348,7 @@ const App = () => (
 
               {/* Communication */}
               <Route path="/communication/templates" element={<ProtectedRoute><NativeTemplateManager /></ProtectedRoute>} />
-              <Route path="/communication/dispatch"  element={<ProtectedRoute><NativeDispatchCenter /></ProtectedRoute>} />
+              <Route path="/communication/dispatch"  element={<ProtectedRoute roles={['admin', 'hr']}><NativeDispatchCenter /></ProtectedRoute>} />
               <Route path="/communication/history"   element={<ProtectedRoute><NativeDispatchHistory /></ProtectedRoute>} />
               <Route path="/communication/preferences" element={<ProtectedRoute><NativeNotificationPreferences /></ProtectedRoute>} />
               <Route
@@ -363,7 +363,7 @@ const App = () => (
               />
 
               {/* System */}
-              <Route path="/migration-console" element={<ProtectedRoute><NativeMigrationConsole /></ProtectedRoute>} />
+              <Route path="/migration-console" element={<ProtectedRoute roles={['admin']}><NativeMigrationConsole /></ProtectedRoute>} />
               <Route path="/exit-management" element={<ProtectedRoute><NativeExitManagement /></ProtectedRoute>} />
               <Route path="/exit/command-center" element={<ProtectedRoute><Gate pageCode="EXIT_COMMAND_CENTER"><NativeExitCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/kpi-config" element={<ProtectedRoute><Gate pageCode="KPI_CONFIG"><NativeKPIConfiguration /></Gate></ProtectedRoute>} />
