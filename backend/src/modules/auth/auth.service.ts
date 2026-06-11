@@ -285,15 +285,10 @@ export const authService = {
 
   async forgotPassword(email: string): Promise<string | null> {
     const normalizedEmail = normalizeEmail(email);
-    const [rows] = await db.execute<RowDataPacket[]>(
-      'SELECT id FROM auth_user WHERE LOWER(email) = LOWER(?) AND is_blocked = 0 LIMIT 1',
-      [normalizedEmail]
-    );
-    if (rows[0]) return this.createPasswordResetTokenByUserId(rows[0].id, 1);
 
-    // First-time employee access fallback. If launch bootstrap has not yet created
-    // auth_user, prepare an active employee account from employees.email/official_email.
-    const [employeeRows] = await db.execute<RowDataPacket[]>(
+    // Always verify the employee is active before issuing a reset token —
+    // terminated employees must not be able to reset their password.
+    const [empRows] = await db.execute<RowDataPacket[]>(
       `SELECT id, email, user_id, active_status
          FROM employees
         WHERE active_status = 1
@@ -301,9 +296,19 @@ export const authService = {
         LIMIT 1`,
       [normalizedEmail]
     );
-    const employee = employeeRows[0];
+    const employee = empRows[0];
     if (!employee) return null; // silent — don't leak whether email exists
 
+    // If auth_user already linked and not blocked, issue token directly
+    if (employee.user_id) {
+      const [authRows] = await db.execute<RowDataPacket[]>(
+        'SELECT id FROM auth_user WHERE id = ? AND is_blocked = 0 LIMIT 1',
+        [employee.user_id]
+      );
+      if (authRows[0]) return this.createPasswordResetTokenByUserId(authRows[0].id, 1);
+    }
+
+    // First-time access: auto-create auth_user so employee can set their password
     const userId = await createOrRepairEmployeeAuthUser(employee, normalizedEmail);
     if (!userId) return null;
     return this.createPasswordResetTokenByUserId(userId, 1);

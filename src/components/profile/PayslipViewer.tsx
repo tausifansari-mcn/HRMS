@@ -94,25 +94,32 @@ export function PayslipViewer({ employeeId, employeeName, employeeCode }: Paysli
   const { data: payrollRecords, isLoading } = useQuery({
     queryKey: ["my-payslips", employeeId, selectedYear],
     queryFn: async () => {
-      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/payroll/structures"); return { data: res.data ?? [], error: null }; })();
-
-      if (error) throw error;
-      return data;
+      if (!employeeId) return [];
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>(
+        `/api/payroll/payslip/my?year=${selectedYear}`
+      );
+      return res.data ?? [];
     },
     enabled: !!employeeId,
   });
 
-  // Fetch salary structure for detailed breakdown
-  const { data: salaryStructure } = useQuery({
-    queryKey: ["my-salary-structure", employeeId],
-    queryFn: async () => {
-      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/payroll/structures"); return { data: res.data ?? [], error: null }; })();
-
-      if (error) throw error;
-      return data as SalaryStructure | null;
-    },
-    enabled: !!employeeId,
-  });
+  // Derive salary structure from the most recent payslip record
+  const salaryStructure: SalaryStructure | null = payrollRecords && payrollRecords.length > 0
+    ? {
+        basic_salary: Number(payrollRecords[0].basic ?? 0),
+        hra: payrollRecords[0].hra != null ? Number(payrollRecords[0].hra) : null,
+        transport_allowance: null,
+        medical_allowance: null,
+        other_allowances: payrollRecords[0].special_allowance != null ? Number(payrollRecords[0].special_allowance) : null,
+        tax_deduction: payrollRecords[0].tds != null ? Number(payrollRecords[0].tds) : null,
+        other_deductions: (() => {
+          const pf = Number(payrollRecords[0].pf_employee ?? 0);
+          const esic = Number(payrollRecords[0].esic_employee ?? 0);
+          const pt = Number(payrollRecords[0].professional_tax ?? 0);
+          return (pf + esic + pt) > 0 ? (pf + esic + pt) : null;
+        })(),
+      }
+    : null;
 
   const getAllowanceBreakdown = () => {
     if (!salaryStructure) return [];
@@ -132,21 +139,23 @@ export function PayslipViewer({ employeeId, employeeName, employeeCode }: Paysli
     return items;
   };
 
-  const handleDownloadPayslip = (record: typeof payrollRecords extends (infer T)[] ? T : never) => {
-    const monthName = MONTHS.find((m) => m.value === String(record.month))?.label || "";
+  const handleDownloadPayslip = (record: any) => {
+    // run_month is "YYYY-MM" format
+    const [recYear, recMonthNum] = (record.run_month || "").split("-");
+    const monthName = MONTHS.find((m) => m.value === String(Number(recMonthNum)))?.label || record.run_month || "";
 
     downloadPayslip({
       employeeName,
       employeeCode,
-      employeeEmail: "", // Not available in this context
+      employeeEmail: "",
       monthName,
-      year: record.year,
-      status: record.status,
+      year: recYear || String(new Date().getFullYear()),
+      status: record.run_status || record.status || "processed",
       paidAt: record.paid_at ? new Date(record.paid_at).toLocaleDateString() : undefined,
-      basicSalary: record.basic_salary,
-      allowances: Number(record.total_allowances) || 0,
+      basicSalary: Number(record.basic ?? record.basic_salary ?? 0),
+      allowances: Number(record.gross_salary ?? 0) - Number(record.basic ?? record.basic_salary ?? 0),
       deductions: Number(record.total_deductions) || 0,
-      netSalary: record.net_salary,
+      netSalary: Number(record.net_salary) || 0,
       salaryBreakdown: salaryStructure ? {
         hra: salaryStructure.hra ?? undefined,
         transport_allowance: salaryStructure.transport_allowance ?? undefined,
@@ -309,7 +318,10 @@ export function PayslipViewer({ employeeId, employeeName, employeeCode }: Paysli
                 </TableHeader>
                 <TableBody>
                   {payrollRecords.map((record) => {
-                    const monthName = MONTHS.find((m) => m.value === String(record.month))?.label || "";
+                    const [, recMonNum] = (record.run_month || "").split("-");
+                    const monthName = MONTHS.find((m) => m.value === String(Number(recMonNum)))?.label || record.run_month || "";
+                    const basicSal = Number(record.basic ?? record.basic_salary ?? 0);
+                    const totalAllowances = Number(record.gross_salary ?? 0) - basicSal;
                     const isExpanded = expandedRecord === record.id;
                     return (
                       <>
@@ -318,15 +330,15 @@ export function PayslipViewer({ employeeId, employeeName, employeeCode }: Paysli
                             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </TableCell>
                           <TableCell className="font-medium">{monthName}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(record.basic_salary)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(basicSal)}</TableCell>
                           <TableCell className="text-right text-green-600">
-                            +{formatCurrency(Number(record.total_allowances) || 0)}
+                            +{formatCurrency(totalAllowances > 0 ? totalAllowances : 0)}
                           </TableCell>
                           <TableCell className="text-right text-red-600">
                             -{formatCurrency(Number(record.total_deductions) || 0)}
                           </TableCell>
-                          <TableCell className="text-right font-semibold">{formatCurrency(record.net_salary)}</TableCell>
-                          <TableCell>{getStatusBadge(record.status)}</TableCell>
+                          <TableCell className="text-right font-semibold">{formatCurrency(Number(record.net_salary) || 0)}</TableCell>
+                          <TableCell>{getStatusBadge(record.run_status || record.status || "processed")}</TableCell>
                           <TableCell className="text-right">
                             <Button
                               variant="ghost"
@@ -335,7 +347,7 @@ export function PayslipViewer({ employeeId, employeeName, employeeCode }: Paysli
                                 e.stopPropagation();
                                 handleDownloadPayslip(record);
                               }}
-                              disabled={record.status === "draft"}
+                              disabled={record.run_status === "draft"}
                             >
                               <Download className="h-4 w-4 mr-1" />
                               PDF
@@ -353,19 +365,18 @@ export function PayslipViewer({ employeeId, employeeName, employeeCode }: Paysli
                                   <div className="space-y-1 text-sm">
                                     <div className="flex justify-between">
                                       <span className="text-muted-foreground">Basic Salary</span>
-                                      <span>{formatCurrency(record.basic_salary)}</span>
+                                      <span>{formatCurrency(Number(record.basic ?? record.basic_salary ?? 0))}</span>
                                     </div>
-                                    {allowanceBreakdown.length > 0 ? (
-                                      allowanceBreakdown.map((item) => (
-                                        <div key={item.label} className="flex justify-between">
-                                          <span className="text-muted-foreground">{item.label}</span>
-                                          <span className="text-green-600">+{formatCurrency(item.amount)}</span>
-                                        </div>
-                                      ))
-                                    ) : (
+                                    {record.hra > 0 && (
                                       <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Total Allowances</span>
-                                        <span className="text-green-600">+{formatCurrency(Number(record.total_allowances) || 0)}</span>
+                                        <span className="text-muted-foreground">HRA</span>
+                                        <span className="text-green-600">+{formatCurrency(Number(record.hra))}</span>
+                                      </div>
+                                    )}
+                                    {record.special_allowance > 0 && (
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Special Allowance</span>
+                                        <span className="text-green-600">+{formatCurrency(Number(record.special_allowance))}</span>
                                       </div>
                                     )}
                                   </div>
@@ -375,18 +386,32 @@ export function PayslipViewer({ employeeId, employeeName, employeeCode }: Paysli
                                     <Minus className="h-3 w-3" /> Deductions Breakdown
                                   </p>
                                   <div className="space-y-1 text-sm">
-                                    {deductionBreakdown.length > 0 ? (
-                                      deductionBreakdown.map((item) => (
-                                        <div key={item.label} className="flex justify-between">
-                                          <span className="text-muted-foreground">{item.label}</span>
-                                          <span className="text-red-600">-{formatCurrency(item.amount)}</span>
-                                        </div>
-                                      ))
-                                    ) : (
+                                    {record.pf_employee > 0 && (
                                       <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Total Deductions</span>
-                                        <span className="text-red-600">-{formatCurrency(Number(record.total_deductions) || 0)}</span>
+                                        <span className="text-muted-foreground">PF (Employee)</span>
+                                        <span className="text-red-600">-{formatCurrency(Number(record.pf_employee))}</span>
                                       </div>
+                                    )}
+                                    {record.esic_employee > 0 && (
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">ESIC</span>
+                                        <span className="text-red-600">-{formatCurrency(Number(record.esic_employee))}</span>
+                                      </div>
+                                    )}
+                                    {record.professional_tax > 0 && (
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Professional Tax</span>
+                                        <span className="text-red-600">-{formatCurrency(Number(record.professional_tax))}</span>
+                                      </div>
+                                    )}
+                                    {record.tds > 0 && (
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">TDS</span>
+                                        <span className="text-red-600">-{formatCurrency(Number(record.tds))}</span>
+                                      </div>
+                                    )}
+                                    {Number(record.total_deductions) === 0 && (
+                                      <p className="text-muted-foreground text-sm">No deductions</p>
                                     )}
                                   </div>
                                 </div>

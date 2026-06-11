@@ -138,6 +138,35 @@ router.get("/statutory-config", requireRole("admin", "finance", "payroll"), h(c.
 
 // ─── Payslip ──────────────────────────────────────────────────────────────────
 
+// GET /api/payroll/payslip/my — list own payslip history (employee self-service)
+router.get("/payslip/my", h(async (req: AuthenticatedRequest, res: Response) => {
+  const callerEmp = await getEmployeeForUser(req.authUser!.id);
+  if (!callerEmp) return res.status(403).json({ success: false, message: "No employee record for authenticated user" });
+
+  const year = req.query.year ? String(req.query.year) : String(new Date().getFullYear());
+
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT spl.id, spl.run_id, spl.employee_id, spl.employee_code,
+            spl.gross_salary, spl.total_deductions, spl.net_salary,
+            spl.basic, spl.hra, spl.special_allowance,
+            spl.pf_employee, spl.esic_employee, spl.professional_tax, spl.tds,
+            spl.working_days, spl.present_days, spl.leave_days, spl.lwp_days,
+            spl.status, spl.remarks,
+            spr.run_month, spr.disbursed_at AS paid_at, spr.status AS run_status,
+            sp.acknowledged_at, sp.file_url, sp.payslip_ref
+       FROM salary_prep_line spl
+       JOIN salary_prep_run spr ON spr.id = spl.run_id
+       LEFT JOIN salary_payslip sp ON sp.prep_line_id = spl.id
+      WHERE spl.employee_id = ?
+        AND spr.run_month LIKE ?
+        AND spl.status NOT IN ('draft')
+      ORDER BY spr.run_month DESC`,
+    [callerEmp.id, `${year}-%`]
+  );
+
+  return res.json({ success: true, data: rows });
+}));
+
 // GET /api/payroll/payslip/:runId/:employeeId — admin/hr/finance/payroll or employee own
 router.get("/payslip/:runId/:employeeId", h(async (req: AuthenticatedRequest, res: Response) => {
   const { runId, employeeId } = req.params;

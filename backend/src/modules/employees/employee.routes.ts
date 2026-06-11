@@ -15,17 +15,39 @@ const h = (fn: (req: any, res: any) => Promise<unknown>) => (req: any, res: any,
 
 router.use(requireAuth);
 
-// GET /api/employees/me — returns the employee record for the logged-in user
+// GET /api/employees/me — returns the employee record for the logged-in user (with joined master data)
 router.get("/me", h(async (req: any, res: any) => {
   const userId = req.authUser?.id;
   if (!userId) return res.status(401).json({ success: false, error: "Unauthorized" });
-  const { db } = await import("../../db/mysql.js");
-  const [rows] = await db.execute(
-    "SELECT * FROM employees WHERE user_id = ? AND active_status = 1 LIMIT 1",
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT e.*,
+            e.mobile                AS phone,
+            e.photo_url             AS avatar_url,
+            e.date_of_joining       AS hire_date,
+            e.employment_status     AS status,
+            dm.designation_name     AS designation,
+            dept.dept_name          AS department_name,
+            b.branch_name,
+            p.process_name,
+            mgr.first_name          AS manager_first_name,
+            mgr.last_name           AS manager_last_name
+       FROM employees e
+       LEFT JOIN designation_master dm   ON dm.id   = e.designation_id
+       LEFT JOIN department_master  dept ON dept.id = e.department_id
+       LEFT JOIN branch_master      b    ON b.id    = e.branch_id
+       LEFT JOIN process_master     p    ON p.id    = e.process_id
+       LEFT JOIN employees          mgr  ON mgr.id  = e.reporting_manager_id
+      WHERE e.user_id = ? AND e.active_status = 1 LIMIT 1`,
     [userId]
-  ) as any[];
+  );
   if (!rows.length) return res.status(404).json({ success: false, error: "No employee record for this user" });
-  return res.json({ success: true, data: rows[0] });
+  const emp: any = rows[0];
+  // Shape nested objects the frontend expects
+  emp.department = emp.department_name ? { name: emp.department_name } : null;
+  emp.reporting_manager = (emp.manager_first_name || emp.manager_last_name)
+    ? `${emp.manager_first_name ?? ''} ${emp.manager_last_name ?? ''}`.trim()
+    : null;
+  return res.json({ success: true, data: emp });
 }));
 
 // GET /api/employees/stats — aggregate counts (must be before /:id to avoid route collision)
