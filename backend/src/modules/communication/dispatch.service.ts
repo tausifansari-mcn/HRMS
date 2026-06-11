@@ -20,7 +20,7 @@ class DispatchService {
   async send(dto: SendMessageDTO): Promise<DispatchResult> {
     const placeholders = dto.recipient_employee_ids.map(() => '?').join(',');
     const [employees] = await db.execute<RowDataPacket[]>(
-      `SELECT id, full_name, email, phone FROM employees WHERE id IN (${placeholders})`,
+      `SELECT id, full_name, email, mobile AS phone FROM employees WHERE id IN (${placeholders})`,
       dto.recipient_employee_ids
     );
 
@@ -29,11 +29,12 @@ class DispatchService {
 
     for (const emp of employees as any[]) {
       try {
-        // Get template category for preference routing
+        // Get template category and name for preference routing
         let category = 'announcements';
+        let resolvedTemplateName = dto.template_name ?? 'custom';
         if (dto.template_id) {
           const t = await templateService.getTemplateById(dto.template_id);
-          if (t) category = t.category;
+          if (t) { category = t.category; resolvedTemplateName = t.name; }
         }
 
         const channel: Channel = dto.channel
@@ -57,7 +58,7 @@ class DispatchService {
           [
             dispatchId,
             dto.template_id ?? null,
-            dto.template_name ?? 'custom',
+            resolvedTemplateName,
             emp.id,
             contact,
             channel,

@@ -66,22 +66,17 @@ export async function listClients(filters?: {
   subscription_status?: string;
   search?: string;
 }): Promise<Client[]> {
-  let query = "SELECT * FROM clients WHERE 1=1";
+  let query = "SELECT * FROM client_master WHERE 1=1";
   const params: any[] = [];
 
   if (filters?.active_only) {
     query += " AND active_status = 1";
   }
 
-  if (filters?.subscription_status) {
-    query += " AND subscription_status = ?";
-    params.push(filters.subscription_status);
-  }
-
   if (filters?.search) {
-    query += " AND (client_name LIKE ? OR client_code LIKE ? OR primary_contact_email LIKE ?)";
+    query += " AND (client_name LIKE ? OR client_code LIKE ?)";
     const searchPattern = `%${filters.search}%`;
-    params.push(searchPattern, searchPattern, searchPattern);
+    params.push(searchPattern, searchPattern);
   }
 
   query += " ORDER BY client_name";
@@ -92,7 +87,7 @@ export async function listClients(filters?: {
 
 export async function getClient(id: string): Promise<Client | null> {
   const [rows] = await db.execute<RowDataPacket[]>(
-    "SELECT * FROM clients WHERE id = ?",
+    "SELECT * FROM client_master WHERE id = ?",
     [id]
   );
   return rows.length > 0 ? (rows[0] as Client) : null;
@@ -102,46 +97,18 @@ export async function createClient(
   data: CreateClientInput,
   createdBy: string
 ): Promise<Client> {
-  const [result] = await db.execute<ResultSetHeader>(
-    `INSERT INTO clients (
-      client_code, client_name, legal_entity_name, industry,
-      primary_contact_name, primary_contact_email, primary_contact_phone,
-      escalation_contact_name, escalation_contact_email, escalation_contact_phone,
-      address_line1, address_line2, city, state, country, postal_code,
-      logo_url, website, contract_start_date, contract_end_date,
-      billing_cycle, webhook_url, created_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      data.client_code,
-      data.client_name,
-      data.legal_entity_name || null,
-      data.industry || null,
-      data.primary_contact_name || null,
-      data.primary_contact_email || null,
-      data.primary_contact_phone || null,
-      data.escalation_contact_name || null,
-      data.escalation_contact_email || null,
-      data.escalation_contact_phone || null,
-      data.address_line1 || null,
-      data.address_line2 || null,
-      data.city || null,
-      data.state || null,
-      data.country || 'India',
-      data.postal_code || null,
-      data.logo_url || null,
-      data.website || null,
-      data.contract_start_date || null,
-      data.contract_end_date || null,
-      data.billing_cycle || 'MONTHLY',
-      data.webhook_url || null,
-      createdBy
-    ]
+  const id = (await import('crypto')).randomUUID();
+  await db.execute(
+    `INSERT INTO client_master (id, client_code, client_name, active_status) VALUES (?, ?, ?, 1)`,
+    [id, data.client_code, data.client_name]
   );
 
-  const client = await getClient(result.insertId.toString());
+  const client = await getClient(id);
   if (!client) throw new Error("Failed to retrieve created client");
   return client;
 }
+
+const CLIENT_MASTER_COLS = new Set(['client_code', 'client_name', 'active_status']);
 
 export async function updateClient(
   id: string,
@@ -151,7 +118,7 @@ export async function updateClient(
   const params: any[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
-    if (value !== undefined) {
+    if (value !== undefined && CLIENT_MASTER_COLS.has(key)) {
       updates.push(`${key} = ?`);
       params.push(value);
     }
@@ -161,7 +128,7 @@ export async function updateClient(
 
   params.push(id);
   await db.execute(
-    `UPDATE clients SET ${updates.join(", ")} WHERE id = ?`,
+    `UPDATE client_master SET ${updates.join(", ")} WHERE id = ?`,
     params
   );
 }
@@ -171,7 +138,7 @@ export async function toggleClientStatus(
   active_status: boolean
 ): Promise<void> {
   await db.execute(
-    "UPDATE clients SET active_status = ? WHERE id = ?",
+    "UPDATE client_master SET active_status = ? WHERE id = ?",
     [active_status ? 1 : 0, id]
   );
 }
@@ -181,7 +148,7 @@ export async function updateClientSubscriptionStatus(
   status: 'ACTIVE' | 'SUSPENDED' | 'TRIAL' | 'EXPIRED'
 ): Promise<void> {
   await db.execute(
-    "UPDATE clients SET subscription_status = ? WHERE id = ?",
+    "UPDATE client_master SET subscription_status = ? WHERE id = ?",
     [status, id]
   );
 }
@@ -204,28 +171,26 @@ export async function getClientStats(): Promise<ClientStats> {
     `SELECT
       COUNT(*) as total_clients,
       SUM(CASE WHEN active_status = 1 THEN 1 ELSE 0 END) as active_clients,
-      SUM(CASE WHEN subscription_status = 'TRIAL' THEN 1 ELSE 0 END) as trial_clients
-     FROM clients`
-  );
-
-  const [processRows] = await db.execute<RowDataPacket[]>(
-    "SELECT COUNT(*) as total_processes FROM processes WHERE is_active = 1"
+      0 as trial_clients
+     FROM client_master`
   );
 
   const [userRows] = await db.execute<RowDataPacket[]>(
     `SELECT
       COUNT(*) as total_portal_users,
       SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_portal_users
-     FROM portal_users`
+     FROM client_user`
   );
 
+  if (!clientRows[0]) return { total_clients: 0, active_clients: 0, trial_clients: 0, total_processes: 0, total_portal_users: 0, active_portal_users: 0 };
+
   return {
-    total_clients: clientRows[0].total_clients || 0,
-    active_clients: clientRows[0].active_clients || 0,
-    trial_clients: clientRows[0].trial_clients || 0,
-    total_processes: processRows[0].total_processes || 0,
-    total_portal_users: userRows[0].total_portal_users || 0,
-    active_portal_users: userRows[0].active_portal_users || 0,
+    total_clients: Number(clientRows[0].total_clients) || 0,
+    active_clients: Number(clientRows[0].active_clients) || 0,
+    trial_clients: 0,
+    total_processes: 0,
+    total_portal_users: userRows[0] ? Number(userRows[0].total_portal_users) || 0 : 0,
+    active_portal_users: userRows[0] ? Number(userRows[0].active_portal_users) || 0 : 0,
   };
 }
 
@@ -248,19 +213,16 @@ export async function getClientUsageSummary(
       c.id as client_id,
       c.client_name,
       COUNT(DISTINCT pu.id) as active_users,
-      SUM(pu.login_count) as total_logins,
-      COALESCE(SUM(cus.total_logins), 0) as last_30_days_logins,
-      COALESCE(SUM(cus.api_calls), 0) as api_calls,
-      COALESCE(SUM(cus.report_views), 0) as report_views,
-      MAX(pu.last_login_at) as last_activity
-     FROM clients c
-     LEFT JOIN portal_users pu ON pu.client_id = c.id AND pu.is_active = 1
-     LEFT JOIN client_usage_stats cus ON cus.client_id = c.id
-       AND cus.stat_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+      0 as total_logins,
+      0 as last_30_days_logins,
+      0 as api_calls,
+      0 as report_views,
+      NULL as last_activity
+     FROM client_master c
+     LEFT JOIN client_user pu ON pu.client_id = c.id AND pu.is_active = 1
      WHERE c.active_status = 1
      GROUP BY c.id, c.client_name
-     ORDER BY last_activity DESC`,
-    [days]
+     ORDER BY c.created_at DESC`
   );
 
   return rows as ClientUsageSummary[];

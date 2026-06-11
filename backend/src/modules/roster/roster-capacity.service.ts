@@ -138,7 +138,7 @@ class RosterCapacityService {
 
     // Get process strength (total active employees in process)
     const [employees] = await db.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) as count FROM employees WHERE process_id = ? AND employee_status = 'active'`,
+      `SELECT COUNT(*) as count FROM employees WHERE process_id = ? AND active_status = 1`,
       [processId]
     );
     const processStrength = (employees[0] as any).count;

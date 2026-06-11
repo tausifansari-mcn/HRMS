@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
-// Skip if running in test environment without live DB
-const SKIP_LIVE_DB = process.env.NODE_ENV === 'test';
+// Skip if no live DB — honour explicit SKIP_LIVE_DB=false override
+const SKIP_LIVE_DB = process.env.SKIP_LIVE_DB === 'false'
+  ? false
+  : process.env.NODE_ENV === 'test';
 
 import { db } from '../../../db/mysql.js';
 import { templateService } from '../template.service.js';
@@ -18,8 +20,8 @@ describe.skipIf(SKIP_LIVE_DB)('Communication Module Integration Tests', () => {
     // Create test employee for dispatch tests
     testEmployeeId = randomUUID();
     await db.execute(
-      `INSERT INTO employees (id, full_name, email, phone, employee_code, branch_id, process_id, designation_id, department_id)
-       VALUES (?, 'Test Employee', 'test@example.com', '+919876543210', 'TEST001',
+      `INSERT INTO employees (id, first_name, last_name, email, mobile, employee_code, date_of_joining, branch_id, process_id, designation_id, department_id)
+       VALUES (?, 'Test', 'Employee', 'test@example.com', '+919876543210', 'TEST001', '2024-01-01',
                (SELECT id FROM branch_master LIMIT 1),
                (SELECT id FROM process_master LIMIT 1),
                (SELECT id FROM designation_master LIMIT 1),

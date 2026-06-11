@@ -4,8 +4,10 @@ import { db } from '../../../db/mysql.js';
 import type { RowDataPacket } from 'mysql2';
 import { randomUUID } from 'crypto';
 
-// Skip if no live DB available (CI/offline environments)
-const SKIP_LIVE_DB = process.env.SKIP_LIVE_DB === 'true' || process.env.NODE_ENV === 'test';
+// Skip if no live DB — honour explicit SKIP_LIVE_DB=false override
+const SKIP_LIVE_DB = process.env.SKIP_LIVE_DB === 'false'
+  ? false
+  : process.env.SKIP_LIVE_DB === 'true' || process.env.NODE_ENV === 'test';
 
 describe.skipIf(SKIP_LIVE_DB)('Roster Master Integration Tests (MySQL)', () => {
   let testProcessId: string;
