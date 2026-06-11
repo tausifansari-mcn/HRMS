@@ -27,6 +27,7 @@ import { UpdateNotification } from "@/components/dashboard/UpdateNotification";
 import { WhosOut } from "@/components/dashboard/WhosOut";
 import { UpcomingCelebrations } from "@/components/dashboard/UpcomingCelebrations";
 import { UpcomingHolidays } from "@/components/dashboard/UpcomingHolidays";
+import { useEmployeeProfile } from "@/hooks/useEmployeeProfile";
 
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { useEmployeeStatus } from "@/hooks/useEmployeeStatus";
@@ -206,6 +207,7 @@ const Index = () => {
     useEmployeeStatus();
   const { isAdminOrHR, isLoading: isRoleLoading } = useIsAdminOrHR();
   const { user } = useAuth();
+  const { data: employeeProfile } = useEmployeeProfile();
   const navigate = useNavigate();
 
   const hasPendingApprovals = (stats?.pendingApprovals ?? 0) > 0;
@@ -220,8 +222,17 @@ const Index = () => {
   };
 
   const getUserFirstName = () => {
-    const fullName = user?.email || "User";
-    return fullName.split(" ")[0];
+    // Use employee profile first_name if available
+    if (employeeProfile?.first_name) {
+      return employeeProfile.first_name;
+    }
+    // Fallback to full_name
+    if (employeeProfile?.full_name) {
+      return employeeProfile.full_name.split(" ")[0];
+    }
+    // Fallback to email username
+    const email = user?.email || "User";
+    return email.split("@")[0].replace(/[._]/g, " ").split(" ")[0];
   };
 
   const quickActions: QuickAction[] = isAdminOrHR

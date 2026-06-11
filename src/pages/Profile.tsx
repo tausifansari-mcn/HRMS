@@ -29,6 +29,7 @@ import { LeaveRequestHistory } from "@/components/profile/LeaveRequestHistory";
 import { PayslipViewer } from "@/components/profile/PayslipViewer";
 import { TaxDocumentsViewer } from "@/components/profile/TaxDocumentsViewer";
 import { MyAttendanceHistory } from "@/components/profile/MyAttendanceHistory";
+import { AttendanceCalendar } from "@/components/attendance/AttendanceCalendar";
 import { MyAssets } from "@/components/profile/MyAssets";
 import { MyPerformanceReviews } from "@/components/profile/MyPerformanceReviews";
 
@@ -503,6 +504,7 @@ const Profile = () => {
 
             {/* Attendance Tab */}
             <TabsContent value="attendance" className="space-y-6">
+              <AttendanceCalendar employeeId={employee.id} />
               <MyAttendanceHistory employeeId={employee.id} />
             </TabsContent>
 

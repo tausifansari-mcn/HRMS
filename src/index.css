@@ -1,4 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+@import "./styles/smarthr-tokens.css";
 
 @tailwind base;
 @tailwind components;
@@ -25,8 +27,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 222 47% 11%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 223 81% 61%;   /* SmartHR Blue #4361ee */
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 214 32% 95%;
     --secondary-foreground: 222 47% 11%;
@@ -55,11 +57,15 @@
     --sidebar-border: 217 33% 17%;
     --sidebar-ring: 199 89% 48%;
 
-    --chart-1: 199 89% 48%;
-    --chart-2: 160 84% 39%;
-    --chart-3: 243 75% 59%;
-    --chart-4: 38 92% 50%;
-    --chart-5: 215 25% 45%;
+    /* SmartHR Chart Colors */
+    --chart-1: 223 81% 61%;   /* Blue */
+    --chart-2: 142 76% 36%;   /* Green */
+    --chart-3: 262 83% 58%;   /* Purple */
+    --chart-4: 38 92% 50%;    /* Orange */
+    --chart-5: 187 85% 43%;   /* Cyan */
+    --chart-6: 330 81% 60%;   /* Pink */
+    --chart-7: 243 75% 59%;   /* Indigo */
+    --chart-8: 0 84% 60%;     /* Red */
   }
 
   .dark {
@@ -72,8 +78,8 @@
     --popover: 217 33% 17%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 199 89% 48%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 213 94% 68%;   /* SmartHR Blue Light (Dark Mode) */
+    --primary-foreground: 222 47% 11%;
 
     --secondary: 217 33% 17%;
     --secondary-foreground: 210 40% 98%;

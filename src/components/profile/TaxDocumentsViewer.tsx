@@ -49,8 +49,8 @@ export function TaxDocumentsViewer({ employeeId }: TaxDocumentsViewerProps) {
       const filePath = pathMatch ? pathMatch[1] : fileUrl;
 
       const HRMS_API = import.meta.env.VITE_HRMS_API_URL || "http://localhost:5055";
-      const url = filePath?.startsWith("https://") ? filePath : `${HRMS_API}/api/files/documents/${filePath}`;
-      const resp = await fetch(url);
+      const fetchUrl = filePath?.startsWith("https://") ? filePath : `${HRMS_API}/api/files/documents/${filePath}`;
+      const resp = await fetch(fetchUrl);
       const data = await resp.blob();
 
       // Create download link

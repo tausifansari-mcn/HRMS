@@ -17,17 +17,26 @@ export function useLeaveBalances(employeeId: string | undefined) {
     queryFn: async () => {
       if (!employeeId) return [];
 
-      const res = await hrmsApi.get<{ success: boolean; data: any[] }>(
+      // Try current year first
+      let res = await hrmsApi.get<{ success: boolean; data: any[] }>(
         `/api/leave/balance/${employeeId}?year=${currentYear}`
       );
-      const rows = res.data ?? [];
+      let rows = res.data ?? [];
+
+      // Fallback to previous year if no balances found for current year
+      if (rows.length === 0) {
+        res = await hrmsApi.get<{ success: boolean; data: any[] }>(
+          `/api/leave/balance/${employeeId}?year=${currentYear - 1}`
+        );
+        rows = res.data ?? [];
+      }
 
       // Backend returns LeaveBalanceLedger rows:
-      // { id, employee_id, leave_type_id, balance_year, allocated_days, used_days, adjusted_days, leave_type_name?, ... }
+      // { id, employee_id, leave_type_id, balance_year, allocated_days, used_days, adjusted_days, leave_name?, paid_leave?, ... }
       return rows.map((row: any): LeaveBalance => ({
         id: row.id ?? row.leave_type_id,
         leave_type: {
-          name: row.leave_type_name ?? row.leave_name ?? row.leave_type_id ?? "Unknown",
+          name: row.leave_name ?? row.leave_code ?? row.leave_type_id ?? "Unknown",
           is_paid: row.paid_leave != null ? Boolean(row.paid_leave) : null,
         },
         total_days: Number(row.allocated_days ?? row.total_days ?? 0),

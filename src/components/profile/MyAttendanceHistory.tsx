@@ -3,7 +3,8 @@ import { hrmsApi } from "@/lib/hrmsApi";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, MapPin, CalendarDays, Coffee } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Clock, MapPin, CalendarDays, Coffee, AlertCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -33,11 +34,18 @@ const statusStyles: Record<string, string> = {
 };
 
 export function MyAttendanceHistory({ employeeId }: MyAttendanceHistoryProps) {
-  const { data: records, isLoading } = useQuery({
+  const { data: records, isLoading, error } = useQuery({
     queryKey: ["my-attendance-history", employeeId],
     queryFn: async () => {
-      const res = await hrmsApi.get<{success:boolean;data:any}>("/api/wfm/attendance/daily");
-      return (res.data ?? []) as AttendanceRecord[];
+      try {
+        console.log("[MyAttendanceHistory] Fetching attendance for employee:", employeeId);
+        const res = await hrmsApi.get<{success:boolean;data:any}>("/api/wfm/attendance/daily");
+        console.log("[MyAttendanceHistory] Response:", res);
+        return (res.data ?? []) as AttendanceRecord[];
+      } catch (err: any) {
+        console.error("[MyAttendanceHistory] Error fetching attendance:", err);
+        throw new Error(err.response?.data?.error || err.message || "Failed to load attendance records");
+      }
     },
     enabled: !!employeeId,
   });
@@ -73,6 +81,28 @@ export function MyAttendanceHistory({ employeeId }: MyAttendanceHistoryProps) {
               <Skeleton key={i} className="h-12 w-full" />
             ))}
           </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Attendance History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error loading attendance</AlertTitle>
+            <AlertDescription>
+              {(error as Error).message || "Failed to load attendance records. Please try refreshing the page."}
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
     );

@@ -11,6 +11,7 @@ interface LeaveBalanceCardProps {
 export function LeaveBalanceCard({ employeeId }: LeaveBalanceCardProps) {
   const { data: balances, isLoading } = useLeaveBalances(employeeId);
   const currentYear = new Date().getFullYear();
+  const displayYear = balances && balances.length > 0 ? balances[0].year : currentYear;
 
   if (isLoading) {
     return (
@@ -29,7 +30,14 @@ export function LeaveBalanceCard({ employeeId }: LeaveBalanceCardProps) {
           <CalendarDays className="h-5 w-5" />
           Leave Balance
         </CardTitle>
-        <CardDescription>Your available leave days for {currentYear}</CardDescription>
+        <CardDescription>
+          Your available leave days for {displayYear}
+          {displayYear < currentYear && (
+            <span className="text-amber-600 ml-2 text-xs">
+              ({currentYear} balances not yet allocated)
+            </span>
+          )}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {balances && balances.length > 0 ? (
