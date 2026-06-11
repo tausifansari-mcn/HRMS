@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -253,7 +254,7 @@ export function PayrollTable({
       )}
 
       <div className="rounded-xl border border-border bg-card">
-        <Table>
+        <Table className="smarthr-table">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[40px]">
@@ -275,7 +276,7 @@ export function PayrollTable({
           </TableHeader>
           <TableBody>
             {records.map((record) => (
-              <TableRow key={record.id} data-state={selectedIds.has(record.id) ? "selected" : undefined}>
+              <TableRow key={record.id} data-state={selectedIds.has(record.id) ? "selected" : undefined} className="hover:bg-gray-50 transition-colors cursor-pointer">
                 <TableCell>
                   <Checkbox
                     checked={selectedIds.has(record.id)}
@@ -312,10 +313,10 @@ export function PayrollTable({
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col gap-1">
-                    <Badge variant="outline" className={`${statusStyles[record.status]} inline-flex items-center`}>
-                      {statusIcons[record.status]}
-                      {record.status}
-                    </Badge>
+                    <StatusBadge
+                      status={record.status === "paid" ? "success" : record.status === "processing" ? "in_progress" : "pending"}
+                      label={record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+                    />
                     {record.paidAt && (
                       <Tooltip>
                         <TooltipTrigger asChild>
