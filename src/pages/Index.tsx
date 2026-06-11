@@ -68,6 +68,7 @@ interface QuickAction {
   icon: ReactNode;
 }
 
+// SmartHR-inspired stat card colors with primary blue (#4361ee)
 const statToneMap: Record<
   StatTone,
   {
@@ -77,24 +78,24 @@ const statToneMap: Record<
   }
 > = {
   sky: {
-    card: "border-sky-100 bg-gradient-to-br from-white via-white to-sky-50",
-    icon: "bg-sky-50 text-sky-700 ring-sky-100",
-    value: "text-sky-950",
+    card: "border-blue-100 bg-gradient-to-br from-white via-white to-blue-50",
+    icon: "bg-[#4361ee]/10 text-[#4361ee] ring-blue-100",
+    value: "text-[#4361ee]",
   },
   emerald: {
-    card: "border-emerald-100 bg-gradient-to-br from-white via-white to-emerald-50",
-    icon: "bg-emerald-50 text-emerald-700 ring-emerald-100",
-    value: "text-emerald-950",
+    card: "border-green-100 bg-gradient-to-br from-white via-white to-green-50",
+    icon: "bg-[#10b981]/10 text-[#10b981] ring-green-100",
+    value: "text-[#10b981]",
   },
   indigo: {
-    card: "border-indigo-100 bg-gradient-to-br from-white via-white to-indigo-50",
-    icon: "bg-indigo-50 text-indigo-700 ring-indigo-100",
-    value: "text-indigo-950",
+    card: "border-purple-100 bg-gradient-to-br from-white via-white to-purple-50",
+    icon: "bg-[#8b5cf6]/10 text-[#8b5cf6] ring-purple-100",
+    value: "text-[#8b5cf6]",
   },
   amber: {
-    card: "border-amber-100 bg-gradient-to-br from-white via-white to-amber-50",
-    icon: "bg-amber-50 text-amber-700 ring-amber-100",
-    value: "text-amber-950",
+    card: "border-orange-100 bg-gradient-to-br from-white via-white to-orange-50",
+    icon: "bg-[#f59e0b]/10 text-[#f59e0b] ring-orange-100",
+    value: "text-[#f59e0b]",
   },
   slate: {
     card: "border-slate-200 bg-white",
@@ -115,25 +116,26 @@ const StatCard = ({
 
   const content = (
     <div
-      className={`h-full rounded-2xl border p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${styles.card}`}
+      className={`smarthr-stat-card h-full rounded-xl border p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${styles.card} ${onClick ? 'cursor-pointer' : ''}`}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+        <div className="min-w-0 flex-1">
+          <p className="smarthr-stat-label text-slate-500">
             {title}
           </p>
 
           <h3
-            className={`mt-2 truncate text-2xl font-semibold tracking-tight ${styles.value}`}
+            className={`mt-3 truncate text-3xl font-bold tracking-tight ${styles.value}`}
+            style={{ fontFamily: "'Fira Code', monospace" }}
           >
             {value}
           </h3>
         </div>
 
-        <div className={`rounded-xl p-2.5 ring-1 ${styles.icon}`}>{icon}</div>
+        <div className={`rounded-xl p-3 ring-1 ${styles.icon}`}>{icon}</div>
       </div>
 
-      <p className="mt-3 text-xs leading-5 text-slate-500">{description}</p>
+      <p className="mt-3 text-xs font-medium leading-5 text-slate-600">{description}</p>
     </div>
   );
 
