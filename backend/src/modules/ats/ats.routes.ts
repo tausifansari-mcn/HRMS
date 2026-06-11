@@ -30,6 +30,98 @@ atsRouter.post("/candidates",                    h(c.createCandidate.bind(c)));
 atsRouter.use("/onboarding-full", onboardingFullRouter);
 atsRouter.use("/bgv", bgvVerificationRouter);
 
+// ── PUBLIC — candidate file upload (1-hour window after registration) ─────────
+// Configure multer for candidate uploads
+const uploadDir = path.join(process.cwd(), "uploads", "candidates");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const candidateStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${randomUUID()}${ext}`);
+  },
+});
+
+const candidateUpload = multer({
+  storage: candidateStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = [".pdf", ".jpg", ".jpeg", ".png"];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Allowed: PDF, JPG, PNG"));
+    }
+  },
+});
+
+atsRouter.post(
+  "/candidates/:id/upload",
+  candidateUpload.single("file"),
+  h(async (req: any, res: any) => {
+    const { id } = req.params;
+    const { type, mobile } = req.body;
+
+    if (!type || !["resume", "selfie"].includes(type)) {
+      return res.status(400).json({ success: false, message: "type must be 'resume' or 'selfie'" });
+    }
+    if (!mobile || typeof mobile !== "string" || !mobile.trim()) {
+      return res.status(400).json({ success: false, message: "mobile is required to verify upload ownership" });
+    }
+
+    const { db } = await import("../../db/mysql.js");
+    const [rows] = await db.execute(
+      `SELECT id, mobile, created_at FROM ats_candidate WHERE id = ?`,
+      [id]
+    ) as any[];
+
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: "Candidate not found" });
+    }
+
+    const candidate = rows[0];
+
+    if (String(candidate.mobile).trim() !== String(mobile).trim()) {
+      return res.status(403).json({ success: false, message: "Mobile number does not match" });
+    }
+
+    const createdAt = new Date(candidate.created_at);
+    const hoursSinceCreation = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
+
+    if (hoursSinceCreation > 1) {
+      return res.status(403).json({
+        success: false,
+        message: "Upload window expired (1 hour limit from registration)"
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file uploaded" });
+    }
+
+    const fileUrl = `/uploads/candidates/${req.file.filename}`;
+    const updateField = type === "resume" ? "resume_url" : "selfie_url";
+    await db.execute(
+      `UPDATE ats_candidate SET ${updateField} = ? WHERE id = ?`,
+      [fileUrl, id]
+    );
+
+    return res.json({
+      success: true,
+      path: fileUrl,
+      url: fileUrl,
+      filename: req.file.filename,
+      message: `${type} uploaded successfully`,
+    });
+  })
+);
+
 // ── PROTECTED — all remaining routes require a logged-in HR/recruiter ────────
 atsRouter.use(requireAuth);
 
@@ -164,105 +256,6 @@ atsRouter.get("/waiting-queue",                  requireRole("admin", "hr", "rec
   ) as any[];
   return res.json({ success: true, data: rows });
 }));
-
-// ── Candidate File Upload (PUBLIC - 1 hour window after registration) ────────
-
-// Configure multer for candidate uploads
-const uploadDir = path.join(process.cwd(), "uploads", "candidates");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const candidateStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${randomUUID()}${ext}`);
-  },
-});
-
-const candidateUpload = multer({
-  storage: candidateStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  fileFilter: (_req, file, cb) => {
-    const allowed = [".pdf", ".jpg", ".jpeg", ".png"];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(ext)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Invalid file type. Allowed: PDF, JPG, PNG"));
-    }
-  },
-});
-
-// PUBLIC endpoint for candidate uploads (within 1 hour of registration).
-// Caller must supply the candidate's registered mobile to prove ownership.
-atsRouter.post(
-  "/candidates/:id/upload",
-  candidateUpload.single("file"),
-  h(async (req: any, res: any) => {
-    const { id } = req.params;
-    const { type, mobile } = req.body; // "resume" or "selfie" + registered mobile for ownership proof
-
-    if (!type || !["resume", "selfie"].includes(type)) {
-      return res.status(400).json({ success: false, message: "type must be 'resume' or 'selfie'" });
-    }
-    if (!mobile || typeof mobile !== "string" || !mobile.trim()) {
-      return res.status(400).json({ success: false, message: "mobile is required to verify upload ownership" });
-    }
-
-    // Verify candidate exists, mobile matches, and was created recently (within 1 hour)
-    const { db } = await import("../../db/mysql.js");
-    const [rows] = await db.execute(
-      `SELECT id, mobile, created_at FROM ats_candidate WHERE id = ?`,
-      [id]
-    ) as any[];
-
-    if (!rows.length) {
-      return res.status(404).json({ success: false, message: "Candidate not found" });
-    }
-
-    const candidate = rows[0];
-
-    // Ownership check: supplied mobile must match the candidate's registered mobile
-    if (String(candidate.mobile).trim() !== String(mobile).trim()) {
-      return res.status(403).json({ success: false, message: "Mobile number does not match" });
-    }
-
-    const createdAt = new Date(candidate.created_at);
-    const nowMs = Date.now();
-    const hoursSinceCreation = (nowMs - createdAt.getTime()) / (1000 * 60 * 60);
-
-    if (hoursSinceCreation > 1) {
-      return res.status(403).json({
-        success: false,
-        message: "Upload window expired (1 hour limit from registration)"
-      });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: "No file uploaded" });
-    }
-
-    const fileUrl = `/uploads/candidates/${req.file.filename}`;
-
-    const updateField = type === "resume" ? "resume_url" : "selfie_url";
-    await db.execute(
-      `UPDATE ats_candidate SET ${updateField} = ? WHERE id = ?`,
-      [fileUrl, id]
-    );
-
-    return res.json({
-      success: true,
-      path: fileUrl,
-      url: fileUrl,
-      filename: req.file.filename,
-      message: `${type} uploaded successfully`,
-    });
-  })
-);
 
 // ── Queue Token Management ────────────────────────────────────────────────────
 

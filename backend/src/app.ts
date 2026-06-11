@@ -142,9 +142,9 @@ app.use("/api/employees", employeeRouter);
 app.use("/api/kpi/process-role", kpiProcessRoleRouter);
 app.use("/api/kpi", kpiRouter);
 app.use("/api/portal", portalRouter);
-app.use("/api", clientRouter); // Client management + enhanced portal user routes
-app.use("/api/ats", atsFormConfigRouter);
+app.use("/api/ats", atsFormConfigRouter); // form-config/bootstrap is public — must be before clientRouter's requireAuth catch-all
 app.use("/api/ats", atsRouter);
+app.use("/api", clientRouter); // Client management — broad /api mount, must come after specific ATS routes
 app.use("/api/ats-full-parity", atsFullParityRouter); // Google Sheets App Script parity
 app.use("/api/exit", exitRouter);
 app.use("/api/migration", migrationRouter);

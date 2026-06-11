@@ -853,7 +853,10 @@ export default function NativeATSCandidateRegistration() {
       setScanStatus(`Extracted ${count} field(s). Please review and correct before submitting.`);
       setScanMode('done');
     } catch (err: any) {
-      setScanStatus(`OCR failed: ${err?.message ?? 'Unknown error'}. Please fill the form manually.`);
+      const reason = err?.message === 'Failed to load Tesseract'
+        ? 'OCR library could not load (check internet connection)'
+        : err?.message || 'OCR engine error';
+      setScanStatus(`${reason}. Please fill the form manually.`);
       setScanMode('done');
     }
   };

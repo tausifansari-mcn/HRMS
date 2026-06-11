@@ -113,7 +113,7 @@ export const authService = {
               e.active_status
          FROM auth_user au
          JOIN employees e ON e.user_id = au.id
-        WHERE LOWER(e.official_email) = LOWER(?)
+        WHERE LOWER(e.email) = LOWER(?)
         UNION
        SELECT au.id, au.email, au.password_hash, au.is_blocked,
               COALESCE(au.must_change_password, 0) AS must_change_password,
@@ -129,18 +129,17 @@ export const authService = {
     // 2) Fallback: if identifier matches an active employee but no auth link exists, auto-repair
     if (!user) {
       const [empRows] = await db.execute<RowDataPacket[]>(
-        `SELECT id, email, official_email, user_id, active_status
+        `SELECT id, email, user_id, active_status
            FROM employees
           WHERE active_status = 1
             AND (UPPER(employee_code) = UPPER(?)
-                 OR LOWER(official_email) = LOWER(?)
                  OR LOWER(email) = LOWER(?))
           LIMIT 1`,
-        [trimmed, trimmed, trimmed]
+        [trimmed, trimmed]
       );
       const employee = empRows[0];
       if (employee) {
-        const preferredEmail = normalizeEmail(employee.official_email ?? employee.email ?? "");
+        const preferredEmail = normalizeEmail(employee.email ?? "");
         if (preferredEmail) {
           const repairedUserId = await createOrRepairEmployeeAuthUser(employee, preferredEmail, false);
           if (repairedUserId) {
@@ -295,12 +294,12 @@ export const authService = {
     // First-time employee access fallback. If launch bootstrap has not yet created
     // auth_user, prepare an active employee account from employees.email/official_email.
     const [employeeRows] = await db.execute<RowDataPacket[]>(
-      `SELECT id, email, official_email, user_id, active_status
+      `SELECT id, email, user_id, active_status
          FROM employees
         WHERE active_status = 1
-          AND (LOWER(email) = LOWER(?) OR LOWER(official_email) = LOWER(?))
+          AND LOWER(email) = LOWER(?)
         LIMIT 1`,
-      [normalizedEmail, normalizedEmail]
+      [normalizedEmail]
     );
     const employee = employeeRows[0];
     if (!employee) return null; // silent — don't leak whether email exists
