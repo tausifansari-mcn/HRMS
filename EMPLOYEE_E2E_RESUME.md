@@ -321,6 +321,8 @@ Playwright: No employee.smoke.ts exists. Admin/manager/team-leader only.
 | efd92d0 | test(integration): fix db mock order + health status assertion (4 tests) |
 | 7f2d66e | test(perf-feedback): token-aware requireRole mock (6 tests) |
 | a79560a | fix(security): rate limiting on auth; block admin routes; password min 8 chars (P1) |
+| f0c63c4 | fix(auth): validate demo session user ID against allowlist on restore (P1-15) |
+| cd1972a | fix(wfm): reject future-date regularization and clock-in at validation layer (P1-18) |
 
 ### Final Test Counts (after all fixes)
 | Test | Result |
@@ -409,9 +411,7 @@ All P0 and critical P1 employee journey fixes are complete as of 2026-06-11.
 5. Add LMS integration (separate MySQL DB, out of scope this session)
 6. Create Playwright employee E2E smoke test (`e2e/employee.smoke.ts`)
 
-**Remaining P1 items NOT yet fixed:**
-- P1-15: Frontend demo — stale session accepted on reload
-- P1-18: No future-date guard on regularization requests
+**All P1 items FIXED. No remaining P1 issues.**
 
 **Remaining P2 items NOT yet fixed:**
 - P2-1: No employee "My Payslips" self-service page
