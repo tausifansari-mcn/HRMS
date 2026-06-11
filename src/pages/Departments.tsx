@@ -246,8 +246,8 @@ const Departments = () => {
                 ))}
               </div>
             ) : departments && departments.length > 0 ? (
-              <div className="rounded-md border">
-                <Table>
+              <div className="rounded-xl border border-gray-200 overflow-hidden">
+                <Table className="smarthr-table">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
@@ -260,7 +260,7 @@ const Departments = () => {
                   </TableHeader>
                   <TableBody>
                     {departments.map((department) => (
-                      <TableRow key={department.id}>
+                      <TableRow key={department.id} className="cursor-pointer hover:bg-gray-50 transition-colors">
                         <TableCell className="font-medium">{department.name}</TableCell>
                         <TableCell className="text-muted-foreground">
                           {department.description || "-"}

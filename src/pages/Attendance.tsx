@@ -1341,8 +1341,8 @@ const Attendance = () => {
               </div>
             ) : attendanceRecords && attendanceRecords.length > 0 ? (
               <>
-                <div className="overflow-hidden rounded-xl border border-slate-200">
-                  <Table>
+                <div className="overflow-hidden rounded-xl border border-gray-200">
+                  <Table className="smarthr-table">
                     <TableHeader>
                       <TableRow>
                         <SortableTableHead
