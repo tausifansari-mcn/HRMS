@@ -31,6 +31,11 @@ vi.mock("../src/shared/scopeAccess.js", () => ({
   AccessDeniedError: class AccessDeniedError extends Error {},
   BadRequestAccessError: class BadRequestAccessError extends Error {},
 }));
+vi.mock("../src/shared/accessGuard.js", () => ({
+  hasRole: vi.fn().mockResolvedValue(true),
+  getEmployeeForUser: vi.fn().mockResolvedValue({ id: "emp-1", employee_code: "EMP001" }),
+  selfOrAdminHr: (_param?: string) => (_req: any, _res: any, next: any) => next(),
+}));
 vi.mock("../src/middleware/scopeMiddleware.js", () => ({
   requireScopedRole: () => (_req: any, _res: any, next: any) => next(),
   requireScopedAccess: () => (_req: any, _res: any, next: any) => next(),

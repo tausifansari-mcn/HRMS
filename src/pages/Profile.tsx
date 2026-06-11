@@ -109,35 +109,13 @@ const Profile = () => {
     queryKey: ['my-profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-
-      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
-
-      if (error) throw error;
-      
-      if (data) {
-        return {
-          ...data,
-          department: data.departments,
-        } as EmployeeProfile;
-      }
-      return null;
+      const res = await hrmsApi.get<{ success: boolean; data: any }>('/api/employees/me');
+      return res.data ?? null;
     },
     enabled: !!user?.id,
   });
 
-  // Fetch user profile data
-  const { data: userProfile } = useQuery({
-    queryKey: ['user-profile', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-
-      await (async () => { const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees"); return { data: res.data ?? [], error: null }; })();
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id,
-  });
+  const userProfile = employee;
 
   useEffect(() => {
     if (employee) {
@@ -163,9 +141,7 @@ const Profile = () => {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: ProfileForm) => {
-      if (!employee?.id) throw new Error("No employee profile found");
-
-      await hrmsApi.patch(`/api/employees/${employee.id}`, data);
+      await hrmsApi.patch('/api/employees/me', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-profile'] });

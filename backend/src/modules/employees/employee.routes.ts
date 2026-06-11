@@ -67,7 +67,22 @@ router.post("/",
   })),
   h(c.createEmployee)
 );
-router.get("/:id", requireRole("admin", "hr", "manager"), h(c.getEmployee));  // TODO: Add self-scope check
+router.get("/:id", h(async (req: any, res: any) => {
+  const userId = req.authUser!.id;
+  const targetId = req.params.id;
+  const isPrivileged = await hasRole(userId, 'admin', 'hr', 'manager');
+  if (!isPrivileged) {
+    const emp = await getEmployeeForUser(userId);
+    if (!emp || emp.id !== targetId) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+  }
+  return c.getEmployee(req, res);
+}));
+
+// PATCH /api/employees/me — employee self-service (whitelisted fields only)
+router.patch("/me", h((req: any, res: any) => c.updateMyProfile(req, res)));
+
 router.patch("/:id",
   requireRole("admin", "hr"),
   requireScopedRole(["hr"], async (req) => {

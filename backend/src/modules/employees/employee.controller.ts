@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { createEmployeeSchema, employeeFiltersSchema, updateEmployeeSchema } from "./employee.validation.js";
 import { employeeService } from "./employee.service.js";
+import { db } from "../../db/mysql.js";
 
 export const employeeController = {
   async createEmployee(req: Request, res: Response) {
@@ -32,5 +33,34 @@ export const employeeController = {
   async deactivateEmployee(req: Request, res: Response) {
     await employeeService.deactivateEmployee(req.params.id, (req as any).userId ?? "system");
     res.status(204).send();
+  },
+
+  async updateMyProfile(req: any, res: any): Promise<unknown> {
+    const userId = req.authUser?.id;
+    if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    const [rows] = await db.execute(
+      'SELECT id FROM employees WHERE user_id = ? AND active_status = 1 LIMIT 1',
+      [userId]
+    ) as any[];
+    if (!rows.length) return res.status(404).json({ success: false, error: 'No employee record' });
+    const empId = rows[0].id;
+
+    // Whitelist: only these fields may be self-edited
+    const allowed = ['phone', 'address', 'city', 'country', 'date_of_birth', 'gender',
+                     'working_hours_start', 'working_hours_end', 'working_days'];
+    const updates: Record<string, unknown> = {};
+    for (const key of allowed) {
+      if (key in req.body) updates[key] = req.body[key];
+    }
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ success: false, error: 'No editable fields provided' });
+    }
+    const sets = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+    const vals = [...Object.values(updates), empId];
+    await db.execute(`UPDATE employees SET ${sets}, updated_at = NOW() WHERE id = ?`, vals);
+    const [updated] = await db.execute(
+      'SELECT * FROM employees WHERE id = ? LIMIT 1', [empId]
+    ) as any[];
+    return res.json({ success: true, data: updated[0] });
   },
 };
