@@ -43,6 +43,7 @@ describe('Customization API', () => {
   let _pendingPriority: number | null = null;
 
   beforeAll(() => {
+    process.env.INTERNAL_DEMO_BYPASS = 'true';
     // Route mock responses by SQL pattern; role resolved from params
     mockExecute.mockImplementation(async (sql: string, params?: unknown[]) => {
       const s = (sql as string).replace(/\s+/g, ' ').toLowerCase();
@@ -71,6 +72,10 @@ describe('Customization API', () => {
       }
       return [{ affectedRows: 1, insertId: 1 }, []];
     });
+  });
+
+  afterAll(() => {
+    delete process.env.INTERNAL_DEMO_BYPASS;
   });
 
   describe('POST /api/customization/rules', () => {

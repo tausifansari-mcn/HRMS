@@ -46,6 +46,11 @@ vi.mock("../src/middleware/scopeMiddleware.js", () => ({
   requireRosterPlanScope: () => (_req: any, _res: any, next: any) => next(),
   getTargetFromBodyOrQuery: () => ({}),
 }));
+vi.mock("../src/shared/accessGuard.js", () => ({
+  getEmployeeForUser: vi.fn().mockResolvedValue({ id: "emp-1", employee_code: "EMP001" }),
+  hasRole: vi.fn().mockResolvedValue(true),
+  selfOrAdminHr: () => (_req: any, _res: any, next: any) => next(),
+}));
 
 import { supabaseAuthClient } from "../src/db/supabaseAdmin.js";
 import { leaveService } from "../src/modules/leave/leave.service.js";
