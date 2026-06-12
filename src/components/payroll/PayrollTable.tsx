@@ -158,10 +158,11 @@ export function PayrollTable({
 
   const downloadPayslipPDF = async (record: PayrollRecord) => {
     setDownloadingId(record.id);
-    
+
     try {
       // Fetch salary structure for detailed breakdown
-      await hrmsApi.get<{success:boolean;data:any}>("/api/payroll/structures");
+      const structureResponse = await hrmsApi.get<{success:boolean;data:any}>("/api/payroll/structures");
+      const salaryStructure = structureResponse.data;
 
       const monthName = MONTH_NAMES[record.monthNum - 1] || "";
 
