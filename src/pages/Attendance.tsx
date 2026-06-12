@@ -269,10 +269,21 @@ const Attendance = () => {
 
   const { data: todayRecord, isLoading: todayLoading } =
     useTodayAttendance(currentEmployee?.id);
-  const { data: attendanceRecords, isLoading: recordsLoading } = useAttendance(
+  const { data: attendanceRecords, isLoading: recordsLoading, error: recordsError } = useAttendance(
     targetDate,
     currentEmployee?.id
   );
+
+  // Debug logging
+  useEffect(() => {
+    console.log("Attendance Debug:", {
+      recordsLoading,
+      recordsError,
+      attendanceRecords,
+      targetDate,
+      employeeId: currentEmployee?.id,
+    });
+  }, [recordsLoading, recordsError, attendanceRecords, targetDate, currentEmployee?.id]);
   const { data: reportData, isLoading: reportLoading } =
     useAttendanceReport(targetDate);
 

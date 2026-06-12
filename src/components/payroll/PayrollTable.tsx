@@ -160,13 +160,17 @@ export function PayrollTable({
     setDownloadingId(record.id);
 
     try {
+      console.log("Starting payslip download for:", record.employee.name);
+
       // Fetch salary structure for detailed breakdown
       const structureResponse = await hrmsApi.get<{success:boolean;data:any}>("/api/payroll/structures");
       const salaryStructure = structureResponse.data;
 
+      console.log("Salary structure fetched:", salaryStructure);
+
       const monthName = MONTH_NAMES[record.monthNum - 1] || "";
 
-      downloadPayslip({
+      const payslipData = {
         employeeName: record.employee.name,
         employeeCode: record.employeeCode,
         employeeEmail: record.employee.email,
@@ -186,16 +190,23 @@ export function PayrollTable({
           tax_deduction: salaryStructure.tax_deduction ?? undefined,
           other_deductions: salaryStructure.other_deductions ?? undefined,
         } : undefined,
-      }, `Payslip_${record.employeeCode}_${monthName}_${record.year}.pdf`);
-      
+      };
+
+      console.log("Calling downloadPayslip with data:", payslipData);
+
+      downloadPayslip(payslipData, `Payslip_${record.employeeCode}_${monthName}_${record.year}.pdf`);
+
+      console.log("Payslip download completed successfully");
+
       toast({
         title: "Payslip Downloaded",
         description: `PDF generated for ${record.employee.name}`,
       });
     } catch (error) {
+      console.error("Payslip download error:", error);
       toast({
         title: "Download Failed",
-        description: "Could not generate payslip PDF",
+        description: error instanceof Error ? error.message : "Could not generate payslip PDF",
         variant: "destructive",
       });
     } finally {
