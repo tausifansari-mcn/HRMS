@@ -37,10 +37,10 @@ VALUES
     'Vicidial agent log. UNION ALL across 8 tables. Live read on Performance page.',
     JSON_OBJECT(
       'db_type', 'mysql',
-      'host', '122.184.128.90',
+      'host', '',
       'port', 3306,
       'database', 'dialer_db',
-      'username', 'root',
+      'username', '',
       'date_column', 'event_time',
       'employee_code_column', 'agent_user',
       'tables', JSON_ARRAY(
