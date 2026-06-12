@@ -32,6 +32,7 @@ const envSchema = z.object({
   PORTAL_DEMO_BYPASS: z.string().default("false"),
   // Required secret for payroll bank account AES encryption. Must be set in production.
   PAYROLL_BANK_KEY: z.string().min(16).default("hrms-bank-key-dev"),
+  ENCRYPTION_KEY: z.string().length(64).default('0000000000000000000000000000000000000000000000000000000000000000'),
   // Dedicated AES-256-GCM key for communication provider secrets. Falls back to PAYROLL_BANK_KEY if not set.
   COMM_SECRET: z.string().min(16).optional(),
   // Enables mock-token demo bypass. Must NOT be "true" in production.
@@ -125,6 +126,10 @@ if (parsed.data.NODE_ENV === "production") {
   }
   if (parsed.data.PAYROLL_BANK_KEY === "hrms-bank-key-dev") {
     console.error("[FATAL] PAYROLL_BANK_KEY must be set to a secure value in production.");
+    process.exit(1);
+  }
+  if (parsed.data.ENCRYPTION_KEY === '0000000000000000000000000000000000000000000000000000000000000000') {
+    console.error('[FATAL] ENCRYPTION_KEY must be set to a secure 64-char hex value in production.');
     process.exit(1);
   }
   if (parsed.data.INTERNAL_DEMO_BYPASS === "true") {
