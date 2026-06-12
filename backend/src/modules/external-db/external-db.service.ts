@@ -38,7 +38,10 @@ export function decryptCredentials(stored: string): DbCredentials {
   const encrypted = Buffer.from(encHex, 'hex');
   const decipher = createDecipheriv(ALGO, KEY_BUF(), iv);
   decipher.setAuthTag(tag);
-  const plain = decipher.update(encrypted) + decipher.final('utf8');
+  const plain = Buffer.concat([
+    decipher.update(encrypted),
+    decipher.final(),
+  ]).toString('utf8');
   return JSON.parse(plain) as DbCredentials;
 }
 
@@ -64,7 +67,11 @@ export async function getPoolForKey(key: string): Promise<sql.ConnectionPool | m
 
   if (creds.db_type === 'mssql') {
     const existing = mssqlPools.get(key);
-    if (existing && existing.connected) return existing;
+    if (existing) {
+      if (existing.connected) return existing;
+      await existing.close().catch(() => {});
+      mssqlPools.delete(key);
+    }
     const pool = await new sql.ConnectionPool({
       server: creds.host,
       port: creds.port,
@@ -114,8 +121,8 @@ export async function testPoolForKey(key: string): Promise<{ ok: boolean; error?
       await (pool as mysql.Pool).execute('SELECT 1 AS ok');
     }
     return { ok: true };
-  } catch (e: any) {
+  } catch (e: unknown) {
     invalidatePool(key);
-    return { ok: false, error: e.message };
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
