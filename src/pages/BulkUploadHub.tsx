@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { hrmsApi, getAuthToken } from "@/lib/hrmsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { StatusBadge as SmartHRStatusBadge, normalizeStatus } from "@/components/ui/status-badge";
 
 type UploadTemplate = {
   id: string;
@@ -1497,17 +1498,29 @@ function StatusBadge({
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
+  const statusMap: Record<string, string> = {
+    uploaded: "pending",
+    validating: "in_progress",
+    validated: "success",
+    validation_failed: "warning",
+    importing: "in_progress",
+    imported: "success",
+    imported_with_errors: "warning",
+    failed: "failed",
+    cancelled: "cancelled",
+    pending: "pending",
+    valid: "success",
+    error: "failed",
+    skipped: "cancelled",
+    active: "success",
+    inactive: "cancelled",
+  };
+
   return (
-    <span
-      className={`inline-flex rounded-full border font-semibold ${
-        small ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs"
-      } ${
-        statusClass[status] ||
-        rowStatusClass[status] ||
-        "bg-slate-100 text-slate-700 border-slate-200"
-      }`}
-    >
-      {label}
-    </span>
+    <SmartHRStatusBadge
+      status={normalizeStatus(statusMap[status] || status)}
+      label={label}
+      className={small ? "text-[11px] px-2 py-0.5" : ""}
+    />
   );
 }
