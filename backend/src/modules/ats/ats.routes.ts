@@ -13,6 +13,7 @@ import onboardingFullRouter from "./onboarding-full.routes.js";
 import bgvVerificationRouter from "./bgv-verification.routes.js";
 import { registrationEnhancedRouter } from "./registration.enhanced.routes.js";
 import { payrollHRRouter } from "./payroll-hr.routes.js";
+import { interviewRouter } from "./interview.routes.js";
 import { atsQueueService } from "./ats.queue.service.js";
 import { verifyRecruiter, getMyPendingCandidates, getSubmissionHistory, resolveRecruiterForActor } from "../ats-full-parity/recruiterInterview.service.js";
 import multer from "multer";
@@ -132,6 +133,9 @@ atsRouter.use(requireAuth);
 
 // Payroll HR validation routes (with salary_start_date support)
 atsRouter.use("/payroll-hr", payrollHRRouter);
+
+// Interview routes (recruiter portal)
+atsRouter.use("/interview", interviewRouter);
 
 // Candidates (HR/recruiter facing) - Scoped
 atsRouter.get("/candidates", requireRole("admin", "hr", "recruiter", "manager"), h(async (req, res) => {
