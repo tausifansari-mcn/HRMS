@@ -216,7 +216,7 @@ const ReviewsManagement = () => {
         ) : filteredReviews && filteredReviews.length > 0 ? (
           <Card>
             <CardContent className="p-0">
-              <Table>
+              <Table className="smarthr-table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Employee</TableHead>
@@ -229,7 +229,7 @@ const ReviewsManagement = () => {
                 </TableHeader>
                 <TableBody>
                   {filteredReviews.map((review: any) => (
-                    <TableRow key={review.id}>
+                    <TableRow key={review.id} className="hover:bg-gray-50 transition-colors">
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">

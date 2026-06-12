@@ -297,7 +297,7 @@ export default function SuperAdminAccessControl() {
                       <CardTitle className="text-lg">Current Page Assignments for {userEmail}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <Table>
+                      <Table className="smarthr-table">
                         <TableHeader>
                           <TableRow>
                             <TableHead>Page</TableHead>
@@ -313,7 +313,7 @@ export default function SuperAdminAccessControl() {
                           {userPageAccess.map(access => {
                             const page = pages.find(p => p.page_code === access.page_code);
                             return (
-                              <TableRow key={access.page_code}>
+                              <TableRow key={access.page_code} className="hover:bg-gray-50 transition-colors">
                                 <TableCell>
                                   <div>
                                     <p className="font-medium">{page?.page_name || access.page_code}</p>

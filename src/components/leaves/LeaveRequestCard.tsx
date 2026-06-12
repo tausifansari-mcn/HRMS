@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Check, X, Calendar, Clock, UserCheck } from "lucide-react";
+import { StatusBadge, normalizeStatus } from "@/components/ui/status-badge";
 
 export interface LeaveRequest {
   id: string;
@@ -148,9 +149,10 @@ export function LeaveRequestCard({ request, onApprove, onReject }: LeaveRequestC
                 )}
               </>
             ) : (
-              <Badge variant="outline" className={statusStyles[request.status] || ""}>
-                {request.status}
-              </Badge>
+              <StatusBadge
+                status={normalizeStatus(request.status)}
+                label={request.status}
+              />
             )}
           </div>
         </div>

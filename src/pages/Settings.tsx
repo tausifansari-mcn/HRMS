@@ -391,7 +391,7 @@ const Settings = () => {
                 ) : departments.length === 0 ? (
                   <div className="py-8 text-center text-muted-foreground">No departments found. Add your first department.</div>
                 ) : (
-                  <Table>
+                  <Table className="smarthr-table">
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
@@ -401,7 +401,7 @@ const Settings = () => {
                     </TableHeader>
                     <TableBody>
                       {departments.map((dept) => (
-                        <TableRow key={dept.id}>
+                        <TableRow key={dept.id} className="hover:bg-gray-50 transition-colors">
                           <TableCell className="font-medium">{dept.name}</TableCell>
                           <TableCell className="text-muted-foreground">{dept.description || '-'}</TableCell>
                           <TableCell>

@@ -344,7 +344,7 @@ export default function NativeMasterReports() {
                         <p className="px-6 py-8 text-center text-sm text-slate-400">No data returned for the selected filters.</p>
                       ) : (
                         <div className="overflow-auto max-h-[60vh]">
-                          <Table>
+                          <Table className="smarthr-table">
                             <TableHeader>
                               <TableRow>
                                 {result.columns.map((col) => (
@@ -356,7 +356,7 @@ export default function NativeMasterReports() {
                             </TableHeader>
                             <TableBody>
                               {result.rows.map((row, ri) => (
-                                <TableRow key={ri}>
+                                <TableRow key={ri} className="hover:bg-gray-50 transition-colors">
                                   {result.columns.map((col) => {
                                     const val = (row as Record<string, unknown>)[col];
                                     const display = val === null || val === undefined ? '—' : String(val);

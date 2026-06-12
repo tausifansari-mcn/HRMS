@@ -253,7 +253,7 @@ export default function NativeDocumentVerification() {
                 </p>
               )}
               {unverifiedQuery.data && (
-                <Table>
+                <Table className="smarthr-table">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Emp Code</TableHead>
@@ -276,7 +276,7 @@ export default function NativeDocumentVerification() {
                       </TableRow>
                     )}
                     {unverifiedQuery.data.map((doc) => (
-                      <TableRow key={doc.id}>
+                      <TableRow key={doc.id} className="hover:bg-gray-50 transition-colors">
                         <TableCell className="font-mono text-xs">
                           {doc.employee_code ?? "—"}
                         </TableCell>
@@ -340,7 +340,7 @@ export default function NativeDocumentVerification() {
                 </p>
               )}
               {expiringQuery.data && (
-                <Table>
+                <Table className="smarthr-table">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Employee</TableHead>
@@ -362,7 +362,7 @@ export default function NativeDocumentVerification() {
                       </TableRow>
                     )}
                     {expiringQuery.data.map((doc) => (
-                      <TableRow key={doc.id}>
+                      <TableRow key={doc.id} className="hover:bg-gray-50 transition-colors">
                         <TableCell>
                           <div className="flex flex-col">
                             <span className="font-medium text-sm">
@@ -445,7 +445,7 @@ export default function NativeDocumentVerification() {
                 </p>
               )}
               {selectedDocId && accessLogQuery.data && (
-                <Table>
+                <Table className="smarthr-table">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Accessed By</TableHead>
@@ -466,7 +466,7 @@ export default function NativeDocumentVerification() {
                       </TableRow>
                     )}
                     {accessLogQuery.data.map((entry) => (
-                      <TableRow key={entry.id}>
+                      <TableRow key={entry.id} className="hover:bg-gray-50 transition-colors">
                         <TableCell>
                           {entry.first_name || entry.last_name
                             ? fullName(entry)

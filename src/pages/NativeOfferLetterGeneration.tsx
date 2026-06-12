@@ -414,7 +414,7 @@ export default function NativeOfferLetterGeneration() {
 
                 {letters.length > 0 && (
                   <div className="rounded-xl border overflow-hidden">
-                    <Table>
+                    <Table className="smarthr-table">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Template</TableHead>
@@ -426,7 +426,7 @@ export default function NativeOfferLetterGeneration() {
                       </TableHeader>
                       <TableBody>
                         {letters.map((letter) => (
-                          <TableRow key={letter.id}>
+                          <TableRow key={letter.id} className="hover:bg-gray-50 transition-colors">
                             <TableCell className="font-medium text-sm">{letter.template_name}</TableCell>
                             <TableCell><Badge variant="secondary">{letter.letter_type}</Badge></TableCell>
                             <TableCell className="text-sm text-slate-500">

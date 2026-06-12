@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { hrmsApi } from "@/lib/hrmsApi";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { StatusBadge as SmartHRStatusBadge, normalizeStatus } from "@/components/ui/status-badge";
 
 type RequestStatus =
   | "submitted"
@@ -570,14 +571,20 @@ function Td({ children }: { children: ReactNode }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const statusMap: Record<string, string> = {
+    submitted: "pending",
+    pending_manager: "pending",
+    pending_admin: "pending",
+    approved: "success",
+    rejected: "failed",
+    cancelled: "cancelled",
+  };
+
   return (
-    <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
-        statusClass[status] || "bg-slate-100 text-slate-700 border-slate-200"
-      }`}
-    >
-      {statusLabel[status] || status}
-    </span>
+    <SmartHRStatusBadge
+      status={normalizeStatus(statusMap[status] || status)}
+      label={statusLabel[status] || status}
+    />
   );
 }
 

@@ -104,7 +104,7 @@ export default function NativeCallCentreConfig() {
               </div>
             )}
             {!isLoading && !isError && rows.length > 0 && (
-              <Table>
+              <Table className="smarthr-table">
                 <TableHeader>
                   <TableRow className="bg-slate-50">
                     <TableHead className="pl-6">Branch Name</TableHead>

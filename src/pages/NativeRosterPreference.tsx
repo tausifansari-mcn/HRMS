@@ -468,7 +468,7 @@ export default function NativeRosterPreference() {
                   </p>
                 )}
                 {myPrefsQuery.data && (
-                  <Table>
+                  <Table className="smarthr-table">
                     <TableHeader>
                       <TableRow>
                         <TableHead>Shift</TableHead>
@@ -491,7 +491,7 @@ export default function NativeRosterPreference() {
                         </TableRow>
                       )}
                       {myPrefsQuery.data.map((pref) => (
-                        <TableRow key={pref.id}>
+                        <TableRow key={pref.id} className="hover:bg-gray-50 transition-colors">
                           <TableCell className="text-sm">
                             {pref.shift_name ?? (pref.preferred_shift_id ? (
                               <span className="font-mono text-xs text-slate-400">
@@ -603,7 +603,7 @@ export default function NativeRosterPreference() {
               )}
 
               {pendingQuery.data && (
-                <Table>
+                <Table className="smarthr-table">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Employee</TableHead>
@@ -627,7 +627,7 @@ export default function NativeRosterPreference() {
                       </TableRow>
                     )}
                     {pendingQuery.data.map((pref) => (
-                      <TableRow key={pref.id}>
+                      <TableRow key={pref.id} className="hover:bg-gray-50 transition-colors">
                         <TableCell>
                           <div className="flex flex-col">
                             <span className="font-medium text-sm">

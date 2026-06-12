@@ -536,7 +536,7 @@ export default function EnhancedClientMaster() {
                 {usersLoading ? (
                   <div className="text-center py-8">Loading users...</div>
                 ) : (
-                  <Table>
+                  <Table className="smarthr-table">
                     <TableHeader>
                       <TableRow>
                         <TableHead>User</TableHead>
@@ -549,7 +549,7 @@ export default function EnhancedClientMaster() {
                     </TableHeader>
                     <TableBody>
                       {portalUsers.map((user) => (
-                        <TableRow key={user.id}>
+                        <TableRow key={user.id} className="hover:bg-gray-50 transition-colors">
                           <TableCell>
                             <div>
                               <div className="font-medium">{user.full_name || user.email}</div>
@@ -667,7 +667,7 @@ export default function EnhancedClientMaster() {
                 <CardDescription>Last 30 days activity</CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
+                <Table className="smarthr-table">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Client</TableHead>
@@ -680,7 +680,7 @@ export default function EnhancedClientMaster() {
                   </TableHeader>
                   <TableBody>
                     {usageSummary.map((usage: any) => (
-                      <TableRow key={usage.client_id}>
+                      <TableRow key={usage.client_id} className="hover:bg-gray-50 transition-colors">
                         <TableCell className="font-medium">{usage.client_name}</TableCell>
                         <TableCell>{usage.active_users}</TableCell>
                         <TableCell>{usage.last_30_days_logins}</TableCell>
