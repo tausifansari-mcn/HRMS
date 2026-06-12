@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { ReportingManagerChangeDialog } from "@/components/profile/ReportingManagerChangeDialog";
+import { useMyRMChangeRequests } from "@/hooks/useReportingManagerChange";
 import { hrmsApi } from "@/lib/hrmsApi";
 import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -52,6 +54,7 @@ interface EmployeeProfile {
   working_hours_start: string | null;
   working_hours_end: string | null;
   working_days: number[] | null;
+  reporting_manager_name: string | null;
 }
 
 interface ProfileForm {
@@ -78,6 +81,7 @@ const Profile = () => {
 
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [isEditing, setIsEditing] = useState(false);
+  const [rmChangeOpen, setRmChangeOpen] = useState(false);
   const [formData, setFormData] = useState<ProfileForm>({
     phone: '',
     address: '',
@@ -104,6 +108,9 @@ const Profile = () => {
       return next;
     });
   };
+
+  const { data: myRMRequests } = useMyRMChangeRequests();
+  const hasPendingRMRequest = myRMRequests?.some(r => r.status === 'pending') ?? false;
 
   // Fetch employee profile linked to current user
   const { data: employee, isLoading } = useQuery({
@@ -418,6 +425,25 @@ const Profile = () => {
                       <p className="text-xs text-muted-foreground">Contact HR to change department assignment</p>
                     </div>
 
+                    <div className="space-y-2">
+                      <Label>Reporting Manager</Label>
+                      <div className="flex items-center gap-2">
+                        <Input value={employee.reporting_manager_name || "Not assigned"} disabled className="flex-1" />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={hasPendingRMRequest}
+                          onClick={() => setRmChangeOpen(true)}
+                          title={hasPendingRMRequest ? 'A change request is pending approval' : 'Request manager change'}
+                        >
+                          {hasPendingRMRequest ? 'Pending' : 'Change'}
+                        </Button>
+                      </div>
+                      {hasPendingRMRequest && (
+                        <p className="text-xs text-amber-600">A change request is pending approval</p>
+                      )}
+                    </div>
+
                     <Separator />
 
                     {/* Working Schedule Section */}
@@ -535,6 +561,12 @@ const Profile = () => {
           </Tabs>
         )}
       </div>
+
+      <ReportingManagerChangeDialog
+        open={rmChangeOpen}
+        onOpenChange={setRmChangeOpen}
+        currentManagerName={employee?.reporting_manager_name}
+      />
     </DashboardLayout>
   );
 };
