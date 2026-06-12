@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { hrmsApi } from "@/lib/hrmsApi";
+import { DatabaseConnectorCard } from "@/components/integrations/DatabaseConnectorCard";
+import { DatabaseConfigModal } from "@/components/integrations/DatabaseConfigModal";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -152,6 +154,12 @@ export default function NativeIntegrationHub() {
   const [connectors, setConnectors] = useState<Connector[]>([]);
   const [runningKey, setRunningKey] = useState<string | null>(null);
 
+  // Database Connectors
+  const [dbConnectors, setDbConnectors] = useState<any[]>([]);
+  const [dbConfigOpen, setDbConfigOpen] = useState(false);
+  const [activeDbKey, setActiveDbKey] = useState<string | null>(null);
+  const [testingKey, setTestingKey] = useState<string | null>(null);
+
   // Run History
   const [runs, setRuns] = useState<RunRecord[]>([]);
   const [runsLoading, setRunsLoading] = useState(false);
@@ -189,6 +197,25 @@ export default function NativeIntegrationHub() {
       setMessage(msg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDbConnectors = async () => {
+    try {
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>('/api/external-db');
+      setDbConnectors(res.data ?? []);
+    } catch { /* silent */ }
+  };
+
+  const testDbConnector = async (key: string) => {
+    setTestingKey(key);
+    try {
+      await hrmsApi.post(`/api/external-db/${key}/test`, {});
+      await loadDbConnectors();
+    } catch (err: unknown) {
+      setMessage(err instanceof Error ? err.message : 'Test failed');
+    } finally {
+      setTestingKey(null);
     }
   };
 
@@ -238,6 +265,7 @@ export default function NativeIntegrationHub() {
 
   useEffect(() => {
     void loadConnectors();
+    void loadDbConnectors();
   }, []);
 
   useEffect(() => {
@@ -474,6 +502,32 @@ export default function NativeIntegrationHub() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {dbConnectors.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-sm font-black uppercase tracking-widest text-slate-400">Database Connectors</h2>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {dbConnectors.map((dc) => {
+                    const cfg = dc.config_json ?? {};
+                    return (
+                      <DatabaseConnectorCard
+                        key={dc.integration_key}
+                        integrationKey={dc.integration_key}
+                        name={dc.integration_name}
+                        config={cfg}
+                        activeStatus={dc.active_status}
+                        testOk={dc.test_ok}
+                        testError={dc.test_error}
+                        testAt={dc.test_at}
+                        onConfigure={() => { setActiveDbKey(dc.integration_key); setDbConfigOpen(true); }}
+                        onTest={() => testDbConnector(dc.integration_key)}
+                        isTesting={testingKey === dc.integration_key}
+                      />
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -847,6 +901,22 @@ export default function NativeIntegrationHub() {
           </div>
         )}
       </div>
+
+      {/* ── Database Config Modal ───────────────────────────────────────────── */}
+      {dbConfigOpen && activeDbKey && (() => {
+        const dc = dbConnectors.find(d => d.integration_key === activeDbKey);
+        if (!dc) return null;
+        const cfg = dc.config_json ?? {};
+        return (
+          <DatabaseConfigModal
+            open={dbConfigOpen}
+            onClose={() => { setDbConfigOpen(false); void loadDbConnectors(); }}
+            integrationKey={activeDbKey}
+            name={dc.integration_name}
+            initialConfig={cfg}
+          />
+        );
+      })()}
 
       {/* ── Add Connector Modal ─────────────────────────────────────────────── */}
       {showAddModal && (
