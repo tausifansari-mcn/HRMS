@@ -2,7 +2,7 @@
 USE mas_hrms;
 
 -- 1. Fix EL max_days_per_year from 15 → 18
-UPDATE leave_type_master SET max_days_per_year = 18 WHERE leave_code = 'EL';
+UPDATE leave_type_master SET max_days_per_year = 18 WHERE leave_code = 'EL' AND max_days_per_year != 18;
 
 -- 2. leave_request.status is VARCHAR(50), so 'pending_branch_head' value is already supported.
 --    No schema change required.
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS leave_policy_config (
   max_days_per_occurrence   DECIMAL(5,2)  NOT NULL DEFAULT 0,
   exception_approver_role   VARCHAR(50)   NULL,
   created_at                DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (leave_type_id) REFERENCES leave_type_master(id)
+  FOREIGN KEY (leave_type_id) REFERENCES leave_type_master(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. Seed CL policy: 1 day/month credit, max 2 days/month, no occurrence limits
@@ -30,7 +30,7 @@ INSERT INTO leave_policy_config (
 )
 SELECT id, 1.00, 0.00, 0, 2.00, 0, 0.00, NULL
 FROM leave_type_master WHERE leave_code = 'CL'
-ON DUPLICATE KEY UPDATE monthly_credit_days = 1.00, max_days_per_month = 2.00;
+ON DUPLICATE KEY UPDATE monthly_credit_days = 1.00, max_days_per_month = 2.00; -- idempotent re-run: update core policy fields if row already exists
 
 -- 5. Seed EL policy: 18 days/year on Jan 1, max 2 occurrences/year, max 12 days/occurrence, branch_head exception
 INSERT INTO leave_policy_config (
