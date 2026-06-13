@@ -17,7 +17,7 @@ export const leaveRequestSchema = z
     leaveTypeId: z.string().uuid(),
     fromDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
     toDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
-    totalDays: z.number().min(0.5),
+    totalDays: z.number().min(0.5).max(182),
     reason: z.string().trim().nullable().optional(),
   })
   .refine((d) => d.toDate >= d.fromDate, { message: "toDate must be >= fromDate" })
@@ -32,7 +32,7 @@ export const leaveRequestSchema = z
   });
 
 export const reviewLeaveSchema = z.object({
-  status: z.enum(["approved", "rejected"]),
+  status: z.enum(["approved", "rejected", "branch_head_approved", "branch_head_rejected"]),
   remarks: z.string().trim().nullable().optional(),
 });
 
