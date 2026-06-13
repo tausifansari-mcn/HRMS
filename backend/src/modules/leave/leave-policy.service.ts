@@ -46,7 +46,7 @@ async function checkMonthlyCapExceeded(
 
   for (const { year, month } of months) {
     const excludeClause = excludeRequestId ? "AND lr.id != ?" : "";
-    const params: unknown[] = [employeeId, year, month, year, month];
+    const params: unknown[] = [employeeId, year, month, year, month, year, month];
     if (excludeRequestId) params.push(excludeRequestId);
 
     const sql = `
@@ -58,8 +58,8 @@ async function checkMonthlyCapExceeded(
         )
         AND lr.status IN ('approved', 'pending', 'pending_branch_head')
         AND (
-          (YEAR(lr.from_date) = ? AND MONTH(lr.from_date) = ?)
-          OR (YEAR(lr.to_date) = ? AND MONTH(lr.to_date) = ?)
+          lr.from_date <= LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+          AND lr.to_date >= CONCAT(?, '-', LPAD(?, 2, '0'), '-01')
         )
         ${excludeClause}
     `;
@@ -89,7 +89,7 @@ async function checkCLMLInSameMonth(
 
   for (const { year, month } of months) {
     const excludeClause = excludeRequestId ? "AND lr.id != ?" : "";
-    const params: unknown[] = [employeeId, year, month, year, month];
+    const params: unknown[] = [employeeId, year, month, year, month, year, month];
     if (excludeRequestId) params.push(excludeRequestId);
 
     const sql = `
@@ -101,8 +101,8 @@ async function checkCLMLInSameMonth(
         )
         AND lr.status IN ('approved', 'pending', 'pending_branch_head')
         AND (
-          (YEAR(lr.from_date) = ? AND MONTH(lr.from_date) = ?)
-          OR (YEAR(lr.to_date) = ? AND MONTH(lr.to_date) = ?)
+          lr.from_date <= LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+          AND lr.to_date >= CONCAT(?, '-', LPAD(?, 2, '0'), '-01')
         )
         ${excludeClause}
     `;
@@ -132,7 +132,7 @@ async function checkELInSameMonth(
 
   for (const { year, month } of months) {
     const excludeClause = excludeRequestId ? "AND lr.id != ?" : "";
-    const params: unknown[] = [employeeId, year, month, year, month];
+    const params: unknown[] = [employeeId, year, month, year, month, year, month];
     if (excludeRequestId) params.push(excludeRequestId);
 
     const sql = `
@@ -144,8 +144,8 @@ async function checkELInSameMonth(
         )
         AND lr.status IN ('approved', 'pending', 'pending_branch_head')
         AND (
-          (YEAR(lr.from_date) = ? AND MONTH(lr.from_date) = ?)
-          OR (YEAR(lr.to_date) = ? AND MONTH(lr.to_date) = ?)
+          lr.from_date <= LAST_DAY(CONCAT(?, '-', LPAD(?, 2, '0'), '-01'))
+          AND lr.to_date >= CONCAT(?, '-', LPAD(?, 2, '0'), '-01')
         )
         ${excludeClause}
     `;
@@ -260,7 +260,7 @@ function prorateAnnualCredit(
     // months from join month to December, inclusive
     monthsServed = 12 - joinMonth + 1;
   } else {
-    // joined after priorYear ends — no credit
+    // joined in creditYear or later — no prior-year service
     monthsServed = 0;
   }
 
