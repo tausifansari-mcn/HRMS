@@ -22,16 +22,38 @@ router.get("/me", h(async (req: any, res: any) => {
   const { db } = await import("../../db/mysql.js");
   const [rows] = await db.execute(
     `SELECT e.*,
-            COALESCE(CONCAT(m.first_name, ' ', COALESCE(m.last_name, '')), '') AS reporting_manager_name
+            COALESCE(CONCAT(m.first_name, ' ', COALESCE(m.last_name, '')), '') AS reporting_manager_name,
+            dept.dept_name AS department_name
      FROM employees e
      LEFT JOIN employees m ON m.id = e.reporting_manager_id
+     LEFT JOIN department_master dept ON dept.id = e.department_id
      WHERE e.user_id = ? AND e.active_status = 1
      LIMIT 1`,
     [userId]
   ) as any[];
   if (!rows.length) return res.status(404).json({ success: false, error: "No employee record for this user" });
-  return res.json({ success: true, data: rows[0] });
+
+  // Transform DB fields to match frontend expectations
+  const employee = rows[0];
+  const transformed = {
+    ...employee,
+    // Map mobile to phone
+    phone: employee.mobile || null,
+    // Map address1 to address
+    address: employee.address1 || null,
+    // Map state to country (temporary until country field is added to DB)
+    country: employee.state || null,
+    // Add department object structure
+    department: employee.department_name ? { name: employee.department_name } : null,
+    // Keep date_of_joining as hire_date for compatibility
+    hire_date: employee.date_of_joining,
+  };
+
+  return res.json({ success: true, data: transformed });
 }));
+
+// PATCH /api/employees/me — update own profile (employee self-service)
+router.patch("/me", h(c.updateMyProfile));
 
 // GET /api/employees/stats — aggregate counts (must be before /:id to avoid route collision)
 router.get("/stats", requireRole("admin", "hr", "manager", "ceo"), h(async (_req: any, res: any) => {

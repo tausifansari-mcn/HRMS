@@ -55,6 +55,7 @@ const NativeBGVVerificationCenter   = lazy(() => import("./pages/NativeBGVVerifi
 // ATS
 const NativeATSDashboardReplica     = lazy(() => import("./pages/NativeATSDashboardReplica"));
 const NativeATSCandidateRegistration = lazy(() => import("./pages/NativeATSCandidateRegistration"));
+const NativeATSRegistrationEnhanced = lazy(() => import("./pages/NativeATSRegistrationEnhanced"));
 const NativeATSRecruiterDashboard   = lazy(() => import("./pages/NativeATSRecruiterDashboard"));
 const NativeATSOnboardingBridge     = lazy(() => import("./pages/NativeATSOnboardingBridge"));
 const NativeATSWaitingQueue         = lazy(() => import("./pages/NativeATSWaitingQueue"));
@@ -254,6 +255,7 @@ const App = () => (
               {/* ATS */}
               <Route path="/ats/dashboard" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativeATSDashboardReplica /></Gate></ProtectedRoute>} />
               <Route path="/ats/candidate-registration" element={<ProtectedRoute><NativeATSCandidateRegistration /></ProtectedRoute>} />
+              <Route path="/ats/registration-enhanced" element={<ProtectedRoute><NativeATSRegistrationEnhanced /></ProtectedRoute>} />
               <Route path="/ats/recruiter/my-candidates" element={<ProtectedRoute><Gate pageCode="ATS_RECRUITER_QUEUE"><NativeATSRecruiterDashboard /></Gate></ProtectedRoute>} />
               <Route path="/ats/onboarding-bridge" element={<ProtectedRoute><Gate pageCode="ATS_ONBOARDING_BRIDGE"><NativeATSOnboardingBridge /></Gate></ProtectedRoute>} />
               <Route path="/ats/waiting-queue" element={<ProtectedRoute><Gate pageCode="ATS_WAITING_QUEUE"><NativeATSWaitingQueue /></Gate></ProtectedRoute>} />

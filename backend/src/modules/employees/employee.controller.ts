@@ -45,19 +45,40 @@ export const employeeController = {
     if (!rows.length) return res.status(404).json({ success: false, error: 'No employee record' });
     const empId = rows[0].id;
 
-    // Whitelist: only these fields may be self-edited
+    // Map frontend field names to database column names
+    const fieldMapping: Record<string, string> = {
+      phone: 'mobile',
+      address: 'address1',
+      country: 'state', // Temporarily map country to state until country column is added
+    };
+
+    // Whitelist: only these DB fields may be self-edited
     const allowed = ['mobile', 'address1', 'address2', 'city', 'state', 'pincode',
-                     'date_of_birth', 'gender', 'blood_group', 'nominee_name', 'nominee_relation'];
+                     'date_of_birth', 'gender', 'blood_group', 'nominee_name', 'nominee_relation',
+                     'working_hours_start', 'working_hours_end', 'working_days'];
     const updates: Record<string, unknown> = {};
-    for (const key of allowed) {
-      if (key in req.body) updates[key] = req.body[key];
+
+    // Map frontend field names to DB column names and validate against whitelist
+    for (const [frontendKey, value] of Object.entries(req.body)) {
+      const dbKey = fieldMapping[frontendKey] || frontendKey;
+      if (allowed.includes(dbKey)) {
+        updates[dbKey] = value;
+      }
     }
+
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ success: false, error: 'No editable fields provided' });
     }
+
+    // Handle working_days separately - it needs JSON serialization
+    if ('working_days' in updates && Array.isArray(updates.working_days)) {
+      updates.working_days = JSON.stringify(updates.working_days);
+    }
+
     const sets = Object.keys(updates).map(k => `${k} = ?`).join(', ');
     const vals = [...Object.values(updates), empId];
     await db.execute(`UPDATE employees SET ${sets}, updated_at = NOW() WHERE id = ?`, vals);
+
     const [updated] = await db.execute(
       'SELECT * FROM employees WHERE id = ? LIMIT 1', [empId]
     ) as any[];
