@@ -15,6 +15,8 @@ const assignSalary = async (employeeId: string, structureId: string, ctcAnnual: 
     "INSERT INTO employee_salary_assignment (id, employee_id, structure_id, ctc_annual, effective_from) VALUES (?, ?, ?, ?, ?)",
     [asgId, employeeId, structureId, ctcAnnual, effectiveFrom]
   );
+  // Mirror CTC onto employees.ctc for fast payslip joins
+  await db.execute("UPDATE employees SET ctc = ? WHERE id = ?", [ctcAnnual, employeeId]);
 };
 
 export const employeeService = {
@@ -148,6 +150,7 @@ export const employeeService = {
     if (input.reportingManagerId !== undefined) { sets.push("reporting_manager_id = ?"); params.push(input.reportingManagerId ?? null); }
     if (input.photoUrl          !== undefined) { sets.push("photo_url = ?");            params.push(input.photoUrl ?? null); }
     if (input.userId            !== undefined) { sets.push("user_id = ?");              params.push(input.userId ?? null); }
+    if ((input as any).ctc      !== undefined) { sets.push("ctc = ?");                 params.push((input as any).ctc ?? null); }
 
     if (sets.length > 0) {
       params.push(id);
