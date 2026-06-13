@@ -16,6 +16,7 @@ import type {
   LeaveRequestInput,
   ReviewLeaveInput,
 } from "./leave.validation.js";
+import { leavePolicyService } from "./leave-policy.service.js";
 
 export const leaveService = {
   async listLeaveTypes(employeeId?: string): Promise<LeaveType[]> {
@@ -60,12 +61,79 @@ export const leaveService = {
   },
 
   async submitRequest(input: LeaveRequestInput): Promise<LeaveRequest> {
+    // --- Step 3: Policy validation ---
+
+    // 1. Look up leave_code for the given leaveTypeId
+    const [ltRows] = await db.execute<RowDataPacket[]>(
+      "SELECT leave_code FROM leave_type_master WHERE id = ? LIMIT 1",
+      [input.leaveTypeId]
+    );
+    const leaveCode: string | undefined = (ltRows as RowDataPacket[])[0]?.leave_code;
+
+    let initialStatus = "pending";
+
+    if (leaveCode === "CL" || leaveCode === "ML") {
+      // a. Check for EL in the same month
+      const elConflict = await leavePolicyService.checkELInSameMonth(
+        input.employeeId,
+        input.fromDate,
+        input.toDate
+      );
+      if (elConflict.hasConflict) {
+        throw new Error(
+          `EL cannot be taken in a month where CL/ML is already applied. Conflict in month: ${elConflict.conflictMonth}`
+        );
+      }
+
+      // b. Check monthly cap (2 days for CL/ML)
+      const capResult = await leavePolicyService.checkMonthlyCapExceeded(
+        input.employeeId,
+        input.fromDate,
+        input.toDate,
+        input.totalDays
+      );
+      if (capResult.exceeded) {
+        throw new Error(
+          `Monthly leave cap of 2 days reached for ${capResult.monthBreached}. Please apply excess days as Earned Leave.`
+        );
+      }
+    } else if (leaveCode === "EL") {
+      // a. EL must be at least 1 day
+      if (input.totalDays < 1) {
+        throw new Error("EL must be at least 1 day");
+      }
+
+      // b. Check for CL/ML in the same month
+      const clmlConflict = await leavePolicyService.checkCLMLInSameMonth(
+        input.employeeId,
+        input.fromDate,
+        input.toDate
+      );
+      if (clmlConflict.hasConflict) {
+        throw new Error(
+          `CL/ML and EL cannot be taken in the same calendar month. Conflict in month: ${clmlConflict.conflictMonth}`
+        );
+      }
+
+      // c & d. Determine year and check if branch head approval is required
+      const year = new Date(input.fromDate).getFullYear();
+      const needsBranchHead = await leavePolicyService.requiresBranchHeadApproval(
+        input.employeeId,
+        input.totalDays,
+        year
+      );
+      if (needsBranchHead) {
+        initialStatus = "pending_branch_head";
+      }
+    }
+    // All other leave types: initialStatus remains 'pending'
+
     const id = randomUUID();
     await db.execute(
-      `INSERT INTO leave_request (id, employee_id, leave_type_id, from_date, to_date, total_days, reason)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO leave_request (id, employee_id, leave_type_id, from_date, to_date, total_days, reason, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, input.employeeId, input.leaveTypeId, input.fromDate, input.toDate,
-       input.totalDays, input.reason ?? null]
+       input.totalDays, input.reason ?? null, initialStatus]
     );
     return this.getRequest(id);
   },
@@ -81,26 +149,108 @@ export const leaveService = {
 
   async reviewRequest(id: string, input: ReviewLeaveInput, reviewerId: string): Promise<LeaveRequest> {
     const request = await this.getRequest(id);
-    
+
+    // --- Step 4: Branch head approval path ---
+
+    // Helper: deduct leave balance (shared by 'approved' and 'branch_head_approved')
+    const deductLeaveBalance = async () => {
+      if (!request.leave_type_id) {
+        throw new Error("Leave type is required for approval");
+      }
+      const duration = request.total_days;
+      const employeeId = request.employee_id;
+      const leaveTypeId = request.leave_type_id;
+      const year = new Date(request.from_date).getFullYear();
+
+      const [balanceRows] = await db.execute<RowDataPacket[]>(
+        `SELECT * FROM leave_balance_ledger
+         WHERE employee_id = ? AND leave_type_id = ? AND balance_year = ?`,
+        [employeeId, leaveTypeId, year]
+      );
+
+      if (balanceRows.length === 0) {
+        await db.execute(
+          `INSERT INTO leave_balance_ledger (id, employee_id, leave_type_id, balance_year, allocated_days, used_days, adjusted_days)
+           VALUES (UUID(), ?, ?, ?, 0, ?, 0)`,
+          [employeeId, leaveTypeId, year, duration]
+        );
+      } else {
+        const balance = balanceRows[0];
+        const availableBalance =
+          (balance.allocated_days || 0) + (balance.adjusted_days || 0) - (balance.used_days || 0);
+        if (duration > availableBalance) {
+          throw new Error(
+            `Insufficient leave balance. Available: ${availableBalance}, Requested: ${duration}`
+          );
+        }
+        await db.execute(
+          `UPDATE leave_balance_ledger
+           SET used_days = used_days + ?
+           WHERE employee_id = ? AND leave_type_id = ? AND balance_year = ?`,
+          [duration, employeeId, leaveTypeId, year]
+        );
+      }
+    };
+
+    if (input.status === "branch_head_approved") {
+      if (request.status !== "pending_branch_head") {
+        throw new Error("Only pending_branch_head requests can be branch-head approved");
+      }
+      await deductLeaveBalance();
+      await db.execute(
+        "UPDATE leave_request SET status = ? WHERE id = ?",
+        ["approved", id]
+      );
+      await db.execute(
+        `INSERT INTO leave_approval_log (id, leave_request_id, action, action_by, remarks)
+         VALUES (UUID(), ?, ?, ?, ?)`,
+        [id, "branch_head_approved", reviewerId, input.remarks ?? null]
+      );
+      return this.getRequest(id);
+    }
+
+    if (input.status === "branch_head_rejected") {
+      if (request.status !== "pending_branch_head") {
+        throw new Error("Only pending_branch_head requests can be branch-head rejected");
+      }
+      await db.execute(
+        "UPDATE leave_request SET status = ? WHERE id = ?",
+        ["rejected", id]
+      );
+      await db.execute(
+        `INSERT INTO leave_approval_log (id, leave_request_id, action, action_by, remarks)
+         VALUES (UUID(), ?, ?, ?, ?)`,
+        [id, "branch_head_rejected", reviewerId, input.remarks ?? null]
+      );
+      return this.getRequest(id);
+    }
+
+    // Guard: standard 'approved' action cannot be used on pending_branch_head requests
+    if (input.status === "approved" && request.status === "pending_branch_head") {
+      throw new Error(
+        "This leave requires branch head approval before it can be approved"
+      );
+    }
+
     // Handle approval - deduct leave balance
     if (input.status === 'approved') {
       // Validate leave_type_id exists
       if (!request.leave_type_id) {
         throw new Error("Leave type is required for approval");
       }
-      
+
       const duration = request.total_days;
       const employeeId = request.employee_id;
       const leaveTypeId = request.leave_type_id;
       const year = new Date(request.from_date).getFullYear();
-      
+
       // Check current balance
       const [balanceRows] = await db.execute<RowDataPacket[]>(
-        `SELECT * FROM leave_balance_ledger 
+        `SELECT * FROM leave_balance_ledger
          WHERE employee_id = ? AND leave_type_id = ? AND balance_year = ?`,
         [employeeId, leaveTypeId, year]
       );
-      
+
       if (balanceRows.length === 0) {
         // No ledger row exists - create one with used_days = duration and allocated_days = 0
         await db.execute(
@@ -111,22 +261,22 @@ export const leaveService = {
       } else {
         const balance = balanceRows[0];
         const availableBalance = (balance.allocated_days || 0) + (balance.adjusted_days || 0) - (balance.used_days || 0);
-        
+
         // Validate sufficient balance
         if (duration > availableBalance) {
           throw new Error(`Insufficient leave balance. Available: ${availableBalance}, Requested: ${duration}`);
         }
-        
+
         // Update used_days
         await db.execute(
-          `UPDATE leave_balance_ledger 
-           SET used_days = used_days + ? 
+          `UPDATE leave_balance_ledger
+           SET used_days = used_days + ?
            WHERE employee_id = ? AND leave_type_id = ? AND balance_year = ?`,
           [duration, employeeId, leaveTypeId, year]
         );
       }
     }
-    
+
     // Restore leave balance when an approved request is rejected
     if (input.status === 'rejected' && request.status === 'approved') {
       const duration = request.total_days;
