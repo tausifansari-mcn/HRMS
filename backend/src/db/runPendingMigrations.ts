@@ -87,6 +87,8 @@ const MIGRATION_MANIFEST: string[] = [
   "099_ats_candidate_uploads.sql",
   "100_user_page_access.sql",
   "125_kpi_process_role_engine.sql",
+  "143_report_builder.sql",
+  "150_leave_policy_engine.sql",
 ];
 
 export type MigrationHealth = {
