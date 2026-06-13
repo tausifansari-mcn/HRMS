@@ -49,7 +49,7 @@ export default function NativeNotificationPreferences() {
     if (!user?.id) return;
     try {
       setLoading(true);
-      const response = await hrmsApi.get('/communication/preferences');
+      const response = await hrmsApi.get('/api/communication/preferences');
 
       // Initialize with defaults if empty
       const prefs = response.data.length > 0
@@ -94,7 +94,7 @@ export default function NativeNotificationPreferences() {
     try {
       setSaving(true);
       for (const pref of preferences) {
-        await hrmsApi.patch('/communication/preferences', pref);
+        await hrmsApi.patch('/api/communication/preferences', pref);
       }
       toast({
         title: "Saved",

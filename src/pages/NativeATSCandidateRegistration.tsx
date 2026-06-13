@@ -372,7 +372,7 @@ export default function NativeATSCandidateRegistration() {
 
   const loadBootstrap = async () => {
   try {
-    const res = await hrmsApi.get('/ats/form-config/bootstrap').catch(() => null);
+    const res = await hrmsApi.get('/api/ats/form-config/bootstrap').catch(() => null);
     const data = res?.data?.data;
     if (data) {
       setBootstrap({

@@ -34,7 +34,7 @@ export function DatabaseConfigModal({ open, onClose, integrationKey, name, initi
 
   const saveMutation = useMutation({
     mutationFn: (data: Partial<DbConnectorConfig>) =>
-      hrmsApi.put(`/external-db/${integrationKey}`, data),
+      hrmsApi.put(`/api/external-db/${integrationKey}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['external-db'] });
       onClose();
@@ -43,8 +43,8 @@ export function DatabaseConfigModal({ open, onClose, integrationKey, name, initi
 
   const testMutation = useMutation({
     mutationFn: async () => {
-      await hrmsApi.put(`/external-db/${integrationKey}`, form);
-      return hrmsApi.post<TestResult>(`/external-db/${integrationKey}/test`, {});
+      await hrmsApi.put(`/api/external-db/${integrationKey}`, form);
+      return hrmsApi.post<TestResult>(`/api/external-db/${integrationKey}/test`, {});
     },
     onSuccess: (res) => setTestResult(res as TestResult),
     onError: (e: unknown) => setTestResult({ ok: false, error: e instanceof Error ? e.message : String(e) }),
