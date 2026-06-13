@@ -45,12 +45,36 @@ export function useAttendance(month?: Date, employeeId?: string) {
   return useQuery({
     queryKey: ["attendance", start, end, employeeId ?? "all"],
     queryFn: async () => {
+      console.log('[useAttendance] Fetching:', { start, end, employeeId });
+
       const params = new URLSearchParams({ fromDate: start, toDate: end, limit: "200" });
-      if (employeeId) params.set("employeeId", employeeId);
-      const res = await hrmsApi.get<{ success: boolean; data: any[] }>(`/api/wfm/attendance/daily?${params}`);
-      return (res.data || []) as unknown as AttendanceRecord[];
+      if (employeeId) {
+        params.set("employeeId", employeeId);
+      }
+
+      console.log('[useAttendance] API URL:', `/api/wfm/attendance/daily?${params.toString()}`);
+
+      try {
+        const res = await hrmsApi.get<{ success: boolean; data: any[] }>(`/api/wfm/attendance/daily?${params}`);
+        console.log('[useAttendance] Response:', res);
+
+        if (!res.success) {
+          throw new Error(res.message || 'Failed to fetch attendance records');
+        }
+
+        const records = (res.data || []) as unknown as AttendanceRecord[];
+        console.log('[useAttendance] Records count:', records.length);
+
+        return records;
+      } catch (error: any) {
+        console.error('[useAttendance] Error:', error);
+        throw new Error(error.message || 'Failed to load attendance history. Please check your connection and try again.');
+      }
     },
-    enabled: employeeId === undefined ? true : !!employeeId,
+    enabled: true, // Always enabled - let API handle authorization
+    retry: 2,
+    retryDelay: 1000,
+    staleTime: 30000, // 30 seconds
   });
 }
 

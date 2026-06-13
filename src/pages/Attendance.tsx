@@ -258,14 +258,25 @@ const Attendance = () => {
     1
   );
 
-  const { data: currentEmployee } = useQuery<EmployeeSchedule | null>({
+  const { data: currentEmployee, error: employeeError, isLoading: employeeLoading } = useQuery<EmployeeSchedule | null>({
     queryKey: ["current-employee-schedule", user?.id],
     queryFn: async () => {
-      const empData = await hrmsApi.get<{ data: { id: string; first_name?: string | null; last_name?: string | null; working_hours_start?: string | null; working_hours_end?: string | null; working_days?: number[] | null } }>(`/api/employees/me`);
-      if (!empData.data) return null;
-      return empData.data as EmployeeSchedule;
+      console.log('[Attendance] Fetching employee for user:', user?.id);
+      try {
+        const empData = await hrmsApi.get<{ data: { id: string; first_name?: string | null; last_name?: string | null; working_hours_start?: string | null; working_hours_end?: string | null; working_days?: number[] | null } }>(`/api/employees/me`);
+        console.log('[Attendance] Employee data:', empData);
+        if (!empData.data) {
+          console.error('[Attendance] No employee data returned');
+          return null;
+        }
+        return empData.data as EmployeeSchedule;
+      } catch (error) {
+        console.error('[Attendance] Failed to fetch employee:', error);
+        throw error;
+      }
     },
     enabled: !!user?.id,
+    retry: 2,
   });
 
   const { data: todayRecord, isLoading: todayLoading } =
@@ -277,14 +288,32 @@ const Attendance = () => {
 
   // Debug logging
   useEffect(() => {
-    console.log("Attendance Debug:", {
-      recordsLoading,
-      recordsError,
-      attendanceRecords,
-      targetDate,
-      employeeId: currentEmployee?.id,
+    console.log("=== Attendance Debug ===", {
+      user: { id: user?.id, email: user?.email },
+      employee: {
+        loading: employeeLoading,
+        error: employeeError?.message,
+        id: currentEmployee?.id,
+        data: currentEmployee,
+      },
+      records: {
+        loading: recordsLoading,
+        error: recordsError?.message,
+        count: attendanceRecords?.length || 0,
+        data: attendanceRecords,
+      },
+      targetDate: targetDate.toISOString(),
     });
-  }, [recordsLoading, recordsError, attendanceRecords, targetDate, currentEmployee?.id]);
+
+    // Show user-friendly errors
+    if (employeeError) {
+      console.error('[Attendance] Employee Error:', employeeError);
+      toast.error('Failed to load employee information. Please refresh the page.');
+    }
+    if (recordsError) {
+      console.error('[Attendance] Records Error:', recordsError);
+    }
+  }, [user, employeeLoading, employeeError, currentEmployee, recordsLoading, recordsError, attendanceRecords, targetDate]);
   const { data: reportData, isLoading: reportLoading } =
     useAttendanceReport(targetDate);
 
@@ -1345,15 +1374,22 @@ const Attendance = () => {
               )}
             </div>
 
-            {recordsError ? (
+            {employeeError ? (
               <div className="rounded-xl border-2 border-red-200 bg-red-50 p-8 text-center">
                 <AlertTriangle className="mx-auto mb-3 h-12 w-12 text-red-500" />
                 <h3 className="mb-2 text-lg font-semibold text-red-900">
-                  Failed to Load Attendance History
+                  Failed to Load Employee Information
                 </h3>
                 <p className="mb-4 text-sm text-red-700">
-                  {recordsError?.message || 'An error occurred while fetching your attendance records.'}
+                  {employeeError?.message || 'Could not fetch your employee profile. Please check if you are linked to an employee record.'}
                 </p>
+                <div className="bg-white rounded-lg p-4 mb-4 text-left">
+                  <p className="text-xs font-mono text-gray-700">
+                    <strong>User ID:</strong> {user?.id}<br />
+                    <strong>Email:</strong> {user?.email}<br />
+                    <strong>Error:</strong> {employeeError?.message}
+                  </p>
+                </div>
                 <Button
                   onClick={() => window.location.reload()}
                   variant="outline"
@@ -1363,7 +1399,49 @@ const Attendance = () => {
                   Retry
                 </Button>
               </div>
-            ) : recordsLoading ? (
+            ) : !currentEmployee ? (
+              <div className="rounded-xl border-2 border-amber-200 bg-amber-50 p-8 text-center">
+                <AlertTriangle className="mx-auto mb-3 h-12 w-12 text-amber-500" />
+                <h3 className="mb-2 text-lg font-semibold text-amber-900">
+                  Employee Record Not Found
+                </h3>
+                <p className="mb-4 text-sm text-amber-700">
+                  Your user account is not linked to an employee record. Please contact HR to link your account.
+                </p>
+                <div className="bg-white rounded-lg p-4 mb-4 text-left">
+                  <p className="text-xs font-mono text-gray-700">
+                    <strong>User ID:</strong> {user?.id}<br />
+                    <strong>Email:</strong> {user?.email}<br />
+                    <strong>Status:</strong> No employee record found
+                  </p>
+                </div>
+              </div>
+            ) : recordsError ? (
+              <div className="rounded-xl border-2 border-red-200 bg-red-50 p-8 text-center">
+                <AlertTriangle className="mx-auto mb-3 h-12 w-12 text-red-500" />
+                <h3 className="mb-2 text-lg font-semibold text-red-900">
+                  Failed to Load Attendance History
+                </h3>
+                <p className="mb-4 text-sm text-red-700">
+                  {recordsError?.message || 'An error occurred while fetching your attendance records.'}
+                </p>
+                <div className="bg-white rounded-lg p-4 mb-4 text-left">
+                  <p className="text-xs font-mono text-gray-700">
+                    <strong>Employee ID:</strong> {currentEmployee?.id}<br />
+                    <strong>Month:</strong> {format(targetDate, 'MMMM yyyy')}<br />
+                    <strong>Error:</strong> {recordsError?.message}
+                  </p>
+                </div>
+                <Button
+                  onClick={() => window.location.reload()}
+                  variant="outline"
+                  className="border-red-300 text-red-700 hover:bg-red-100"
+                >
+                  <RefreshCcw className="mr-2 h-4 w-4" />
+                  Retry
+                </Button>
+              </div>
+            ) : recordsLoading || employeeLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3, 4, 5].map((item) => (
                   <Skeleton key={item} className="h-16 rounded-xl" />
