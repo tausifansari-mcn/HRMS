@@ -89,54 +89,59 @@ export async function creditCLMonthly(
 
   // 3. Process each employee
   for (const emp of employees) {
-    const employeeId: string = emp.id;
-    const dateOfJoining: string = emp.date_of_joining;
+    try {
+      const employeeId: string = emp.id;
+      const dateOfJoining: string = emp.date_of_joining;
 
-    // 3a. Compute prorated days
-    const daysToCredit = prorateMonthlyCredit(dateOfJoining, creditMonth, creditYear);
+      // 3a. Compute prorated days
+      const daysToCredit = prorateMonthlyCredit(dateOfJoining, creditMonth, creditYear);
 
-    // 3b. Skip if no days to credit (employee joined after the credit month)
-    if (daysToCredit <= 0) {
+      // 3b. Skip if no days to credit (employee joined after the credit month)
+      if (daysToCredit <= 0) {
+        skipped++;
+        continue;
+      }
+
+      // 3c. Idempotency check — has this employee already been credited this month?
+      const [existingRows]: any = await db.execute(
+        `SELECT 1 FROM leave_el_credit_log
+         WHERE employee_id   = ?
+           AND leave_type_id = ?
+           AND credit_year   = ?
+           AND credit_month  = ?
+           AND credit_type   = 'monthly'
+         LIMIT 1`,
+        [employeeId, leaveTypeId, creditYear, creditMonth]
+      );
+
+      if (existingRows && existingRows.length > 0) {
+        // 3d. Already credited — skip (idempotent)
+        skipped++;
+        continue;
+      }
+
+      // 3e. Upsert leave_balance_ledger
+      await db.execute(
+        `INSERT INTO leave_balance_ledger
+           (id, employee_id, leave_type_id, balance_year, allocated_days, used_days, adjusted_days)
+         VALUES (UUID(), ?, ?, ?, ?, 0, 0)
+         ON DUPLICATE KEY UPDATE allocated_days = allocated_days + ?`,
+        [employeeId, leaveTypeId, creditYear, daysToCredit, daysToCredit]
+      );
+
+      // 3f. Insert audit record into leave_el_credit_log
+      await db.execute(
+        `INSERT INTO leave_el_credit_log
+           (id, employee_id, leave_type_id, credit_year, credit_month, credit_date, days_credited, months_served, credit_type)
+         VALUES (UUID(), ?, ?, ?, ?, CURDATE(), ?, 0, 'monthly')`,
+        [employeeId, leaveTypeId, creditYear, creditMonth, daysToCredit]
+      );
+
+      credited++;
+    } catch (error: any) {
+      console.error(`[LeaveMonthlyCreditWorker] Error processing employee ${emp.id}:`, error.message);
       skipped++;
-      continue;
     }
-
-    // 3c. Idempotency check — has this employee already been credited this month?
-    const [existingRows]: any = await db.execute(
-      `SELECT 1 FROM leave_el_credit_log
-       WHERE employee_id   = ?
-         AND leave_type_id = ?
-         AND credit_year   = ?
-         AND credit_month  = ?
-         AND credit_type   = 'monthly'
-       LIMIT 1`,
-      [employeeId, leaveTypeId, creditYear, creditMonth]
-    );
-
-    if (existingRows && existingRows.length > 0) {
-      // 3d. Already credited — skip (idempotent)
-      skipped++;
-      continue;
-    }
-
-    // 3e. Upsert leave_balance_ledger
-    await db.execute(
-      `INSERT INTO leave_balance_ledger
-         (id, employee_id, leave_type_id, balance_year, allocated_days, used_days, adjusted_days)
-       VALUES (UUID(), ?, ?, ?, ?, 0, 0)
-       ON DUPLICATE KEY UPDATE allocated_days = allocated_days + ?`,
-      [employeeId, leaveTypeId, creditYear, daysToCredit, daysToCredit]
-    );
-
-    // 3f. Insert audit record into leave_el_credit_log
-    await db.execute(
-      `INSERT INTO leave_el_credit_log
-         (id, employee_id, leave_type_id, credit_year, credit_month, credit_date, days_credited, months_served, credit_type)
-       VALUES (UUID(), ?, ?, ?, ?, CURDATE(), ?, 0, 'monthly')`,
-      [employeeId, leaveTypeId, creditYear, creditMonth, daysToCredit]
-    );
-
-    credited++;
   }
 
   // 4. Summary log

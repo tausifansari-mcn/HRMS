@@ -95,7 +95,6 @@ export async function creditELAnnual(creditYear: number): Promise<void> {
 
       // b. Skip if no credit due
       if (daysToCredit <= 0) {
-        console.log(`[ELAnnualCreditWorker] Skipping employee ${emp.id} — joined after prior year (0 months served)`);
         skipped++;
         continue;
       }
