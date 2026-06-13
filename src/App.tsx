@@ -73,6 +73,7 @@ const CandidatePortalDashboard      = lazy(() => import("./pages/CandidatePortal
 const BranchHeadApproval            = lazy(() => import("./pages/BranchHeadApproval"));
 const SuperAdminModuleAccess        = lazy(() => import("./pages/SuperAdminModuleAccess"));
 const ATSCommandCentre              = lazy(() => import("./pages/ATSCommandCentre"));
+const NativeBGVEnhanced             = lazy(() => import("./pages/NativeBGVEnhanced"));
 
 // LMS
 const NativeLMSMyLearning           = lazy(() => import("./pages/NativeLMSMyLearning"));
@@ -284,6 +285,7 @@ const App = () => (
               {/* Super Admin Module Access (Protected - Admin Only) */}
               <Route path="/super-admin/module-access" element={<ProtectedRoute roles={['admin']}><SuperAdminModuleAccess /></ProtectedRoute>} />
               <Route path="/ats/command-centre" element={<ProtectedRoute roles={['admin', 'manager', 'hr']}><ATSCommandCentre /></ProtectedRoute>} />
+              <Route path="/ats/bgv-enhanced" element={<ProtectedRoute roles={['admin', 'hr']}><NativeBGVEnhanced /></ProtectedRoute>} />
 
               {/* LMS */}
               <Route path="/lms/my-learning" element={<ProtectedRoute><Gate pageCode="LMS_MY_LEARNING"><NativeLMSMyLearning /></Gate></ProtectedRoute>} />
