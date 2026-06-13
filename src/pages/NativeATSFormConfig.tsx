@@ -34,12 +34,12 @@ export default function NativeATSFormConfig() {
 
   const { data: configData, isLoading: configLoading } = useQuery({
     queryKey: ['ats-form-config'],
-    queryFn: () => hrmsApi.get('/ats/form-config').then(r => r.data.data as ConfigRow[]),
+    queryFn: () => hrmsApi.get('/api/ats/form-config').then(r => r.data.data as ConfigRow[]),
   });
 
   const { data: recruiters, isLoading: recruiterLoading } = useQuery({
     queryKey: ['ats-recruiters'],
-    queryFn: () => hrmsApi.get('/ats/recruiters').then(r => r.data.data as Recruiter[]),
+    queryFn: () => hrmsApi.get('/api/ats/recruiters').then(r => r.data.data as Recruiter[]),
   });
 
   const optionMap: Record<string, string[]> = {};
@@ -76,7 +76,7 @@ export default function NativeATSFormConfig() {
               fields={initialFields}
               loading={configLoading}
               onSave={async (fields) => {
-                await hrmsApi.put('/ats/form-config/fields', { fields });
+                await hrmsApi.put('/api/ats/form-config/fields', { fields });
                 qc.invalidateQueries({ queryKey: ['ats-form-config'] });
                 toast({ title: 'Fields saved', description: 'Form field configuration updated.' });
               }}
@@ -88,7 +88,7 @@ export default function NativeATSFormConfig() {
               optionMap={optionMap}
               loading={configLoading}
               onSave={async (key, values) => {
-                await hrmsApi.put(`/ats/form-config/${key}`, { values });
+                await hrmsApi.put(`/api/ats/form-config/${key}`, { values });
                 qc.invalidateQueries({ queryKey: ['ats-form-config'] });
                 toast({ title: 'Options saved', description: `${key} updated.` });
               }}
@@ -304,7 +304,7 @@ function RecruitersTab({ recruiters, loading, onRefresh }: {
     if (!newName.trim()) return;
     setAdding(true);
     try {
-      await hrmsApi.post('/ats/recruiters', { name: newName.trim() });
+      await hrmsApi.post('/api/ats/recruiters', { name: newName.trim() });
       setNewName(''); setShowAdd(false); onRefresh();
       toast({ title: 'Recruiter added' });
     } catch { toast({ title: 'Error', description: 'Could not add recruiter', variant: 'destructive' }); }
@@ -312,12 +312,12 @@ function RecruitersTab({ recruiters, loading, onRefresh }: {
   };
 
   const toggle = async (id: string, current: number) => {
-    await hrmsApi.patch(`/ats/recruiters/${id}`, { active_status: current === 1 ? 0 : 1 });
+    await hrmsApi.patch(`/api/ats/recruiters/${id}`, { active_status: current === 1 ? 0 : 1 });
     onRefresh();
   };
 
   const remove = async (id: string) => {
-    await hrmsApi.delete(`/ats/recruiters/${id}`);
+    await hrmsApi.delete(`/api/ats/recruiters/${id}`);
     onRefresh();
     toast({ title: 'Recruiter removed' });
   };
@@ -345,8 +345,8 @@ function RecruitersTab({ recruiters, loading, onRefresh }: {
           {recruiters.map((r, i) => (
             <div key={r.id} className="flex items-center gap-3 py-2.5">
               <div className="flex gap-1">
-                <button onClick={async () => { await hrmsApi.patch(`/ats/recruiters/${r.id}`, { sort_order: r.sort_order - 1 }); onRefresh(); }} disabled={i === 0} className="p-1 rounded hover:bg-slate-100 disabled:opacity-30"><ChevronUp className="h-3.5 w-3.5" /></button>
-                <button onClick={async () => { await hrmsApi.patch(`/ats/recruiters/${r.id}`, { sort_order: r.sort_order + 1 }); onRefresh(); }} disabled={i === recruiters.length - 1} className="p-1 rounded hover:bg-slate-100 disabled:opacity-30"><ChevronDown className="h-3.5 w-3.5" /></button>
+                <button onClick={async () => { await hrmsApi.patch(`/api/ats/recruiters/${r.id}`, { sort_order: r.sort_order - 1 }); onRefresh(); }} disabled={i === 0} className="p-1 rounded hover:bg-slate-100 disabled:opacity-30"><ChevronUp className="h-3.5 w-3.5" /></button>
+                <button onClick={async () => { await hrmsApi.patch(`/api/ats/recruiters/${r.id}`, { sort_order: r.sort_order + 1 }); onRefresh(); }} disabled={i === recruiters.length - 1} className="p-1 rounded hover:bg-slate-100 disabled:opacity-30"><ChevronDown className="h-3.5 w-3.5" /></button>
               </div>
               <span className={`flex-1 text-sm ${r.active_status !== 1 ? 'line-through text-slate-400' : ''}`}>{r.name}</span>
               <Switch checked={r.active_status === 1} onCheckedChange={() => toggle(r.id, r.active_status)} />

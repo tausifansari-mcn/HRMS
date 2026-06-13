@@ -166,7 +166,7 @@ export default function NativeDocumentVerification() {
 
   const verifyMutation = useMutation({
     mutationFn: (docId: string) =>
-      hrmsApi.post(`/lifecycle/documents/${docId}/verify`, {
+      hrmsApi.post(`/api/lifecycle/documents/${docId}/verify`, {
         verifiedBy: user?.id ?? "",
         remarks: "Verified",
       }),

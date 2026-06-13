@@ -34,7 +34,7 @@ export const useNotifications = () => {
     queryKey: ["notifications", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const res = await hrmsApi.get('/inbox');
+      const res = await hrmsApi.get('/api/inbox');
       return (res.data?.data ?? []).map(mapInboxItem) as Notification[];
     },
     enabled: !!user?.id,
@@ -49,7 +49,7 @@ export const useUnreadNotificationsCount = () => {
     queryKey: ["notifications-unread-count", user?.id],
     queryFn: async () => {
       if (!user?.id) return 0;
-      const res = await hrmsApi.get('/inbox/count');
+      const res = await hrmsApi.get('/api/inbox/count');
       return Number(res.data?.count ?? 0);
     },
     enabled: !!user?.id,
@@ -63,7 +63,7 @@ export const useMarkNotificationRead = () => {
 
   return useMutation({
     mutationFn: async (notificationId: string) => {
-      await hrmsApi.patch(`/inbox/${notificationId}/read`);
+      await hrmsApi.patch(`/api/inbox/${notificationId}/read`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications", user?.id] });
@@ -79,7 +79,7 @@ export const useMarkAllNotificationsRead = () => {
   return useMutation({
     mutationFn: async () => {
       if (!user?.id) return;
-      await hrmsApi.patch('/inbox/mark-all-read');
+      await hrmsApi.patch('/api/inbox/mark-all-read');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications", user?.id] });

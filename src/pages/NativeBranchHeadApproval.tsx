@@ -33,7 +33,7 @@ export default function NativeBranchHeadApproval() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await hrmsApi.get('/ats/onboarding/pending-approval');
+      const r = await hrmsApi.get('/api/ats/onboarding/pending-approval');
       setOffers(r.data.data ?? []);
     } catch {
       // silent — show empty state
@@ -53,7 +53,7 @@ export default function NativeBranchHeadApproval() {
     }
     setActing(offerId);
     try {
-      await hrmsApi.post(`/ats/onboarding/offers/${offerId}/${action}`, {
+      await hrmsApi.post(`/api/ats/onboarding/offers/${offerId}/${action}`, {
         remarks: remarks[offerId] ?? '',
       });
       await load();

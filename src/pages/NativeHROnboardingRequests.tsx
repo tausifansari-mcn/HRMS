@@ -61,7 +61,7 @@ export default function NativeHROnboardingRequests() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await hrmsApi.get('/ats/onboarding/requests');
+      const r = await hrmsApi.get('/api/ats/onboarding/requests');
       setRows(r.data.data ?? []);
     } catch {
       // silent — show empty state
@@ -76,7 +76,7 @@ export default function NativeHROnboardingRequests() {
     if (!offer.offered_ctc || !offer.salary_band) return;
     setCalcLoading(true);
     try {
-      const r = await hrmsApi.post('/ats/onboarding/calculate-salary', {
+      const r = await hrmsApi.post('/api/ats/onboarding/calculate-salary', {
         ctc: Number(offer.offered_ctc) * 12, // input as monthly CTC, API takes annual
         bandCode: offer.salary_band,
       });
@@ -92,7 +92,7 @@ export default function NativeHROnboardingRequests() {
     if (!selected) return;
     setSaving(true);
     try {
-      await hrmsApi.post(`/ats/onboarding/requests/${selected.id}/offer`, {
+      await hrmsApi.post(`/api/ats/onboarding/requests/${selected.id}/offer`, {
         ...offer,
         offered_ctc: Number(offer.offered_ctc) * 12, // store annual
         submit,
