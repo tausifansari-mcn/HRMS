@@ -71,6 +71,7 @@ const CandidatePortalLogin          = lazy(() => import("./pages/CandidatePortal
 const CandidatePortalDashboard      = lazy(() => import("./pages/CandidatePortalDashboard"));
 const BranchHeadApproval            = lazy(() => import("./pages/BranchHeadApproval"));
 const SuperAdminModuleAccess        = lazy(() => import("./pages/SuperAdminModuleAccess"));
+const ATSCommandCentre              = lazy(() => import("./pages/ATSCommandCentre"));
 
 // LMS
 const NativeLMSMyLearning           = lazy(() => import("./pages/NativeLMSMyLearning"));
@@ -180,7 +181,7 @@ const NativeRosterCapacityConfig    = lazy(() => import("./pages/NativeRosterCap
 const NativeWFMAutoRoster           = lazy(() => import("./pages/NativeWFMAutoRoster"));
 const NativeControlTower            = lazy(() => import("./pages/NativeControlTower"));
 const NativeRTABoard                = lazy(() => import("./pages/NativeRTABoard"));
-const NativeWalkinQueue             = lazy(() => import("./pages/NativeWalkinQueue"));
+const NativeWalkinQueue             = lazy(() => import("./pages/NativeWalkinQueueEnhanced"));
 const NativeAttendanceRulesMaster   = lazy(() => import("./pages/NativeAttendanceRulesMaster"));
 const NativeCustomizationManager    = lazy(() => import("./pages/customization/NativeCustomizationManager"));
 const NativeCustomizationRuleEditor = lazy(() => import("./pages/customization/NativeCustomizationRuleEditor"));
@@ -280,6 +281,7 @@ const App = () => (
 
               {/* Super Admin Module Access (Protected - Admin Only) */}
               <Route path="/super-admin/module-access" element={<ProtectedRoute roles={['admin']}><SuperAdminModuleAccess /></ProtectedRoute>} />
+              <Route path="/ats/command-centre" element={<ProtectedRoute roles={['admin', 'manager', 'hr']}><ATSCommandCentre /></ProtectedRoute>} />
 
               {/* LMS */}
               <Route path="/lms/my-learning" element={<ProtectedRoute><Gate pageCode="LMS_MY_LEARNING"><NativeLMSMyLearning /></Gate></ProtectedRoute>} />
