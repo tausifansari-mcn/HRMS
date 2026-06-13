@@ -3,6 +3,8 @@ import {
   AlertTriangle, CheckCircle2, Download, Eye, FileText,
   Loader, RefreshCcw, Users, X, BookOpen,
 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { hrmsApi } from "@/lib/hrmsApi";
 
@@ -128,6 +130,108 @@ function StatCard({
       </div>
     </div>
   );
+}
+
+// ─── PDF Generator ────────────────────────────────────────────────────────────
+
+async function downloadPayslipPdf(payslip: Payslip): Promise<void> {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const BRAND_BLUE = [67, 97, 238] as [number, number, number];
+  const pageW = doc.internal.pageSize.getWidth();
+
+  // Header band
+  doc.setFillColor(...BRAND_BLUE);
+  doc.rect(0, 0, pageW, 28, "F");
+
+  // Logo placeholder text (logo as image would require base64 embed)
+  doc.setFontSize(16);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.text("MAS CALLNET", 14, 11);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text("PAY SLIP", 14, 17);
+  doc.text(`Period: ${MONTH_NAMES[payslip.month]} ${payslip.year}`, 14, 23);
+
+  // Employee meta box
+  doc.setFillColor(247, 248, 251);
+  doc.rect(0, 30, pageW, 32, "F");
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.text(payslip.employee_name, 14, 39);
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(100, 116, 139);
+  if (payslip.employee_code) doc.text(`Code: ${payslip.employee_code}`, 14, 46);
+  if (payslip.designation)   doc.text(`Designation: ${payslip.designation}`, 14, 52);
+  if (payslip.department)    doc.text(`Department: ${payslip.department}`, 80, 52);
+  if (payslip.ctc_annual)    doc.text(`Annual CTC: ${INR(payslip.ctc_annual)}`, 80, 46);
+
+  let y = 68;
+
+  // Earnings table
+  autoTable(doc, {
+    startY: y,
+    head: [["Earnings", "Amount (₹)"]],
+    body: [
+      ["Basic", INR(payslip.basic)],
+      ["HRA", INR(payslip.hra)],
+      ["Other Allowances", INR(payslip.other_allowances)],
+      ["Gross Pay", INR(payslip.gross_pay)],
+    ],
+    headStyles: { fillColor: BRAND_BLUE, textColor: [255, 255, 255], fontStyle: "bold" },
+    bodyStyles: { textColor: [30, 41, 59] },
+    columnStyles: { 1: { halign: "right", fontStyle: "bold" } },
+    foot: [["", ""]],
+    theme: "striped",
+    styles: { fontSize: 9, cellPadding: 3 },
+    margin: { left: 14, right: 14 },
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 8;
+
+  // Deductions table
+  const deductions: [string, string][] = [
+    ["PF (Employee)", INR(payslip.pf_employee)],
+    ["ESIC (Employee)", INR(payslip.esic_employee)],
+    ["Professional Tax", INR(payslip.pt_amount)],
+  ];
+  if (payslip.tds_amount)       deductions.push(["TDS (Income Tax)", INR(payslip.tds_amount)]);
+  if (payslip.lwp_deduction)    deductions.push(["LWP Deduction", INR(payslip.lwp_deduction)]);
+  if (payslip.advance_recovery) deductions.push(["Advance Recovery", INR(payslip.advance_recovery)]);
+  deductions.push(["Total Deductions", INR(payslip.total_deductions)]);
+
+  autoTable(doc, {
+    startY: y,
+    head: [["Deductions", "Amount (₹)"]],
+    body: deductions,
+    headStyles: { fillColor: [239, 68, 68] as [number,number,number], textColor: [255, 255, 255], fontStyle: "bold" },
+    bodyStyles: { textColor: [30, 41, 59] },
+    columnStyles: { 1: { halign: "right", fontStyle: "bold" } },
+    theme: "striped",
+    styles: { fontSize: 9, cellPadding: 3 },
+    margin: { left: 14, right: 14 },
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 8;
+
+  // Net pay banner
+  doc.setFillColor(15, 23, 42);
+  doc.rect(14, y, pageW - 28, 14, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.text("Net Pay", 20, y + 9);
+  doc.text(INR(payslip.net_pay), pageW - 14, y + 9, { align: "right" });
+
+  // Footer
+  doc.setTextColor(150, 150, 150);
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.text("This is a system-generated payslip and does not require a signature.", pageW / 2, 285, { align: "center" });
+
+  doc.save(`Payslip_${payslip.employee_code ?? payslip.employee_id}_${MONTH_NAMES[payslip.month]}_${payslip.year}.pdf`);
 }
 
 // ─── Payslip Modal ─────────────────────────────────────────────────────────────
@@ -371,6 +475,13 @@ function PayslipModal({
             className="flex-1 cursor-pointer rounded-2xl border border-slate-200 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
             Close
+          </button>
+          <button
+            onClick={() => { void downloadPayslipPdf(payslip); }}
+            className="flex-1 cursor-pointer rounded-2xl border border-blue-200 bg-blue-50 py-3 text-sm font-bold text-blue-700 hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Download PDF
           </button>
           <button
             onClick={() => { void fetchForm16(); }}
