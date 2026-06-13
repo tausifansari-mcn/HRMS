@@ -14,6 +14,7 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin } fr
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { hrmsApi } from "@/lib/hrmsApi";
+import { attendanceStatusColors } from "@/lib/statusStyles";
 
 interface AttendanceRecord {
   id: string;
@@ -31,15 +32,7 @@ interface AttendanceCalendarProps {
   employeeId: string;
 }
 
-const statusColors: Record<string, string> = {
-  present: "bg-emerald-500 hover:bg-emerald-600 text-white",
-  late: "bg-amber-500 hover:bg-amber-600 text-white",
-  absent: "bg-red-500 hover:bg-red-600 text-white",
-  "half-day": "bg-sky-500 hover:bg-sky-600 text-white",
-  leave: "bg-blue-500 hover:bg-blue-600 text-white",
-  holiday: "bg-purple-500 hover:bg-purple-600 text-white",
-  weekend: "bg-gray-300 hover:bg-gray-400 text-gray-700",
-};
+const statusColors = attendanceStatusColors;
 
 export function AttendanceCalendar({ employeeId }: AttendanceCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
