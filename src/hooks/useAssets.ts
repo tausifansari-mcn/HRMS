@@ -33,9 +33,12 @@ export function useAssets() {
         cost: Number(a.purchase_cost ?? 0),
         status: a.status as Asset["status"],
         notes: a.notes ?? undefined,
-        assignedTo: a.current_assignment
-          ? { name: a.current_assignment.employee_name ?? String(a.current_assignment.employee_id) }
-          : undefined,
+        assignedTo: (() => {
+          const ca = typeof a.current_assignment === "string"
+            ? (() => { try { return JSON.parse(a.current_assignment); } catch { return null; } })()
+            : a.current_assignment;
+          return ca ? { name: ca.employee_name ?? String(ca.employee_id) } : undefined;
+        })(),
       }));
     },
   });
