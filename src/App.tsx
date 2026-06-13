@@ -67,6 +67,8 @@ const NativeATSFormConfig           = lazy(() => import("./pages/NativeATSFormCo
 const NativeATSFullParityCommandCenter = lazy(() => import("./pages/NativeATSFullParityCommandCenter"));
 const NativeRecruiterPortal         = lazy(() => import("./pages/NativeRecruiterPortal"));
 const NativePayrollHRValidation     = lazy(() => import("./pages/NativePayrollHRValidation"));
+const CandidatePortalLogin          = lazy(() => import("./pages/CandidatePortalLogin"));
+const CandidatePortalDashboard      = lazy(() => import("./pages/CandidatePortalDashboard"));
 
 // LMS
 const NativeLMSMyLearning           = lazy(() => import("./pages/NativeLMSMyLearning"));
@@ -266,6 +268,10 @@ const App = () => (
               <Route path="/ats/recruiter-portal" element={<ProtectedRoute><Gate pageCode="ATS_RECRUITER_PORTAL"><NativeRecruiterPortal /></Gate></ProtectedRoute>} />
               <Route path="/ats/payroll-hr-validation" element={<ProtectedRoute><Gate pageCode="ATS_PAYROLL_HR"><NativePayrollHRValidation /></Gate></ProtectedRoute>} />
               <Route path="/ats/walkin-queue" element={<ProtectedRoute><Gate pageCode="ATS_WALKIN_QUEUE"><NativeWalkinQueue /></Gate></ProtectedRoute>} />
+
+              {/* Candidate Portal (Public - No Auth Required) */}
+              <Route path="/candidate-portal/login" element={<CandidatePortalLogin />} />
+              <Route path="/candidate-portal/dashboard" element={<CandidatePortalDashboard />} />
 
               {/* LMS */}
               <Route path="/lms/my-learning" element={<ProtectedRoute><Gate pageCode="LMS_MY_LEARNING"><NativeLMSMyLearning /></Gate></ProtectedRoute>} />

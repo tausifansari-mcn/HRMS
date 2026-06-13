@@ -15,6 +15,7 @@ import { registrationEnhancedRouter } from "./registration.enhanced.routes.js";
 import { payrollHRRouter } from "./payroll-hr.routes.js";
 import { interviewRouter } from "./interview.routes.js";
 import { queueRouter } from "./queue.routes.js";
+import { candidatePortalRouter } from "./candidate-portal.routes.js";
 import { atsQueueService } from "./ats.queue.service.js";
 import { verifyRecruiter, getMyPendingCandidates, getSubmissionHistory, resolveRecruiterForActor } from "../ats-full-parity/recruiterInterview.service.js";
 import multer from "multer";
@@ -32,6 +33,9 @@ atsRouter.post("/candidates",                    h(c.createCandidate.bind(c)));
 
 // ── PUBLIC — enhanced registration routes (branch aliases, recruiters, tokens)
 atsRouter.use("/registration", registrationEnhancedRouter);
+
+// ── PUBLIC — candidate portal (no auth, uses custom JWT) ─────────────────────
+atsRouter.use("/candidate-portal", candidatePortalRouter);
 
 // ── PUBLIC — candidate onboarding with token (no auth required) ──────────────
 atsRouter.use("/onboarding-full", onboardingFullRouter);
