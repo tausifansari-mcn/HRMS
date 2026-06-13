@@ -43,6 +43,12 @@ router.get("/me", h(async (req: any, res: any) => {
     address: employee.address1 || null,
     // country column now exists in DB
     country: employee.country || null,
+    // Convert gender to lowercase for frontend Select component
+    gender: employee.gender ? String(employee.gender).toLowerCase() : null,
+    // Parse working_days JSON if it's a string
+    working_days: employee.working_days
+      ? (typeof employee.working_days === 'string' ? JSON.parse(employee.working_days) : employee.working_days)
+      : null,
     // Add department object structure
     department: employee.department_name ? { name: employee.department_name } : null,
     // Keep date_of_joining as hire_date for compatibility

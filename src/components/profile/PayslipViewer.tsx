@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Download, FileText, Wallet, ChevronDown, ChevronUp, Plus, Minus } from "lucide-react";
 import { downloadMasCallnetPayslip } from "@/lib/masCallnetPayslipGenerator";
+import { numberToWords } from "@/lib/numberToWords";
 
 interface PayslipViewerProps {
   employeeId: string;
@@ -249,6 +250,7 @@ export function PayslipViewer({ employeeId, employeeName, employeeCode }: Paysli
       // Payment details
       chequeNo: record.cheque_number || `S${Date.now().toString().slice(-8)}`,
       netSalary: Number(record.net_salary ?? 0),
+      netSalaryWords: numberToWords(Math.floor(Number(record.net_salary ?? 0))),
     }, `Payslip_${employeeCode}_${monthName}_${recYear}.pdf`);
   };
 
