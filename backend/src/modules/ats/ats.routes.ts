@@ -18,6 +18,7 @@ import { queueRouter } from "./queue.routes.js";
 import { candidatePortalRouter } from "./candidate-portal.routes.js";
 import { branchHeadApprovalRouter } from "./branch-head-approval.routes.js";
 import { superAdminRouter } from "./super-admin.routes.js";
+import { commandCentreRouter } from "./command-centre.routes.js";
 import { atsQueueService } from "./ats.queue.service.js";
 import { verifyRecruiter, getMyPendingCandidates, getSubmissionHistory, resolveRecruiterForActor } from "../ats-full-parity/recruiterInterview.service.js";
 import multer from "multer";
@@ -152,6 +153,9 @@ atsRouter.use("/branch-head-approval", branchHeadApprovalRouter);
 
 // Super Admin routes (module access control)
 atsRouter.use("/super-admin", superAdminRouter);
+
+// Command Centre routes (analytics and metrics)
+atsRouter.use("/command-centre", commandCentreRouter);
 
 // Candidates (HR/recruiter facing) - Scoped
 atsRouter.get("/candidates", requireRole("admin", "hr", "recruiter", "manager"), h(async (req, res) => {
