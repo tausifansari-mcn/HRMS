@@ -19,6 +19,7 @@ import { candidatePortalRouter } from "./candidate-portal.routes.js";
 import { branchHeadApprovalRouter } from "./branch-head-approval.routes.js";
 import { superAdminRouter } from "./super-admin.routes.js";
 import { commandCentreRouter } from "./command-centre.routes.js";
+import { bgvEnhancedRouter } from "./bgv.enhanced.routes.js";
 import { atsQueueService } from "./ats.queue.service.js";
 import { verifyRecruiter, getMyPendingCandidates, getSubmissionHistory, resolveRecruiterForActor } from "../ats-full-parity/recruiterInterview.service.js";
 import multer from "multer";
@@ -156,6 +157,9 @@ atsRouter.use("/super-admin", superAdminRouter);
 
 // Command Centre routes (analytics and metrics)
 atsRouter.use("/command-centre", commandCentreRouter);
+
+// BGV Enhanced routes (digital verification)
+atsRouter.use("/bgv-enhanced", bgvEnhancedRouter);
 
 // Candidates (HR/recruiter facing) - Scoped
 atsRouter.get("/candidates", requireRole("admin", "hr", "recruiter", "manager"), h(async (req, res) => {
