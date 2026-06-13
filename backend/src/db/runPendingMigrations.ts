@@ -87,6 +87,7 @@ const MIGRATION_MANIFEST: string[] = [
   "099_ats_candidate_uploads.sql",
   "100_user_page_access.sql",
   "125_kpi_process_role_engine.sql",
+  "135_payroll_masters.sql",
   "143_report_builder.sql",
   "150_leave_policy_engine.sql",
   "160_kpi_master_config.sql",
@@ -94,6 +95,7 @@ const MIGRATION_MANIFEST: string[] = [
   "171_attendance_regularization_v2.sql",
   "172_employee_photo.sql",
   "173_employees_ctc_column.sql",
+  "174_apr_attendance_rule.sql",
 ];
 
 export type MigrationHealth = {
