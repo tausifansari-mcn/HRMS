@@ -8,6 +8,7 @@ import { usePerformanceReviews, useAcknowledgeReview } from "@/hooks/usePerforma
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { RatingStars } from "./RatingStars";
+import { performanceStatusColors } from "@/lib/statusStyles";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -24,11 +25,7 @@ interface KpiRating {
   manager_rating: number | null;
 }
 
-const statusColors: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  submitted: "bg-primary/10 text-primary border-primary/20",
-  acknowledged: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-};
+const statusColors = performanceStatusColors;
 
 export function PerformanceReviews({ employeeId, employeeName = "Employee" }: PerformanceReviewsProps) {
   const { user } = useAuth();

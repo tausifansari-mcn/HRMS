@@ -11,18 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Mail, Phone, Building2, Briefcase, Calendar, UserCheck, Crown, Hash } from "lucide-react";
 import { Employee } from "./EmployeeTable";
+import { employeeStatusStyles } from "@/lib/statusStyles";
 interface EmployeeViewDialogProps {
   employee: Employee | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-const statusStyles = {
-  active: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-  inactive: "bg-muted text-muted-foreground border-border",
-  onboarding: "bg-primary/10 text-primary border-primary/20",
-  offboarded: "bg-destructive/10 text-destructive border-destructive/20",
-};
+const statusStyles = employeeStatusStyles;
 
 export function EmployeeViewDialog({ employee, open, onOpenChange }: EmployeeViewDialogProps) {
   // Fetch extended employee details including manager and department head

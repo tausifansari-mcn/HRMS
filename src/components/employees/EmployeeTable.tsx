@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { SortDirection } from "@/hooks/useSorting";
+import { employeeStatusStyles } from "@/lib/statusStyles";
 
 export interface Employee {
   id: string;
@@ -62,12 +63,7 @@ interface EmployeeTableProps {
   onBulkAction?: (action: string, ids: string[]) => void;
 }
 
-const statusStyles = {
-  active: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-  inactive: "bg-muted text-muted-foreground border-border",
-  onboarding: "bg-primary/10 text-primary border-primary/20",
-  offboarded: "bg-destructive/10 text-destructive border-destructive/20",
-};
+const statusStyles = employeeStatusStyles;
 
 export function EmployeeTable({ 
   employees, 

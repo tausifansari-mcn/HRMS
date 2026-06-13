@@ -15,6 +15,7 @@ import { Star, FileText, Loader2, Plus, Users, CheckCircle, Edit2, Target, ListC
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCreateReview, useUpdateReview, useDeleteReview } from "@/hooks/usePerformance";
 import { RatingStars } from "./RatingStars";
+import { performanceStatusColors } from "@/lib/statusStyles";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -60,11 +61,7 @@ interface GoalInfo {
   employee_id: string;
 }
 
-const statusColors: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  submitted: "bg-primary/10 text-primary border-primary/20",
-  acknowledged: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-};
+const statusColors = performanceStatusColors;
 
 export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManagerProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
