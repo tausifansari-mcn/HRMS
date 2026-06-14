@@ -6,6 +6,7 @@ import { startCommunicationCleanup } from "./modules/communication/cleanup.cron.
 import { startAttendanceEngineScheduler } from "./modules/wfm/attendance-engine.cron.js";
 import { legacySyncWorker } from "./workers/legacy-sync-worker.js";
 import { startAccessExpiryScheduler } from "./workers/access-expiry.worker.js";
+import { migrateLegacyIntegrationSecrets } from "./modules/external-db/external-db.service.js";
 
 function startServer() {
   app.listen(env.PORT, () => {
@@ -24,7 +25,10 @@ function startServer() {
 }
 
 runPendingMigrations()
-  .then(() => startServer())
+  .then(async () => {
+    await migrateLegacyIntegrationSecrets();
+    startServer();
+  })
   .catch((error) => {
     console.error("[startup] migration runner failed:", error instanceof Error ? error.message : error);
 

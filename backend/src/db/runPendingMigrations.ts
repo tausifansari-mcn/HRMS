@@ -87,6 +87,7 @@ const MIGRATION_MANIFEST: string[] = [
   "099_ats_candidate_uploads.sql",
   "100_user_page_access.sql",
   "125_kpi_process_role_engine.sql",
+  "134_external_db_credentials.sql",
   "135_payroll_masters.sql",
   "137_schema_gaps.sql",
   "141_branch_head_approval.sql",

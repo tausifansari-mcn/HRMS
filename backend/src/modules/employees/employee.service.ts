@@ -123,10 +123,7 @@ export const employeeService = {
   },
 
   async getEmployee(id: string): Promise<Employee> {
-    const [rows] = await db.execute<RowDataPacket[]>(
-      "SELECT * FROM employees WHERE id = ? LIMIT 1", [id]
-    );
-    const rec = (rows as Employee[])[0];
+    const rec = await getEmployeeContext(id) as Employee | null;
     if (!rec) throw new Error("Employee not found");
     return rec;
   },

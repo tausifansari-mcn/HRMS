@@ -39,9 +39,28 @@ function parseConfigJson(value: unknown): Record<string, unknown> | null | undef
   }
 }
 
+const SENSITIVE_CONFIG_KEY = /(password|passphrase|private[_-]?key|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|authorization)/i;
+
+function sanitizeConfig(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sanitizeConfig);
+  if (!value || typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !SENSITIVE_CONFIG_KEY.test(key))
+      .map(([key, item]) => [key, sanitizeConfig(item)])
+  );
+}
+
 function connectorDto(record: any) {
+  const {
+    encrypted_credentials: _encryptedCredentials,
+    config_json: configJson,
+    ...safeRecord
+  } = record;
   return {
-    ...record,
+    ...safeRecord,
+    config_json: sanitizeConfig(configJson),
     key: record.integration_key,
     name: record.integration_name,
     type: integrationTypeToUi(record.integration_type),

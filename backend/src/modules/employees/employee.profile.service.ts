@@ -59,7 +59,9 @@ export const employeeProfileService = {
       `SELECT
          e.id, e.employee_code, e.user_id, e.first_name, e.last_name, e.full_name,
          e.email, e.mobile, e.alternate_mobile, e.avatar_url, e.gender,
-         e.date_of_birth, e.date_of_joining, e.employment_status, e.employment_type,
+         DATE_FORMAT(e.date_of_birth, '%Y-%m-%d') AS date_of_birth,
+         DATE_FORMAT(e.date_of_joining, '%Y-%m-%d') AS date_of_joining,
+         e.employment_status, e.employment_type,
          e.branch_id, e.department_id, e.process_id, e.designation_id,
          e.reporting_manager_id, e.address1, e.address2, e.city, e.state,
          e.country, e.pincode, e.marital_status, e.blood_group,

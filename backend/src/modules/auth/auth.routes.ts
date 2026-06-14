@@ -1,9 +1,14 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
+import bcrypt from "bcryptjs";
+import type { RowDataPacket } from "mysql2";
 import { authService } from "./auth.service.js";
 import { requireAuth } from "../../middleware/authMiddleware.js";
 import { emailService } from "../communication/email.service.js";
 import { env } from "../../config/env.js";
+import { db } from "../../db/mysql.js";
+import { logSensitiveAction } from "../../shared/auditLog.js";
+import { canResetPassword, generateTemporaryPassword } from "../../shared/positionHierarchy.js";
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -159,58 +164,86 @@ router.post("/admin-reset-password", requireAuth, h(async (req: any, res: any) =
     });
   }
 
-  const { db } = await import("../../db/mysql.js");
-  const { hasRole, getEmployeeForUser } = await import("../../shared/accessGuard.js");
-  const { canResetPassword, generateTemporaryPassword } = await import("../../shared/positionHierarchy.js");
-  const bcrypt = await import("bcrypt");
+  const [roleRows] = await db.execute<RowDataPacket[]>(
+    `SELECT role_key
+       FROM user_roles
+      WHERE user_id = ? AND active_status = 1`,
+    [req.authUser.id]
+  );
+  const roles = new Set(roleRows.map((row) => String(row.role_key)));
+  const requesterRole = roles.has("super_admin")
+    ? "super_admin"
+    : roles.has("admin")
+      ? "admin"
+      : roles.has("wfm_admin")
+        ? "wfm_admin"
+        : roles.has("wfm")
+          ? "wfm"
+          : null;
 
-  // Check if requester has admin/wfm role
-  const isAdmin = await hasRole(req.authUser.id, "admin", "super_admin");
-  const isWFMAdmin = await hasRole(req.authUser.id, "wfm", "wfm_admin");
-
-  if (!isAdmin && !isWFMAdmin) {
+  if (!requesterRole) {
     return res.status(403).json({
       success: false,
       error: "Only Admin or WFM Admin can reset employee passwords"
     });
   }
 
-  // Get requester's employee record and designation
-  const requesterEmployee = await getEmployeeForUser(req.authUser.id);
-  const requesterDesignation = requesterEmployee?.designation || null;
-  const requesterRole = isAdmin ? "admin" : "wfm_admin";
+  const [requesterRows] = await db.execute<RowDataPacket[]>(
+    `SELECT COALESCE(d.designation_name, e.emp_type, e.profile_type) AS designation
+       FROM employees e
+       LEFT JOIN designation_master d ON d.id = e.designation_id
+      WHERE e.user_id = ? AND e.active_status = 1
+      ORDER BY e.updated_at DESC
+      LIMIT 1`,
+    [req.authUser.id]
+  );
+  const requesterDesignation = requesterRows[0]?.designation
+    ? String(requesterRows[0].designation)
+    : null;
 
-  // Get target user and employee info
-  let targetUserId = userId;
-  let targetEmployee: any = null;
+  let targetUserId = userId ? String(userId) : "";
+  let targetEmployeeId: string | null = null;
+  let targetDesignation: string | null = null;
+  let targetUserEmail: string | null = null;
 
   if (employeeId) {
-    const [empRows] = await db.execute(
-      `SELECT e.*, u.id AS user_id
+    const [empRows] = await db.execute<RowDataPacket[]>(
+      `SELECT e.id AS employee_id, e.user_id,
+              COALESCE(d.designation_name, e.emp_type, e.profile_type) AS designation,
+              au.email
        FROM employees e
-       LEFT JOIN users u ON u.id = e.user_id
-       WHERE e.id = ?`,
+       LEFT JOIN designation_master d ON d.id = e.designation_id
+       LEFT JOIN auth_user au ON au.id = e.user_id
+       WHERE e.id = ?
+       LIMIT 1`,
       [employeeId]
     );
-    if (!(empRows as any[]).length) {
+    if (!empRows.length) {
       return res.status(404).json({ success: false, error: "Employee not found" });
     }
-    targetEmployee = (empRows as any[])[0];
-    targetUserId = targetEmployee.user_id;
+    targetEmployeeId = String(empRows[0].employee_id);
+    targetUserId = empRows[0].user_id ? String(empRows[0].user_id) : "";
+    targetDesignation = empRows[0].designation ? String(empRows[0].designation) : null;
+    targetUserEmail = empRows[0].email ? String(empRows[0].email) : null;
   } else {
-    const [userRows] = await db.execute(
-      `SELECT u.id, e.designation, e.id AS employee_id
-       FROM users u
-       LEFT JOIN employees e ON e.user_id = u.id
-       WHERE u.id = ?`,
+    const [userRows] = await db.execute<RowDataPacket[]>(
+      `SELECT au.id AS user_id, au.email, e.id AS employee_id,
+              COALESCE(d.designation_name, e.emp_type, e.profile_type) AS designation
+       FROM auth_user au
+       LEFT JOIN employees e ON e.user_id = au.id AND e.active_status = 1
+       LEFT JOIN designation_master d ON d.id = e.designation_id
+       WHERE au.id = ?
+       ORDER BY e.updated_at DESC
+       LIMIT 1`,
       [userId]
     );
-    if (!(userRows as any[]).length) {
+    if (!userRows.length) {
       return res.status(404).json({ success: false, error: "User not found" });
     }
-    const userInfo = (userRows as any[])[0];
-    targetEmployee = { designation: userInfo.designation, id: userInfo.employee_id };
-    targetUserId = userInfo.id;
+    targetUserId = String(userRows[0].user_id);
+    targetEmployeeId = userRows[0].employee_id ? String(userRows[0].employee_id) : null;
+    targetDesignation = userRows[0].designation ? String(userRows[0].designation) : null;
+    targetUserEmail = userRows[0].email ? String(userRows[0].email) : null;
   }
 
   if (!targetUserId) {
@@ -221,7 +254,6 @@ router.post("/admin-reset-password", requireAuth, h(async (req: any, res: any) =
   }
 
   // Check hierarchical permission
-  const targetDesignation = targetEmployee?.designation || null;
   const permissionCheck = canResetPassword(
     requesterRole,
     requesterDesignation,
@@ -241,44 +273,33 @@ router.post("/admin-reset-password", requireAuth, h(async (req: any, res: any) =
   const tempPassword = generateTemporaryPassword();
   const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-  // Update password and set force_password_change flag
   await db.execute(
-    `UPDATE users
+    `UPDATE auth_user
      SET password_hash = ?,
-         force_password_change = 1,
+         must_change_password = 1,
          updated_at = NOW()
      WHERE id = ?`,
     [hashedPassword, targetUserId]
   );
 
-  // Log password reset action
-  await db.execute(
-    `INSERT INTO audit_log (user_id, action, entity_type, entity_id, details, ip_address)
-     VALUES (?, 'ADMIN_PASSWORD_RESET', 'user', ?, ?, ?)`,
-    [
-      req.authUser.id,
-      targetUserId,
-      JSON.stringify({
-        target_user_id: targetUserId,
-        target_designation: targetDesignation,
-        requester_role: requesterRole,
-        requester_designation: requesterDesignation
-      }),
-      req.ip || req.connection?.remoteAddress
-    ]
-  );
+  await logSensitiveAction({
+    actor_user_id: req.authUser.id,
+    action_type: "ADMIN_PASSWORD_RESET",
+    module_key: "AUTH",
+    entity_type: "auth_user",
+    entity_id: targetUserId,
+    change_summary: {
+      target_employee_id: targetEmployeeId,
+      target_designation: targetDesignation,
+      requester_role: requesterRole,
+      requester_designation: requesterDesignation,
+    },
+    req,
+  });
 
-  // Get target user email for notification
-  const [targetUserRows] = await db.execute(
-    `SELECT email FROM users WHERE id = ?`,
-    [targetUserId]
-  );
-  const targetUserEmail = (targetUserRows as any[])[0]?.email;
-
-  // Send email notification with temporary password
   if (targetUserEmail) {
     try {
-      await emailService.sendEmail({
+      await emailService.send({
         to: targetUserEmail,
         subject: "Your HRMS Password Has Been Reset",
         html: `
@@ -293,7 +314,7 @@ router.post("/admin-reset-password", requireAuth, h(async (req: any, res: any) =
                   <p style="margin:0 0 8px;font-size:13px;color:#64748b;font-weight:600">TEMPORARY PASSWORD</p>
                   <p style="margin:0;font-size:18px;font-family:monospace;font-weight:700;color:#0f172a">${tempPassword}</p>
                 </div>
-                <p style="font-size:14px;line-height:1.6;margin:16px 0;color:#dc2626;font-weight:600">⚠️ You will be required to change this password on your next login.</p>
+                <p style="font-size:14px;line-height:1.6;margin:16px 0;color:#dc2626;font-weight:600">Important: You will be required to change this password on your next login.</p>
                 <p style="font-size:13px;line-height:1.6;color:#64748b;margin:16px 0 0">For security reasons, please log in and change your password immediately.</p>
               </div>
             </div>
@@ -303,7 +324,6 @@ router.post("/admin-reset-password", requireAuth, h(async (req: any, res: any) =
       });
     } catch (emailError) {
       console.error("Failed to send password reset email:", emailError);
-      // Don't fail the request if email fails
     }
   }
 

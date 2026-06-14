@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Clock,
   Database,
+  FileSpreadsheet,
   GitBranch,
   Loader,
   Plus,
@@ -17,12 +18,16 @@ import {
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { hrmsApi } from "@/lib/hrmsApi";
-import { DatabaseConnectorCard } from "@/components/integrations/DatabaseConnectorCard";
+import {
+  DatabaseConnectorCard,
+  type DbConnectorConfig,
+} from "@/components/integrations/DatabaseConnectorCard";
 import { DatabaseConfigModal } from "@/components/integrations/DatabaseConfigModal";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 type ConnectorType = "manual" | "api" | "db" | "scheduled";
+type ConnectorKind = "api" | "mysql" | "mssql" | "google_sheets";
 type ConnectorStatus = "active" | "inactive" | "error" | "pending";
 
 interface Connector {
@@ -68,13 +73,77 @@ interface RunRecord {
   created_at: string;
 }
 
+interface DatabaseConnector {
+  integration_key: string;
+  integration_name: string;
+  config_json: DbConnectorConfig;
+  active_status: number;
+  test_ok: boolean | null;
+  test_error: string | null;
+  test_at: string | null;
+}
+
 interface NewConnectorForm {
   key: string;
   name: string;
-  type: ConnectorType;
+  kind: ConnectorKind;
   description: string;
-  config_json: string;
+  base_url: string;
+  method: "GET" | "POST";
+  auth_type: "none" | "api_key" | "bearer" | "basic";
+  auth_header: string;
+  secret_name: string;
+  timeout_seconds: string;
+  pagination: "none" | "page" | "offset" | "cursor";
+  host: string;
+  port: string;
+  database: string;
+  username: string;
+  password: string;
+  tables: string;
+  date_column: string;
+  employee_code_column: string;
+  encrypt: boolean;
+  trust_server_certificate: boolean;
+  spreadsheet_id: string;
+  sheet_name: string;
+  sheet_range: string;
+  header_row: string;
+  sheets_auth_mode: "service_account" | "oauth" | "public";
+  service_account_email: string;
+  sync_direction: "pull" | "push";
 }
+
+const emptyConnectorForm = (): NewConnectorForm => ({
+  key: "",
+  name: "",
+  kind: "api",
+  description: "",
+  base_url: "",
+  method: "GET",
+  auth_type: "none",
+  auth_header: "Authorization",
+  secret_name: "",
+  timeout_seconds: "30",
+  pagination: "none",
+  host: "",
+  port: "3306",
+  database: "",
+  username: "",
+  password: "",
+  tables: "",
+  date_column: "event_time",
+  employee_code_column: "employee_code",
+  encrypt: false,
+  trust_server_certificate: true,
+  spreadsheet_id: "",
+  sheet_name: "Sheet1",
+  sheet_range: "A:Z",
+  header_row: "1",
+  sheets_auth_mode: "service_account",
+  service_account_email: "",
+  sync_direction: "pull",
+});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -155,7 +224,7 @@ export default function NativeIntegrationHub() {
   const [runningKey, setRunningKey] = useState<string | null>(null);
 
   // Database Connectors
-  const [dbConnectors, setDbConnectors] = useState<any[]>([]);
+  const [dbConnectors, setDbConnectors] = useState<DatabaseConnector[]>([]);
   const [dbConfigOpen, setDbConfigOpen] = useState(false);
   const [activeDbKey, setActiveDbKey] = useState<string | null>(null);
   const [testingKey, setTestingKey] = useState<string | null>(null);
@@ -174,13 +243,7 @@ export default function NativeIntegrationHub() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
-  const [newForm, setNewForm] = useState<NewConnectorForm>({
-    key: "",
-    name: "",
-    type: "api",
-    description: "",
-    config_json: "{}",
-  });
+  const [newForm, setNewForm] = useState<NewConnectorForm>(emptyConnectorForm);
 
   // ─── Data Loaders ──────────────────────────────────────────────────────────
 
@@ -202,7 +265,7 @@ export default function NativeIntegrationHub() {
 
   const loadDbConnectors = async () => {
     try {
-      const res = await hrmsApi.get<{ success: boolean; data: any[] }>('/api/external-db');
+      const res = await hrmsApi.get<{ success: boolean; data: DatabaseConnector[] }>('/api/external-db');
       setDbConnectors(res.data ?? []);
     } catch { /* silent */ }
   };
@@ -293,18 +356,90 @@ export default function NativeIntegrationHub() {
       setMessage("Key and Name are required.");
       return;
     }
+    const isDatabase = newForm.kind === "mysql" || newForm.kind === "mssql";
+    if (newForm.kind === "api" && !newForm.base_url.trim()) {
+      setMessage("API base URL is required.");
+      return;
+    }
+    if (isDatabase && (!newForm.host.trim() || !newForm.database.trim() || !newForm.username.trim())) {
+      setMessage("Database host, database name, and username are required.");
+      return;
+    }
+    if (newForm.kind === "google_sheets" && !newForm.spreadsheet_id.trim()) {
+      setMessage("Google Spreadsheet ID is required.");
+      return;
+    }
+
+    const integrationType = isDatabase
+      ? "db"
+      : newForm.kind === "google_sheets" || newForm.sync_direction === "pull"
+        ? "api"
+        : "api";
+    const configJson = newForm.kind === "api"
+      ? {
+          connector_kind: "rest_api",
+          method: newForm.method,
+          auth_header: newForm.auth_header,
+          timeout_seconds: Number(newForm.timeout_seconds) || 30,
+          pagination: newForm.pagination,
+        }
+      : isDatabase
+        ? {
+            connector_kind: newForm.kind,
+            db_type: newForm.kind,
+            host: newForm.host.trim(),
+            port: Number(newForm.port),
+            database: newForm.database.trim(),
+            username: newForm.username.trim(),
+            source_tables: newForm.tables.split(",").map((value) => value.trim()).filter(Boolean),
+            date_column: newForm.date_column.trim(),
+            employee_code_column: newForm.employee_code_column.trim(),
+            encrypt: newForm.encrypt,
+            trust_server_certificate: newForm.trust_server_certificate,
+          }
+        : {
+            connector_kind: "google_sheets",
+            spreadsheet_id: newForm.spreadsheet_id.trim(),
+            sheet_name: newForm.sheet_name.trim(),
+            range: newForm.sheet_range.trim(),
+            header_row: Number(newForm.header_row) || 1,
+            auth_mode: newForm.sheets_auth_mode,
+            service_account_email: newForm.service_account_email.trim() || null,
+            sync_direction: newForm.sync_direction,
+          };
+
     try {
       await hrmsApi.post("/api/integration-hub/", {
         key: newForm.key.trim(),
         name: newForm.name.trim(),
-        type: newForm.type,
+        type: integrationType,
         description: newForm.description,
-        config_json: newForm.config_json,
+        vendor_name: newForm.kind === "google_sheets" ? "Google" : null,
+        base_url: newForm.kind === "api" ? newForm.base_url.trim() : null,
+        auth_type: newForm.kind === "api" ? newForm.auth_type : newForm.sheets_auth_mode,
+        secret_name: newForm.secret_name.trim() || null,
+        config_json: configJson,
       });
+      if (isDatabase) {
+        await hrmsApi.put(`/api/external-db/${newForm.key.trim()}`, {
+          db_type: newForm.kind,
+          host: newForm.host.trim(),
+          port: Number(newForm.port),
+          database: newForm.database.trim(),
+          username: newForm.username.trim(),
+          password: newForm.password,
+          date_column: newForm.date_column.trim(),
+          employee_code_column: newForm.employee_code_column.trim(),
+          tables: newForm.tables.split(",").map((value) => value.trim()).filter(Boolean),
+          encrypt: newForm.encrypt,
+          trust_server_certificate: newForm.trust_server_certificate,
+        });
+      }
       setShowAddModal(false);
-      setNewForm({ key: "", name: "", type: "api", description: "", config_json: "{}" });
+      setNewForm(emptyConnectorForm());
       setMessage("Connector added successfully.");
       await loadConnectors();
+      await loadDbConnectors();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to add connector";
       setMessage(msg);
@@ -921,7 +1056,7 @@ export default function NativeIntegrationHub() {
       {/* ── Add Connector Modal ─────────────────────────────────────────────── */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl">
+          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b p-6">
               <h2 className="text-lg font-black text-slate-950">Add Connector</h2>
               <button
@@ -957,18 +1092,25 @@ export default function NativeIntegrationHub() {
                 </div>
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">Type</label>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Connector Type
+                </label>
                 <select
-                  value={newForm.type}
-                  onChange={(e) =>
-                    setNewForm({ ...newForm, type: e.target.value as ConnectorType })
-                  }
+                  value={newForm.kind}
+                  onChange={(event) => {
+                    const kind = event.target.value as ConnectorKind;
+                    setNewForm({
+                      ...newForm,
+                      kind,
+                      port: kind === "mssql" ? "1433" : kind === "mysql" ? "3306" : newForm.port,
+                    });
+                  }}
                   className="w-full rounded-2xl border px-4 py-3 text-sm outline-none focus:border-blue-400 transition-colors"
                 >
-                  <option value="manual">Manual</option>
-                  <option value="api">API</option>
-                  <option value="db">Database</option>
-                  <option value="scheduled">Scheduled</option>
+                  <option value="api">REST API</option>
+                  <option value="mysql">MySQL Database</option>
+                  <option value="mssql">Microsoft SQL Server</option>
+                  <option value="google_sheets">Google Sheets</option>
                 </select>
               </div>
               <div>
@@ -983,18 +1125,289 @@ export default function NativeIntegrationHub() {
                   className="w-full resize-none rounded-2xl border px-4 py-3 text-sm outline-none focus:border-blue-400 transition-colors"
                 />
               </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                  Config JSON
-                </label>
-                <textarea
-                  value={newForm.config_json}
-                  onChange={(e) => setNewForm({ ...newForm, config_json: e.target.value })}
-                  placeholder='{"host": "...", "port": 5432}'
-                  rows={3}
-                  className="w-full resize-none rounded-2xl border px-4 py-3 font-mono text-sm outline-none focus:border-blue-400 transition-colors"
-                />
-              </div>
+
+              {newForm.kind === "api" && (
+                <div className="space-y-4 rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+                  <div className="flex items-center gap-2 font-bold text-blue-900">
+                    <Zap className="h-4 w-4" />
+                    API Configuration
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                      Base URL <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="url"
+                      value={newForm.base_url}
+                      onChange={(event) => setNewForm({ ...newForm, base_url: event.target.value })}
+                      placeholder="https://api.example.com/v1/employees"
+                      className="w-full rounded-2xl border px-4 py-3 text-sm outline-none focus:border-blue-400"
+                    />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">HTTP Method</label>
+                      <select
+                        value={newForm.method}
+                        onChange={(event) => setNewForm({ ...newForm, method: event.target.value as "GET" | "POST" })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      >
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Authentication</label>
+                      <select
+                        value={newForm.auth_type}
+                        onChange={(event) => setNewForm({ ...newForm, auth_type: event.target.value as NewConnectorForm["auth_type"] })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      >
+                        <option value="none">No authentication</option>
+                        <option value="api_key">API key</option>
+                        <option value="bearer">Bearer token</option>
+                        <option value="basic">Basic authentication</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Auth Header</label>
+                      <input
+                        value={newForm.auth_header}
+                        onChange={(event) => setNewForm({ ...newForm, auth_header: event.target.value })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Credential Secret Reference</label>
+                      <input
+                        value={newForm.secret_name}
+                        onChange={(event) => setNewForm({ ...newForm, secret_name: event.target.value })}
+                        placeholder="e.g. HRMS_VENDOR_API"
+                        className="w-full rounded-2xl border px-4 py-3 font-mono text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Pagination</label>
+                      <select
+                        value={newForm.pagination}
+                        onChange={(event) => setNewForm({ ...newForm, pagination: event.target.value as NewConnectorForm["pagination"] })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      >
+                        <option value="none">None</option>
+                        <option value="page">Page number</option>
+                        <option value="offset">Offset and limit</option>
+                        <option value="cursor">Cursor</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Timeout (seconds)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="300"
+                        value={newForm.timeout_seconds}
+                        onChange={(event) => setNewForm({ ...newForm, timeout_seconds: event.target.value })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-blue-800">
+                    Store the API key or token in the deployment secret manager using this reference. Secrets are never written to visible connector JSON.
+                  </p>
+                </div>
+              )}
+
+              {(newForm.kind === "mysql" || newForm.kind === "mssql") && (
+                <div className="space-y-4 rounded-2xl border border-violet-100 bg-violet-50/50 p-4">
+                  <div className="flex items-center gap-2 font-bold text-violet-900">
+                    <Database className="h-4 w-4" />
+                    {newForm.kind === "mssql" ? "Microsoft SQL Server" : "MySQL"} Configuration
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Host / IP *</label>
+                      <input
+                        value={newForm.host}
+                        onChange={(event) => setNewForm({ ...newForm, host: event.target.value })}
+                        placeholder="db.internal.example"
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Port *</label>
+                      <input
+                        type="number"
+                        value={newForm.port}
+                        onChange={(event) => setNewForm({ ...newForm, port: event.target.value })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Database *</label>
+                      <input
+                        value={newForm.database}
+                        onChange={(event) => setNewForm({ ...newForm, database: event.target.value })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Username *</label>
+                      <input
+                        value={newForm.username}
+                        onChange={(event) => setNewForm({ ...newForm, username: event.target.value })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Password</label>
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        value={newForm.password}
+                        onChange={(event) => setNewForm({ ...newForm, password: event.target.value })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      />
+                      <p className="mt-1 text-xs text-violet-800">Encrypted with AES-256-GCM before database storage.</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Source Tables</label>
+                      <input
+                        value={newForm.tables}
+                        onChange={(event) => setNewForm({ ...newForm, tables: event.target.value })}
+                        placeholder="attendance_log, agent_sessions"
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Date Column</label>
+                      <input
+                        value={newForm.date_column}
+                        onChange={(event) => setNewForm({ ...newForm, date_column: event.target.value })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Employee Code Column</label>
+                      <input
+                        value={newForm.employee_code_column}
+                        onChange={(event) => setNewForm({ ...newForm, employee_code_column: event.target.value })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      />
+                    </div>
+                  </div>
+                  {newForm.kind === "mssql" && (
+                    <div className="flex flex-wrap gap-5 text-sm font-semibold text-slate-700">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={newForm.encrypt}
+                          onChange={(event) => setNewForm({ ...newForm, encrypt: event.target.checked })}
+                        />
+                        Encrypt connection
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={newForm.trust_server_certificate}
+                          onChange={(event) => setNewForm({ ...newForm, trust_server_certificate: event.target.checked })}
+                        />
+                        Trust server certificate
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {newForm.kind === "google_sheets" && (
+                <div className="space-y-4 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
+                  <div className="flex items-center gap-2 font-bold text-emerald-900">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Google Sheets Configuration
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">Spreadsheet ID *</label>
+                    <input
+                      value={newForm.spreadsheet_id}
+                      onChange={(event) => setNewForm({ ...newForm, spreadsheet_id: event.target.value })}
+                      placeholder="The ID between /d/ and /edit in the Sheets URL"
+                      className="w-full rounded-2xl border px-4 py-3 font-mono text-sm"
+                    />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Sheet / Tab Name</label>
+                      <input
+                        value={newForm.sheet_name}
+                        onChange={(event) => setNewForm({ ...newForm, sheet_name: event.target.value })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Range</label>
+                      <input
+                        value={newForm.sheet_range}
+                        onChange={(event) => setNewForm({ ...newForm, sheet_range: event.target.value })}
+                        placeholder="A:Z"
+                        className="w-full rounded-2xl border px-4 py-3 font-mono text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Header Row</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={newForm.header_row}
+                        onChange={(event) => setNewForm({ ...newForm, header_row: event.target.value })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Sync Direction</label>
+                      <select
+                        value={newForm.sync_direction}
+                        onChange={(event) => setNewForm({ ...newForm, sync_direction: event.target.value as "pull" | "push" })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      >
+                        <option value="pull">Pull from Google Sheets</option>
+                        <option value="push">Push to Google Sheets</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Authentication</label>
+                      <select
+                        value={newForm.sheets_auth_mode}
+                        onChange={(event) => setNewForm({ ...newForm, sheets_auth_mode: event.target.value as NewConnectorForm["sheets_auth_mode"] })}
+                        className="w-full rounded-2xl border px-4 py-3 text-sm"
+                      >
+                        <option value="service_account">Service account</option>
+                        <option value="oauth">OAuth</option>
+                        <option value="public">Public read-only sheet</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">Credential Secret Reference</label>
+                      <input
+                        value={newForm.secret_name}
+                        onChange={(event) => setNewForm({ ...newForm, secret_name: event.target.value })}
+                        placeholder="e.g. GOOGLE_HRMS_SHEETS"
+                        className="w-full rounded-2xl border px-4 py-3 font-mono text-sm"
+                      />
+                    </div>
+                    {newForm.sheets_auth_mode === "service_account" && (
+                      <div className="md:col-span-2">
+                        <label className="mb-1.5 block text-sm font-semibold text-slate-700">Service Account Email</label>
+                        <input
+                          type="email"
+                          value={newForm.service_account_email}
+                          onChange={(event) => setNewForm({ ...newForm, service_account_email: event.target.value })}
+                          placeholder="hrms-sync@project.iam.gserviceaccount.com"
+                          className="w-full rounded-2xl border px-4 py-3 text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex gap-3 border-t p-6">
               <button

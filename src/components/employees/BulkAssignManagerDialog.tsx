@@ -167,6 +167,7 @@ export function BulkAssignManagerDialog({
             Cancel
           </Button>
           <Button
+            type="button"
             onClick={handleAssign}
             disabled={!selectedManagerId || assignManagerMutation.isPending}
           >

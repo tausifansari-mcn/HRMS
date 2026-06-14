@@ -33,6 +33,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { EmployeeLeaveEligibility, type EmployeeLeaveEligibilityHandle } from "./EmployeeLeaveEligibility";
+import { fetchAllEmployeeRows } from "@/hooks/useEmployees";
 
 const WEEKDAYS = [
   { value: 0, label: 'Sun' },
@@ -184,7 +185,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
     queryKey: ["employee-details", employee?.id],
     queryFn: async () => {
       if (!employee?.id) return null;
-      const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees");
+      const res = await hrmsApi.get<{success:boolean;data:any}>(`/api/employees/${employee.id}`);
       return res.data ?? null;
     },
     enabled: open && !!employee?.id,
@@ -193,10 +194,8 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
   // Fetch managers (active employees who can be managers)
   const { data: managers = [] } = useQuery({
     queryKey: ["managers"],
-    queryFn: async () => {
-      const res = await hrmsApi.get<{success:boolean;data:any}>("/api/employees");
-      return res.data ?? [];
-    },
+    queryFn: fetchAllEmployeeRows,
+    staleTime: 60_000,
   });
 
   // Fetch departments
@@ -228,21 +227,21 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
         first_name: employeeDetails.first_name || "",
         last_name: employeeDetails.last_name || "",
         email: employeeDetails.email || "",
-        phone: employeeDetails.phone || "",
-        address: employeeDetails.address || "",
+        phone: employeeDetails.mobile || employeeDetails.phone || "",
+        address: employeeDetails.address1 || employeeDetails.address || "",
         city: employeeDetails.city || "",
         country: employeeDetails.country || "",
-        date_of_birth: employeeDetails.date_of_birth || "",
+        date_of_birth: employeeDetails.date_of_birth?.slice?.(0, 10) || "",
         gender: employeeDetails.gender || "",
-        designation: employeeDetails.designation || "",
+        designation: employeeDetails.designation_name || employeeDetails.designation || "",
         department_id: employeeDetails.department_id || "",
-        manager_id: employeeDetails.manager_id || "",
-        hire_date: employeeDetails.hire_date || "",
+        manager_id: employeeDetails.reporting_manager_id || employeeDetails.manager_id || "",
+        hire_date: employeeDetails.date_of_joining?.slice?.(0, 10) || employeeDetails.hire_date?.slice?.(0, 10) || "",
         employment_type: employeeDetails.employment_type || "full-time",
         working_hours_start: parseTime(employeeDetails.working_hours_start),
         working_hours_end: parseTime(employeeDetails.working_hours_end),
         working_days: employeeDetails.working_days || [1, 2, 3, 4, 5],
-        status: employeeDetails.status || "active",
+        status: String(employeeDetails.employment_status || employeeDetails.status || "active").toLowerCase(),
       });
     }
   }, [employeeDetails]);
