@@ -18,6 +18,7 @@ import {
 import { format } from "date-fns";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { AttendanceCalendar } from "@/components/attendance/AttendanceCalendar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
 import {
@@ -744,6 +745,26 @@ const Attendance = () => {
               </div>
             )}
           </section>
+
+          {/* Calendar View */}
+          {user?.id && (
+            <section className="space-y-4">
+              <div>
+                <h2 className="text-base font-semibold tracking-tight text-slate-950">
+                  Attendance Calendar
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  View your monthly attendance with color-coded status. Click any date for details.
+                </p>
+              </div>
+
+              <AttendanceCalendar
+                employeeId={user.id}
+                initialMonth={Number(selectedMonth)}
+                initialYear={Number(selectedYear)}
+              />
+            </section>
+          )}
 
           {/* Monthly Summary */}
           <section className="space-y-4">

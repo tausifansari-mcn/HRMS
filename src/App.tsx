@@ -72,6 +72,7 @@ const CandidatePortalLogin          = lazy(() => import("./pages/CandidatePortal
 const CandidatePortalDashboard      = lazy(() => import("./pages/CandidatePortalDashboard"));
 const BranchHeadApproval            = lazy(() => import("./pages/BranchHeadApproval"));
 const SuperAdminModuleAccess        = lazy(() => import("./pages/SuperAdminModuleAccess"));
+const SuperAdminDashboardV2         = lazy(() => import("./pages/SuperAdminDashboardV2"));
 const ATSCommandCentre              = lazy(() => import("./pages/ATSCommandCentre"));
 const NativeBGVEnhanced             = lazy(() => import("./pages/NativeBGVEnhanced"));
 
@@ -286,6 +287,7 @@ const App = () => (
 
               {/* Super Admin Module Access (Protected - Admin Only) */}
               <Route path="/super-admin/module-access" element={<ProtectedRoute roles={['admin']}><SuperAdminModuleAccess /></ProtectedRoute>} />
+              <Route path="/super-admin/dashboard" element={<ProtectedRoute roles={['admin']}><SuperAdminDashboardV2 /></ProtectedRoute>} />
               <Route path="/ats/command-centre" element={<ProtectedRoute roles={['admin', 'manager', 'hr']}><ATSCommandCentre /></ProtectedRoute>} />
               <Route path="/ats/bgv-enhanced" element={<ProtectedRoute roles={['admin', 'hr']}><NativeBGVEnhanced /></ProtectedRoute>} />
 
