@@ -11,6 +11,7 @@ import type {
   SelfProfileUpdateInput,
   StatutoryDetailsInput,
 } from "./employee.profile.validation.js";
+import { isOfficialEmail } from "../../shared/officialEmail.js";
 
 function notFound(message = "No employee record for this user"): Error {
   return Object.assign(new Error(message), { statusCode: 404 });
@@ -58,7 +59,8 @@ export const employeeProfileService = {
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT
          e.id, e.employee_code, e.user_id, e.first_name, e.last_name, e.full_name,
-         e.email, e.mobile, e.alternate_mobile, e.avatar_url, e.gender,
+         COALESCE(NULLIF(TRIM(e.official_email), ''), e.email) AS email,
+         e.mobile, e.alternate_mobile, e.avatar_url, e.gender,
          DATE_FORMAT(e.date_of_birth, '%Y-%m-%d') AS date_of_birth,
          DATE_FORMAT(e.date_of_joining, '%Y-%m-%d') AS date_of_joining,
          e.employment_status, e.employment_type,
@@ -145,6 +147,7 @@ export const employeeProfileService = {
       last_name: row.last_name,
       full_name: row.full_name,
       email: row.email,
+      official_email_compliant: isOfficialEmail(row.email),
       phone: row.mobile,
       alternate_mobile: row.alternate_mobile,
       avatar_url: row.avatar_url,
@@ -224,6 +227,7 @@ export const employeeProfileService = {
   ) {
     const employeeId = await employeeIdForUser(userId);
     const mapping: Record<keyof SelfProfileUpdateInput, string> = {
+      email: "email",
       phone: "mobile",
       alternate_mobile: "alternate_mobile",
       address: "address1",
@@ -254,10 +258,12 @@ export const employeeProfileService = {
       return value;
     });
     const sets = entries.map(([key]) => `${mapping[key]} = ?`).join(", ");
+    const officialEmailSet = input.email !== undefined ? ", official_email = ?" : "";
+    const officialEmailValues = input.email !== undefined ? [input.email] : [];
 
     await db.execute(
-      `UPDATE employees SET ${sets}, updated_at = NOW() WHERE id = ?`,
-      [...values, employeeId],
+      `UPDATE employees SET ${sets}${officialEmailSet}, updated_at = NOW() WHERE id = ?`,
+      [...values, ...officialEmailValues, employeeId],
     );
     await auditProfileChange(
       userId,

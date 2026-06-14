@@ -36,6 +36,7 @@ function normalizeGender(value: unknown): unknown {
 function normalizeUpdateBody(body: Record<string, unknown>): Record<string, unknown> {
   const normalized = { ...body };
   const aliases: Record<string, string> = {
+    employee_code: "employeeCode",
     first_name: "firstName",
     last_name: "lastName",
     phone: "mobile",
@@ -51,10 +52,15 @@ function normalizeUpdateBody(body: Record<string, unknown>): Record<string, unkn
     department_id: "departmentId",
     process_id: "processId",
     designation_id: "designationId",
+    designation: "designationName",
     manager_id: "reportingManagerId",
     reporting_manager_id: "reportingManagerId",
     photo_url: "photoUrl",
     user_id: "userId",
+    address: "address1",
+    working_hours_start: "workingHoursStart",
+    working_hours_end: "workingHoursEnd",
+    working_days: "workingDays",
   };
 
   for (const [legacyKey, canonicalKey] of Object.entries(aliases)) {

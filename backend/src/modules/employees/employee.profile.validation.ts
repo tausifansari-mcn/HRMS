@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isOfficialEmail, OFFICIAL_EMAIL_MESSAGE } from "../../shared/officialEmail.js";
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -17,6 +18,7 @@ const optionalPhone = z
   .transform((value) => value === "" ? null : value);
 
 export const selfProfileUpdateSchema = z.object({
+  email: z.string().trim().email().refine(isOfficialEmail, OFFICIAL_EMAIL_MESSAGE).optional(),
   phone: optionalPhone,
   alternate_mobile: optionalPhone,
   address: optionalText(500),

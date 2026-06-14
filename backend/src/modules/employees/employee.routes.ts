@@ -367,7 +367,7 @@ router.post("/",
     branchId: req.body.branch_id,
     processId: req.body.process_id,
     departmentId: req.body.department_id
-  })),
+  }), { allowAdminBypass: true }),
   h(c.createEmployee)
 );
 router.get("/:id", requireRole("admin", "hr", "manager"), h(c.getEmployee));  // TODO: Add self-scope check
@@ -385,7 +385,7 @@ router.patch("/:id",
       processId: emp?.process_id,
       departmentId: emp?.department_id
     };
-  }),
+  }, { allowAdminBypass: true }),
   h(c.updateEmployee)
 );
 router.delete("/:id", requireRole("admin"), h(c.deactivateEmployee));
@@ -435,7 +435,7 @@ router.post("/:id/journey", requireRole("admin", "hr"), async (req: any, res: an
 router.get("/:id/stat-card", requireAuth, h(async (req: any, res: any) => {
   const { db } = await import("../../db/mysql.js");
   const targetId = req.params.id;
-  const isAdminOrHR = await hasRole(req.authUser!.id, "admin", "hr", "ceo");
+  const isAdminOrHR = await hasRole(req.authUser!.id, "admin", "hr", "ceo", "finance", "payroll");
   const selfEmp = await getEmployeeForUser(req.authUser!.id);
 
   // Access check: admin/hr/ceo can view all; others can only view own
@@ -447,16 +447,17 @@ router.get("/:id/stat-card", requireAuth, h(async (req: any, res: any) => {
   const [[emp]] = await db.execute<RowDataPacket[]>(
     `SELECT e.id, e.employee_code, e.user_id, e.first_name, e.last_name,
             COALESCE(NULLIF(e.full_name, ''), CONCAT(e.first_name, ' ', COALESCE(e.last_name, ''))) AS full_name,
-            e.email, e.mobile, e.alternate_mobile, e.gender, e.marital_status,
+            COALESCE(NULLIF(TRIM(e.official_email), ''), e.email) AS email,
+            e.mobile, e.alternate_mobile, e.gender, e.marital_status,
             e.date_of_birth, e.date_of_joining, e.date_of_exit,
             e.employment_type, e.employee_category, e.employment_status,
             e.branch_id, e.department_id, e.process_id, e.designation_id,
-            e.grade_id, e.reporting_manager_id, e.working_hours_start,
+            e.grade_id, e.cost_centre_id, e.reporting_manager_id, e.working_hours_start,
             e.working_hours_end, e.working_days, e.active_status,
             e.photo_url, e.avatar_url, e.blood_group, e.city, e.state,
             e.country, e.pincode,
             d.designation_name, b.branch_name, b.call_centre_code,
-            p.process_name, dept.dept_name,
+            p.process_name, dept.dept_name, cc.cost_centre_name,
             COALESCE(
               NULLIF(TRIM(CONCAT(manager.first_name, ' ', COALESCE(manager.last_name, ''))), ''),
               manager.full_name
@@ -467,11 +468,41 @@ router.get("/:id/stat-card", requireAuth, h(async (req: any, res: any) => {
        LEFT JOIN branch_master b ON b.id = e.branch_id
        LEFT JOIN process_master p ON p.id = e.process_id
        LEFT JOIN department_master dept ON dept.id = e.department_id
+       LEFT JOIN cost_centre_master cc ON cc.id = e.cost_centre_id
        LEFT JOIN employees manager ON manager.id = e.reporting_manager_id
       WHERE e.id = ? LIMIT 1`,
     [targetId]
   );
   if (!emp) return res.status(404).json({ error: "Employee not found" });
+
+  let salary: RowDataPacket | null = null;
+  if (isAdminOrHR || selfEmp?.id === targetId) {
+    const [salaryRows] = await db.execute<RowDataPacket[]>(
+      `SELECT esa.id,
+              esa.structure_id,
+              ssm.structure_code,
+              ssm.structure_name,
+              esa.ctc_annual,
+              ROUND(esa.ctc_annual / 12, 2) AS monthly_ctc,
+              ROUND((esa.ctc_annual / 12) * ssm.basic_pct / 100, 2) AS basic,
+              ROUND((esa.ctc_annual / 12) * ssm.hra_pct / 100, 2) AS hra,
+              ROUND(
+                (esa.ctc_annual / 12)
+                - ((esa.ctc_annual / 12) * ssm.basic_pct / 100)
+                - ((esa.ctc_annual / 12) * ssm.hra_pct / 100),
+                2
+              ) AS other_allowances,
+              DATE_FORMAT(esa.effective_from, '%Y-%m-%d') AS effective_from
+         FROM employee_salary_assignment esa
+         JOIN salary_structure_master ssm ON ssm.id = esa.structure_id
+        WHERE esa.employee_id = ?
+          AND esa.active_status = 1
+        ORDER BY esa.effective_from DESC, esa.created_at DESC
+        LIMIT 1`,
+      [targetId]
+    );
+    salary = salaryRows[0] ?? null;
+  }
 
   // Leave balances (all types for current year)
   let leaveBalances: RowDataPacket[] = [];
@@ -571,6 +602,7 @@ router.get("/:id/stat-card", requireAuth, h(async (req: any, res: any) => {
       pending_docs: pendingDocs,
       gamification_tier: gamificationTier,
       journey,
+      salary,
     }
   });
 }));

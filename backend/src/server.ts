@@ -6,6 +6,7 @@ import { startCommunicationCleanup } from "./modules/communication/cleanup.cron.
 import { startAttendanceEngineScheduler } from "./modules/wfm/attendance-engine.cron.js";
 import { legacySyncWorker } from "./workers/legacy-sync-worker.js";
 import { startAccessExpiryScheduler } from "./workers/access-expiry.worker.js";
+import { startOfficialEmailComplianceScheduler } from "./workers/official-email-compliance.worker.js";
 import { migrateLegacyIntegrationSecrets } from "./modules/external-db/external-db.service.js";
 
 function startServer() {
@@ -16,7 +17,8 @@ function startServer() {
       startAttendanceEngineScheduler();
       legacySyncWorker.start();
       startAccessExpiryScheduler();
-      console.log(`[schedulers] tenure, communication, attendance, legacy-sync, access-expiry started`);
+      startOfficialEmailComplianceScheduler();
+      console.log(`[schedulers] tenure, communication, attendance, legacy-sync, access-expiry, official-email started`);
     } else {
       console.log(`[schedulers] disabled (set ENABLE_SCHEDULERS=true to enable)`);
     }

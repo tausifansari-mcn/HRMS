@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
@@ -5,6 +6,9 @@ import {
   Building2,
   CalendarDays,
   ExternalLink,
+  Eye,
+  EyeOff,
+  IndianRupee,
   Mail,
   MapPin,
   Phone,
@@ -42,6 +46,14 @@ interface EmployeeStatCard {
   active_assets?: number;
   pending_docs?: number;
   performance?: { overall_score?: number | null } | null;
+  salary?: {
+    structure_name: string;
+    ctc_annual: number;
+    monthly_ctc: number;
+    basic: number;
+    hra: number;
+    other_allowances: number;
+  } | null;
 }
 
 function formatDate(value?: string | null) {
@@ -54,6 +66,7 @@ function formatDate(value?: string | null) {
 }
 
 export function EmployeeViewDialog({ employee, open, onOpenChange }: EmployeeViewDialogProps) {
+  const [salaryVisible, setSalaryVisible] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["employee-stat-card", employee?.id],
     queryFn: async () => {
@@ -166,6 +179,8 @@ export function EmployeeViewDialog({ employee, open, onOpenChange }: EmployeeVie
                 [Building2, "Department", details?.dept_name || employee.department],
                 [BriefcaseBusiness, "Designation", details?.designation_name || employee.designation],
                 [MapPin, "Branch / process", [details?.branch_name, details?.process_name].filter(Boolean).join(" · ") || "Not recorded"],
+                [Building2, "Cost centre", details?.cost_centre_name || employee.costCentre],
+                [UserRoundCheck, "Reporting manager", details?.reporting_manager_name || employee.reportingManager],
                 [CalendarDays, "Date of joining", formatDate(details?.date_of_joining || employee.joinDate)],
                 [UserRoundCheck, "Employment type", details?.employment_type || "Not recorded"],
               ].map(([Icon, label, value]) => {
@@ -183,6 +198,34 @@ export function EmployeeViewDialog({ employee, open, onOpenChange }: EmployeeVie
                 );
               })}
             </div>
+
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-2 font-black text-slate-900">
+                    <IndianRupee className="h-4 w-4 text-[#1B6AB5]" /> Salary Components
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">Hidden by default for shoulder-surfing protection.</p>
+                </div>
+                {data?.salary && (
+                  <Button variant="outline" size="sm" onClick={() => setSalaryVisible((value) => !value)}>
+                    {salaryVisible ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                    {salaryVisible ? "Hide" : "View"}
+                  </Button>
+                )}
+              </div>
+              <div className={`mt-4 grid gap-3 sm:grid-cols-3 ${salaryVisible ? "" : "select-none blur-sm"}`}>
+                {data?.salary ? (
+                  <>
+                    <SalaryValue label="Annual CTC" value={data.salary.ctc_annual} />
+                    <SalaryValue label="Basic" value={data.salary.basic} />
+                    <SalaryValue label="HRA + Other" value={data.salary.hra + data.salary.other_allowances} />
+                  </>
+                ) : (
+                  <p className="text-sm text-slate-500">No active salary assignment.</p>
+                )}
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="journey" className="mt-6">
@@ -195,5 +238,16 @@ export function EmployeeViewDialog({ employee, open, onOpenChange }: EmployeeVie
         </Tabs>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SalaryValue({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border bg-white p-3">
+      <p className="text-xs font-bold uppercase text-slate-400">{label}</p>
+      <p className="mt-1 text-lg font-black text-slate-900">
+        ₹{Number(value).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+      </p>
+    </div>
   );
 }

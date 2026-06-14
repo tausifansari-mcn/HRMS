@@ -12,6 +12,11 @@ export interface Employee {
   phone?: string | null;
   avatar?: string;
   department: string;
+  process: string;
+  branch: string;
+  costCentre: string;
+  reportingManager: string;
+  officialEmailCompliant: boolean;
   designation: string;
   joinDate: string;
   status: "active" | "inactive" | "onboarding" | "offboarded";
@@ -53,6 +58,21 @@ export interface RawEmployee {
   date_of_joining?: string | null;
   employment_status?: string | null;
   reporting_manager_id?: string | null;
+  reporting_manager_name?: string | null;
+  process_name?: string | null;
+  branch_name?: string | null;
+  cost_centre_name?: string | null;
+}
+
+export interface EmployeeDirectoryFilters {
+  page: number;
+  limit: number;
+  recordStatus: "active" | "inactive" | "all";
+  status?: string;
+  search?: string;
+  departmentId?: string;
+  processId?: string;
+  branchId?: string;
 }
 
 interface EmployeeStatsResponse {
@@ -69,9 +89,15 @@ interface DepartmentRow {
   manager_id?: string | null;
 }
 
-export async function fetchAllEmployeeRows(): Promise<RawEmployee[]> {
+interface NamedMasterRow {
+  id: string;
+  process_name?: string;
+  branch_name?: string;
+}
+
+export async function fetchAllEmployeeRows(recordStatus: "active" | "inactive" | "all" = "active"): Promise<RawEmployee[]> {
   const firstPage = await hrmsApi.get<EmployeePage>(
-    `/api/employees?page=1&limit=${EMPLOYEE_PAGE_SIZE}`
+    `/api/employees?page=1&limit=${EMPLOYEE_PAGE_SIZE}&recordStatus=${recordStatus}`
   );
   const rows = firstPage.data ?? [];
   const totalPages = Math.ceil((firstPage.total ?? rows.length) / EMPLOYEE_PAGE_SIZE);
@@ -82,6 +108,7 @@ export async function fetchAllEmployeeRows(): Promise<RawEmployee[]> {
     Array.from({ length: totalPages - 1 }, (_, index) =>
       hrmsApi.get<EmployeePage>(
         `/api/employees?page=${index + 2}&limit=${EMPLOYEE_PAGE_SIZE}`
+          + `&recordStatus=${recordStatus}`
       )
     )
   );
@@ -105,23 +132,58 @@ function normalizeEmployeeStatus(value: unknown): Employee["status"] {
   return "inactive";
 }
 
-export function useEmployees() {
+function mapEmployee(emp: RawEmployee): Employee {
+  return {
+    id: emp.id,
+    employeeCode: emp.employee_code,
+    name: `${emp.first_name} ${emp.last_name ?? ""}`.trim(),
+    email: emp.email ?? "",
+    phone: emp.mobile ?? null,
+    avatar: emp.avatar_url ?? emp.photo_url ?? undefined,
+    department: emp.department_name || "Unassigned",
+    process: emp.process_name || "Unassigned",
+    branch: emp.branch_name || "Unassigned",
+    costCentre: emp.cost_centre_name || "Unassigned",
+    reportingManager: emp.reporting_manager_name || "Unassigned",
+    officialEmailCompliant: /@(teammas\.in|teammas\.co\.in)$/i.test(emp.email ?? ""),
+    designation: emp.designation_name || emp.designation || "",
+    joinDate: formatEmployeeDate(emp.date_of_joining),
+    status: normalizeEmployeeStatus(emp.employment_status),
+  };
+}
+
+export function useEmployeeDirectory(filters: EmployeeDirectoryFilters) {
   return useQuery({
-    queryKey: ["employees"],
+    queryKey: ["employee-directory", filters],
     queryFn: async () => {
-      const rows = await fetchAllEmployeeRows();
-      return rows.map((emp): Employee => ({
-        id: emp.id,
-        employeeCode: emp.employee_code,
-        name: `${emp.first_name} ${emp.last_name ?? ""}`.trim(),
-        email: emp.email ?? "",
-        phone: emp.mobile ?? null,
-        avatar: emp.avatar_url ?? emp.photo_url ?? undefined,
-        department: emp.department_name || "Unassigned",
-        designation: emp.designation_name || emp.designation || "",
-        joinDate: formatEmployeeDate(emp.date_of_joining),
-        status: normalizeEmployeeStatus(emp.employment_status),
-      }));
+      const params = new URLSearchParams({
+        page: String(filters.page),
+        limit: String(filters.limit),
+        recordStatus: filters.recordStatus,
+      });
+      if (filters.status) params.set("status", filters.status);
+      if (filters.search) params.set("search", filters.search);
+      if (filters.departmentId) params.set("departmentId", filters.departmentId);
+      if (filters.processId) params.set("processId", filters.processId);
+      if (filters.branchId) params.set("branchId", filters.branchId);
+
+      const response = await hrmsApi.get<EmployeePage>(`/api/employees?${params.toString()}`);
+      return {
+        employees: (response.data ?? []).map(mapEmployee),
+        total: Number(response.total ?? 0),
+      };
+    },
+    placeholderData: (previous) => previous,
+    staleTime: 30_000,
+  });
+}
+
+export function useEmployees(recordStatus: "active" | "inactive" | "all" = "active") {
+  return useQuery({
+    queryKey: ["employees", recordStatus],
+    queryFn: async () => {
+      const rows = await fetchAllEmployeeRows(recordStatus);
+      return rows.map(mapEmployee);
     },
     staleTime: 60_000,
   });
@@ -157,6 +219,29 @@ export function useDepartments() {
   });
 }
 
+export function useEmployeeDirectoryMasters() {
+  return useQuery({
+    queryKey: ["employee-directory-masters"],
+    queryFn: async () => {
+      const [processResponse, branchResponse] = await Promise.all([
+        hrmsApi.get<{ data: NamedMasterRow[] }>("/api/org/processes"),
+        hrmsApi.get<{ data: NamedMasterRow[] }>("/api/org/branches"),
+      ]);
+      return {
+        processes: (processResponse.data ?? []).map((row) => ({
+          id: row.id,
+          name: row.process_name ?? "",
+        })).filter((row) => row.name),
+        branches: (branchResponse.data ?? []).map((row) => ({
+          id: row.id,
+          name: row.branch_name ?? "",
+        })).filter((row) => row.name),
+      };
+    },
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useBulkDeleteEmployees() {
   const queryClient = useQueryClient();
 
@@ -184,6 +269,7 @@ export function useBulkDeleteEmployees() {
     onSuccess: () => {
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-directory"] });
       queryClient.invalidateQueries({ queryKey: ["employee-stats"] });
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
       queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
@@ -204,6 +290,7 @@ export function useBulkUpdateEmployeeStatus() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-directory"] });
       queryClient.invalidateQueries({ queryKey: ["employee-stats"] });
     },
   });

@@ -43,6 +43,11 @@ export interface Employee {
   phone?: string | null;
   avatar?: string;
   department: string;
+  process: string;
+  branch: string;
+  costCentre: string;
+  reportingManager: string;
+  officialEmailCompliant: boolean;
   designation: string;
   joinDate: string;
   status: "active" | "inactive" | "onboarding" | "offboarded";
@@ -238,6 +243,8 @@ export function EmployeeTable({
                   <TableHead className="w-[100px]">Emp. No.</TableHead>
                   <TableHead className="w-[260px]">Employee</TableHead>
                   <TableHead>Department</TableHead>
+                  <TableHead>Process / Cost Centre</TableHead>
+                  <TableHead>Reporting Manager</TableHead>
                   <TableHead>Designation</TableHead>
                   <TableHead>Join Date</TableHead>
                   <TableHead>Status</TableHead>
@@ -279,6 +286,11 @@ export function EmployeeTable({
                   </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{employee.department}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  <div className="font-medium text-slate-700">{employee.process}</div>
+                  <div className="text-xs text-slate-500">{employee.costCentre}</div>
+                </TableCell>
+                <TableCell className="text-muted-foreground">{employee.reportingManager}</TableCell>
                 <TableCell className="text-muted-foreground">{employee.designation}</TableCell>
                 <TableCell className="text-muted-foreground">{employee.joinDate}</TableCell>
                 <TableCell>

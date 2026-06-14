@@ -6,6 +6,9 @@ import {
   Award,
   CalendarDays,
   FileText,
+  Eye,
+  EyeOff,
+  IndianRupee,
   LogOut,
   Package,
   Search,
@@ -47,6 +50,8 @@ interface Employee {
   call_centre_code: string | null;
   process_name: string | null;
   dept_name: string | null;
+  cost_centre_name: string | null;
+  reporting_manager_name: string | null;
   days_employed: number;
   avatar_url?: string | null;
   photo_url?: string | null;
@@ -97,6 +102,15 @@ interface StatCardData {
   pending_docs: number;
   gamification_tier: GamificationTier | null;
   journey: JourneyEvent[];
+  salary: {
+    structure_name: string;
+    ctc_annual: number;
+    monthly_ctc: number;
+    basic: number;
+    hra: number;
+    other_allowances: number;
+    effective_from: string;
+  } | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -160,6 +174,7 @@ export default function NativeEmployeeStatCard() {
 
   const [searchInput, setSearchInput] = useState("");
   const [targetId, setTargetId] = useState<string | null>(urlId ?? null);
+  const [salaryVisible, setSalaryVisible] = useState(false);
 
   // If not admin/HR, always load own record via /me first
   const { data: meData } = useQuery({
@@ -304,6 +319,11 @@ export default function NativeEmployeeStatCard() {
                           {card.employee.dept_name}
                         </Badge>
                       )}
+                      {card.employee.cost_centre_name && (
+                        <Badge variant="secondary" className="text-xs">
+                          {card.employee.cost_centre_name}
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="mt-2 flex items-center gap-1.5 text-sm text-blue-100">
@@ -318,6 +338,60 @@ export default function NativeEmployeeStatCard() {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-blue-100 bg-gradient-to-br from-white to-blue-50/60">
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <IndianRupee className="h-5 w-5 text-[#1B6AB5]" />
+                    Salary Components
+                  </CardTitle>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Confidential compensation data is hidden by default.
+                  </p>
+                </div>
+                {card.salary && (
+                  <Button variant="outline" size="sm" onClick={() => setSalaryVisible((visible) => !visible)}>
+                    {salaryVisible ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                    {salaryVisible ? "Hide salary" : "View salary"}
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                {!card.salary ? (
+                  <p className="text-sm text-slate-500">No active salary assignment is available.</p>
+                ) : !salaryVisible ? (
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    {["Annual CTC", "Monthly CTC", "Basic", "Allowances"].map((label) => (
+                      <div key={label} className="rounded-xl border bg-white p-4">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
+                        <p className="mt-2 select-none text-xl font-black tracking-[0.2em] text-slate-300 blur-sm">₹00,000</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    {[
+                      ["Annual CTC", card.salary.ctc_annual],
+                      ["Monthly CTC", card.salary.monthly_ctc],
+                      ["Basic", card.salary.basic],
+                      ["HRA", card.salary.hra],
+                      ["Other Allowances", card.salary.other_allowances],
+                    ].map(([label, value]) => (
+                      <div key={String(label)} className="rounded-xl border bg-white p-4">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
+                        <p className="mt-2 text-lg font-black text-slate-900">
+                          ₹{Number(value).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                        </p>
+                      </div>
+                    ))}
+                    <div className="sm:col-span-2 lg:col-span-5 text-xs text-slate-500">
+                      Structure: <b>{card.salary.structure_name}</b> · Effective {fmtDate(card.salary.effective_from)}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

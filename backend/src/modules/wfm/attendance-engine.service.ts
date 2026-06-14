@@ -515,7 +515,8 @@ export const attendanceEngineService = {
   async getRecord(employeeId: string, date: string): Promise<AttendanceDailyRecord | null> {
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT adr.*,
-         adr.record_date       AS date,
+         DATE_FORMAT(adr.record_date, '%Y-%m-%d') AS record_date,
+         DATE_FORMAT(adr.record_date, '%Y-%m-%d') AS date,
          adr.clock_in_time     AS clock_in,
          adr.clock_out_time    AS clock_out,
          ROUND(adr.raw_minutes / 60, 2) AS total_hours,
@@ -545,7 +546,8 @@ export const attendanceEngineService = {
     // plus an employee sub-object for name/code display.
     let q = `SELECT
         adr.*,
-        adr.record_date          AS date,
+        DATE_FORMAT(adr.record_date, '%Y-%m-%d') AS record_date,
+        DATE_FORMAT(adr.record_date, '%Y-%m-%d') AS date,
         adr.clock_in_time        AS clock_in,
         adr.clock_out_time       AS clock_out,
         ROUND(adr.raw_minutes / 60, 2) AS total_hours,

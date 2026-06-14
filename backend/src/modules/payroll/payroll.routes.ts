@@ -52,6 +52,7 @@ router.post("/salary-assignments",
 );
 router.post("/salary-assignments/bulk", requireRole("admin", "hr", "finance", "payroll"), h(c.bulkAssignSalary));
 router.get("/salary-assignments/:employeeId", requireRole("admin", "hr", "finance", "payroll"), h(c.getEmployeeSalary));
+router.get("/salary-assignments/:employeeId/history", requireRole("admin", "hr", "finance", "payroll"), h(c.getEmployeeSalaryHistory));
 
 // ─── Payroll Runs — static paths before :id ───────────────────────────────────
 
@@ -69,6 +70,20 @@ router.get("/runs", requireRole("admin", "hr", "finance", "payroll"), h(async (r
   (req as any).scopeFilter = scoped;
   return c.listRuns(req, res);
 }));
+router.get("/records", requireRole("admin", "hr", "finance", "payroll"), h(async (req, res) => {
+  const scoped = await buildScopeWhereClause(
+    req.authUser!.id,
+    ["finance", "payroll"],
+    {
+      branchId: "e.branch_id",
+      processId: "e.process_id"
+    },
+    { allowCeoAllRead: true }
+  );
+  (req as any).scopeFilter = scoped;
+  return c.listPayrollRecords(req, res);
+}));
+router.get("/overview", requireRole("admin", "hr", "finance", "payroll"), h(c.getPayrollOverview));
 router.post("/runs",
   requireRole("admin", "finance", "payroll"),
   requireScopedRole(["finance", "payroll"], async (req) => ({

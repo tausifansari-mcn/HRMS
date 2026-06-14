@@ -153,8 +153,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         const mockSession = buildDemoSession(demoCred);
         localStorage.setItem('hrms_demo_session', JSON.stringify(mockSession));
+        await queryClient.cancelQueries();
+        queryClient.clear();
         setUser({ id: mockSession.user.id, email: mockSession.user.email });
-        queryClient.invalidateQueries();
         return { error: null };
       }
     }
@@ -174,9 +175,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const forceChange = authUser.mustChangePassword === true;
       localStorage.setItem('hrms_must_change_password', String(forceChange));
       setMustChangePassword(forceChange);
+      await queryClient.cancelQueries();
+      queryClient.clear();
       setUser({ id: authUser.id, email: authUser.email });
       scheduleRefresh();
-      queryClient.invalidateQueries();
       return { error: null };
     } catch (err) {
       return { error: err instanceof Error ? err : new Error('Network error') };

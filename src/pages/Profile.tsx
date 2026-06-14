@@ -45,6 +45,7 @@ import {
 } from "@/components/profile/ProfileSensitiveDetails";
 
 interface ProfileForm {
+  email: string;
   phone: string;
   alternate_mobile: string;
   address: string;
@@ -126,7 +127,7 @@ const Profile = () => {
   const [rmChangeOpen, setRmChangeOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState<ProfileForm>({
-    phone: "", alternate_mobile: "", address: "", city: "", country: "",
+    email: "", phone: "", alternate_mobile: "", address: "", city: "", country: "",
     date_of_birth: "", gender: "", marital_status: "", blood_group: "",
     working_hours_start: "09:00", working_hours_end: "18:00",
     working_days: [1, 2, 3, 4, 5],
@@ -161,6 +162,7 @@ const Profile = () => {
       if (!avatarUrl) setAvatarUrl(employee.avatar_url ?? null);
       const fmt = (t: string | null) => (t ? t.slice(0, 5) : "");
       setFormData({
+        email: employee.email || "",
         phone: employee.phone || "",
         alternate_mobile: employee.alternate_mobile || "",
         address: employee.address || "",
@@ -202,6 +204,7 @@ const Profile = () => {
     setIsEditing(false);
     const fmt = (t: string | null) => (t ? t.slice(0, 5) : "");
     if (employee) setFormData({
+      email: employee.email || "",
       phone: employee.phone || "",
       alternate_mobile: employee.alternate_mobile || "",
       address: employee.address || "",
@@ -443,8 +446,20 @@ const Profile = () => {
                             <Input value={employee.last_name} disabled className="rounded-xl bg-slate-50" />
                           </div>
                           <div className="space-y-1.5">
-                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Email</Label>
-                            <Input value={employee.email} disabled className="rounded-xl bg-slate-50" />
+                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Official Email</Label>
+                            <Input
+                              type="email"
+                              value={formData.email}
+                              onChange={(e) => setFormData(p => ({ ...p, email: e.target.value.toLowerCase() }))}
+                              disabled={!isEditing}
+                              placeholder="name@teammas.in"
+                              className="rounded-xl"
+                            />
+                            <p className={`text-xs font-semibold ${employee.official_email_compliant ? "text-emerald-600" : "text-amber-600"}`}>
+                              {employee.official_email_compliant
+                                ? "Official email verified"
+                                : "Use @teammas.in or @teammas.co.in"}
+                            </p>
                           </div>
                           <div className="space-y-1.5">
                             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Employee Code</Label>

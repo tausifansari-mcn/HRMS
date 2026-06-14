@@ -44,7 +44,8 @@ const assignSalary = async (
 
 async function getEmployeeContext(id: string) {
   const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT e.*,
+      `SELECT e.*,
+            COALESCE(NULLIF(TRIM(e.official_email), ''), e.email) AS email,
             d.designation_name, dept.dept_name, b.branch_name, p.process_name,
             CONCAT(m.first_name, ' ', COALESCE(m.last_name, '')) AS manager_name
        FROM employees e
@@ -72,15 +73,16 @@ export const employeeService = {
     const salaryStartDate = input.salaryStartDate ?? input.dateOfJoining;
     await db.execute(
       `INSERT INTO employees
-         (id, employee_code, first_name, last_name, email, mobile, gender,
+         (id, employee_code, first_name, last_name, email, official_email, mobile, gender,
           date_of_birth, date_of_joining, salary_start_date, employment_type,
           branch_id, department_id, process_id, designation_id, reporting_manager_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         input.employeeCode,
         input.firstName,
         input.lastName ?? null,
+        input.email ?? null,
         input.email ?? null,
         input.mobile ?? null,
         input.gender ?? null,
@@ -129,17 +131,26 @@ export const employeeService = {
   },
 
   async listEmployees(filters: EmployeeFilters & { scopeFilter?: { sql: string; params: unknown[] } | string }): Promise<PaginatedResult<Employee>> {
-    const { page, limit, status, processId, branchId, search, scopeFilter } = filters;
+    const { page, limit, status, recordStatus, processId, branchId, departmentId, search, scopeFilter } = filters;
     const offset = (page - 1) * limit;
-    const conds: string[] = ["e.active_status = 1"];
+    const conds: string[] = [];
     const params: unknown[] = [];
+
+    if (recordStatus === "active") {
+      conds.push("e.active_status = 1 AND LOWER(COALESCE(e.employment_status, 'active')) NOT IN ('inactive', 'terminated', 'offboarded', 'absconded')");
+    } else if (recordStatus === "inactive") {
+      conds.push("LOWER(COALESCE(e.employment_status, '')) IN ('inactive', 'terminated', 'offboarded', 'absconded')");
+    } else {
+      conds.push("(e.active_status = 1 OR LOWER(COALESCE(e.employment_status, '')) IN ('inactive', 'terminated', 'offboarded', 'absconded'))");
+    }
 
     if (status)    { conds.push("e.employment_status = ?"); params.push(status); }
     if (processId) { conds.push("e.process_id = ?");        params.push(processId); }
     if (branchId)  { conds.push("e.branch_id = ?");         params.push(branchId); }
+    if (departmentId) { conds.push("e.department_id = ?");  params.push(departmentId); }
     if (search)    {
-      conds.push("(CONCAT(e.first_name,' ',COALESCE(e.last_name,'')) LIKE ? OR e.employee_code LIKE ?)");
-      params.push(`%${search}%`, `%${search}%`);
+      conds.push("(CONCAT(e.first_name,' ',COALESCE(e.last_name,'')) LIKE ? OR e.employee_code LIKE ? OR COALESCE(NULLIF(TRIM(e.official_email), ''), e.email) LIKE ?)");
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     // Apply scope filter from middleware (object {sql, params} or legacy string)
@@ -160,15 +171,20 @@ export const employeeService = {
 
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT e.*,
+         COALESCE(NULLIF(TRIM(e.official_email), ''), e.email) AS email,
          dept.dept_name         AS department_name,
          desig.designation_name AS designation_name,
          b.branch_name,
-         p.process_name
+         p.process_name,
+         cc.cost_centre_name,
+         TRIM(CONCAT(m.first_name, ' ', COALESCE(m.last_name, ''))) AS reporting_manager_name
        FROM employees e
        LEFT JOIN department_master  dept  ON dept.id  = e.department_id
        LEFT JOIN designation_master desig ON desig.id = e.designation_id
        LEFT JOIN branch_master      b     ON b.id     = e.branch_id
        LEFT JOIN process_master     p     ON p.id     = e.process_id
+       LEFT JOIN cost_centre_master cc    ON cc.id    = e.cost_centre_id
+       LEFT JOIN employees          m     ON m.id     = e.reporting_manager_id
        ${where}
        ORDER BY e.employee_code ASC
        LIMIT ${limit} OFFSET ${offset}`,
@@ -186,9 +202,13 @@ export const employeeService = {
     const sets: string[] = [];
     const params: unknown[] = [];
 
+    if (input.employeeCode      !== undefined) { sets.push("employee_code = ?");        params.push(input.employeeCode); }
     if (input.firstName         !== undefined) { sets.push("first_name = ?");           params.push(input.firstName); }
     if (input.lastName          !== undefined) { sets.push("last_name = ?");            params.push(input.lastName ?? null); }
-    if (input.email             !== undefined) { sets.push("email = ?");                params.push(input.email ?? null); }
+    if (input.email             !== undefined) {
+      sets.push("email = ?", "official_email = ?");
+      params.push(input.email ?? null, input.email ?? null);
+    }
     if (input.mobile            !== undefined) { sets.push("mobile = ?");               params.push(input.mobile ?? null); }
     if (input.gender            !== undefined) { sets.push("gender = ?");               params.push(input.gender); }
     if (input.dateOfBirth       !== undefined) { sets.push("date_of_birth = ?");        params.push(input.dateOfBirth ?? null); }
@@ -201,7 +221,17 @@ export const employeeService = {
     if (input.departmentId      !== undefined) { sets.push("department_id = ?");        params.push(input.departmentId ?? null); }
     if (input.processId         !== undefined) { sets.push("process_id = ?");           params.push(input.processId ?? null); }
     if (input.designationId     !== undefined) { sets.push("designation_id = ?");       params.push(input.designationId ?? null); }
+    if (input.designationName   !== undefined) {
+      sets.push("designation_id = (SELECT id FROM designation_master WHERE LOWER(TRIM(designation_name)) = LOWER(TRIM(?)) AND active_status = 1 ORDER BY created_at DESC LIMIT 1)");
+      params.push(input.designationName ?? "");
+    }
     if (input.reportingManagerId !== undefined) { sets.push("reporting_manager_id = ?"); params.push(input.reportingManagerId ?? null); }
+    if (input.address1          !== undefined) { sets.push("address1 = ?");              params.push(input.address1 ?? null); }
+    if (input.city              !== undefined) { sets.push("city = ?");                  params.push(input.city ?? null); }
+    if (input.country           !== undefined) { sets.push("country = ?");               params.push(input.country ?? null); }
+    if (input.workingHoursStart !== undefined) { sets.push("working_hours_start = ?");   params.push(input.workingHoursStart ?? null); }
+    if (input.workingHoursEnd   !== undefined) { sets.push("working_hours_end = ?");     params.push(input.workingHoursEnd ?? null); }
+    if (input.workingDays       !== undefined) { sets.push("working_days = ?");          params.push(input.workingDays == null ? null : JSON.stringify(input.workingDays)); }
     if (input.photoUrl          !== undefined) { sets.push("photo_url = ?");            params.push(input.photoUrl ?? null); }
     if (input.userId            !== undefined) { sets.push("user_id = ?");              params.push(input.userId ?? null); }
     if ((input as any).ctc      !== undefined) { sets.push("ctc = ?");                 params.push((input as any).ctc ?? null); }
