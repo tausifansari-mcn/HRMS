@@ -15,6 +15,7 @@ import { PortalRoute } from "./components/portal/PortalRoute";
 // ── Core (eager — needed before auth resolves) ────────────────────────────────
 import Auth from "./pages/AuthClean";
 import ResetPassword from "./pages/ResetPassword";
+import ChangePassword from "./pages/ChangePassword";
 import NotFound from "./pages/NotFound";
 
 // ── Lazy page chunks ──────────────────────────────────────────────────────────
@@ -228,6 +229,7 @@ const App = () => (
               <Route path="/security" element={<Security />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
               <Route path="/onboard" element={<CandidateOnboardingPage />} />
 
               <Route path="/interview-registration" element={<NativeATSCandidateRegistration />} />

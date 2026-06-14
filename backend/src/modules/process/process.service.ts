@@ -37,11 +37,12 @@ export const processService = {
 
     const duplicate = existing.find(
       (item) =>
-        item.process_code.toLowerCase() === input.processCode.toLowerCase()
+        item.process_code.toLowerCase() === input.processCode.toLowerCase() ||
+        item.process_name.trim().toLowerCase() === input.processName.trim().toLowerCase()
     );
 
     if (duplicate) {
-      throw new Error("Process code already exists");
+      throw new Error("Process code or process name already exists");
     }
 
     return repository.create(input, userId);

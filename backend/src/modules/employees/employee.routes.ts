@@ -331,7 +331,7 @@ router.get("/", requireRole("admin", "hr", "manager"), h(async (req, res) => {
       departmentId: "e.department_id",
       managerEmployeeId: "e.reporting_manager_id"
     },
-    { allowCeoAllRead: true }
+    { allowAdminBypass: true, allowCeoAllRead: true }
   );
 
   // Pass scope SQL to controller (will need service update for proper integration)

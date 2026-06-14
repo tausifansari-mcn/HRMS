@@ -150,6 +150,18 @@ router.post("/reset-password", h(async (req: any, res: any) => {
   }
 }));
 
+router.post("/change-password", requireAuth, h(async (req: any, res: any) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "currentPassword and newPassword are required" });
+  }
+  if (String(newPassword).length < 8) {
+    return res.status(400).json({ error: "New password must be at least 8 characters" });
+  }
+  await authService.changePassword(req.authUser.id, String(currentPassword), String(newPassword));
+  return res.json({ success: true });
+}));
+
 // POST /api/auth/admin-reset-password — Admin password reset for employees
 // Super Admin can reset for positions <= Level 8 (Manager, Team Lead, Staff, etc.)
 // WFM Admin can reset for positions <= Level 6 (Assistant Manager and below)

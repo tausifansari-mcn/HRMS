@@ -259,7 +259,7 @@ export function TeamKpiView({ teamMembers }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await hrmsApi.get<{ success: boolean; data: TeamSummary }>(`/kpi-master/team-summary?period=${p}`);
+      const res = await hrmsApi.get<{ success: boolean; data: TeamSummary }>(`/api/kpi-master/team-summary?period=${p}`);
       setSummary(res.data ?? null);
     } catch (err: any) {
       setError(err?.message ?? "Failed to load team KPI data");
@@ -271,7 +271,7 @@ export function TeamKpiView({ teamMembers }: Props) {
   async function loadDrillDown(empId: string, p: Period) {
     setDrillLoading(true);
     try {
-      const res = await hrmsApi.get<{ success: boolean; data: DrillData }>(`/kpi-master/live/${empId}?period=${p}`);
+      const res = await hrmsApi.get<{ success: boolean; data: DrillData }>(`/api/kpi-master/live/${empId}?period=${p}`);
       setDrillData(res.data ?? null);
     } catch {
       setDrillData(null);

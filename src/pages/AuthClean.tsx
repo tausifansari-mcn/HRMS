@@ -24,13 +24,13 @@ export default function AuthClean() {
   const [showPassword, setShowPassword] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { signIn, forgotPassword, user } = useAuth();
+  const { signIn, forgotPassword, user, mustChangePassword } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) navigate("/dashboard", { replace: true });
-  }, [user, navigate]);
+    if (user) navigate(mustChangePassword ? "/change-password" : "/dashboard", { replace: true });
+  }, [user, mustChangePassword, navigate]);
 
   const handleLogin = async (event: FormEvent) => {
     event.preventDefault();

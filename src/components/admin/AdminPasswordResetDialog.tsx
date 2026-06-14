@@ -21,11 +21,13 @@ import { Loader2, AlertTriangle, Copy, CheckCircle2, Lock, ShieldAlert } from "l
 interface AdminPasswordResetDialogProps {
   employee: {
     id: string;
-    first_name: string;
-    last_name: string;
+    name?: string;
+    first_name?: string;
+    last_name?: string;
     email: string;
-    employee_code: string;
-    designation: string | null;
+    employeeCode?: string;
+    employee_code?: string;
+    designation?: string | null;
     user_id?: string;
   } | null;
   open: boolean;
@@ -89,7 +91,10 @@ export function AdminPasswordResetDialog({
 
   if (!employee) return null;
 
-  const employeeName = `${employee.first_name} ${employee.last_name}`;
+  const employeeName = employee.name
+    ?? `${employee.first_name ?? ""} ${employee.last_name ?? ""}`.trim()
+    ?? "Employee";
+  const employeeCode = employee.employeeCode ?? employee.employee_code ?? "—";
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -118,7 +123,7 @@ export function AdminPasswordResetDialog({
               </div>
               <div className="flex justify-between">
                 <span className="text-sm font-medium text-muted-foreground">Employee Code</span>
-                <span className="text-sm font-mono">{employee.employee_code}</span>
+                <span className="text-sm font-mono">{employeeCode}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm font-medium text-muted-foreground">Email</span>

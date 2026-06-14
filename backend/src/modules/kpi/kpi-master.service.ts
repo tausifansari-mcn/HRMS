@@ -96,10 +96,10 @@ export async function listKpiMasterConfig(filters: {
       kmc.updated_at
     FROM kpi_master_config kmc
     JOIN kpi_metric_master kmm ON kmm.id = kmc.metric_id
-    LEFT JOIN department_master  dm   ON kmc.org_unit_type = 'department'   AND dm.id   = kmc.org_unit_id
-    LEFT JOIN designation_master desm ON kmc.org_unit_type = 'designation'  AND desm.id = kmc.org_unit_id
-    LEFT JOIN process_master     pm   ON kmc.org_unit_type = 'process'      AND pm.id   = kmc.org_unit_id
-    LEFT JOIN cost_centre_master ccm  ON kmc.org_unit_type = 'cost_centre'  AND ccm.id  = kmc.org_unit_id
+    LEFT JOIN department_master  dm   ON kmc.org_unit_type = 'department'   AND dm.id   = kmc.org_unit_id COLLATE utf8mb4_unicode_ci
+    LEFT JOIN designation_master desm ON kmc.org_unit_type = 'designation'  AND desm.id = kmc.org_unit_id COLLATE utf8mb4_unicode_ci
+    LEFT JOIN process_master     pm   ON kmc.org_unit_type = 'process'      AND pm.id   = kmc.org_unit_id COLLATE utf8mb4_unicode_ci
+    LEFT JOIN cost_centre_master ccm  ON kmc.org_unit_type = 'cost_centre'  AND ccm.id  = kmc.org_unit_id COLLATE utf8mb4_unicode_ci
     ${where}
     ORDER BY kmm.category, kmm.metric_name, kmc.org_unit_type
   `;
@@ -401,7 +401,11 @@ export async function getOrgUnitOptions(type: OrgUnitType) {
 
   const { table, id, name } = tableMap[type];
   const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT \`${id}\` AS id, \`${name}\` AS name FROM \`${table}\` ORDER BY \`${name}\``
+    `SELECT MIN(\`${id}\`) AS id, TRIM(\`${name}\`) AS name
+       FROM \`${table}\`
+      WHERE active_status = 1 AND TRIM(COALESCE(\`${name}\`, '')) <> ''
+      GROUP BY LOWER(TRIM(\`${name}\`))
+      ORDER BY name`
   );
   return rows;
 }

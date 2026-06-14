@@ -34,7 +34,19 @@ async function listActive(table: string, orderCol = "created_at", entityType?: s
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT * FROM ${table} WHERE active_status = 1 ORDER BY ${orderCol}`
   );
-  let items = rows as RowDataPacket[];
+  const nameColumns: Record<string, string> = {
+    department_master: "dept_name",
+    process_master: "process_name",
+  };
+  const nameColumn = nameColumns[table];
+  const seen = new Set<string>();
+  let items = (rows as RowDataPacket[]).filter((item) => {
+    if (!nameColumn) return true;
+    const normalized = String(item[nameColumn] ?? "").trim().toLocaleLowerCase();
+    if (!normalized || seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
 
   // Apply customization if entityType + employeeId provided
   if (entityType && employeeId) {
@@ -236,7 +248,7 @@ export const costCentreService = {
 // ── Grade / Band ──────────────────────────────────────────────────────────────
 
 export const gradeBandService = {
-  list: (employeeId?: string) => listActive("grade_band_master", "grade_band_name", "grade_band", employeeId),
+  list: (employeeId?: string) => listActive("grade_band_master", "grade_name", "grade_band", employeeId),
   getById: (id: string) => getById("grade_band_master", id),
   async create(data: { grade_code: string; grade_name: string; band?: string; min_ctc?: number; max_ctc?: number }) {
     const id = randomUUID();

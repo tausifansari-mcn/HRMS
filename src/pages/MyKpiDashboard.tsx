@@ -208,7 +208,7 @@ export default function MyKpiDashboard() {
     setError(null);
     setNoKpis(false);
     try {
-      const res = await hrmsApi.get<{ success: boolean; data: LivePerformanceData }>(`/kpi-master/live?period=${p}`);
+      const res = await hrmsApi.get<{ success: boolean; data: LivePerformanceData }>(`/api/kpi-master/live?period=${p}`);
       if (!res.data?.metrics?.length) {
         setNoKpis(true);
         setData(null);

@@ -107,6 +107,7 @@ const MIGRATION_MANIFEST: string[] = [
   "180_ats_registration_onboarding_repair.sql",
   "181_careers_super_admin.sql",
   "182_user_notification_preferences.sql",
+  "183_launch_data_repairs.sql",
 ];
 
 export type MigrationHealth = {

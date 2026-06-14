@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 
 export async function listSlabs() {
   const [rows] = await db.execute<RowDataPacket[]>(
-    'SELECT * FROM salary_slab_master ORDER BY seq_order ASC'
+    'SELECT * FROM salary_slab_master WHERE active_status = 1 ORDER BY seq_order ASC'
   );
   return rows;
 }
@@ -80,9 +80,10 @@ export async function listPackages(filters: {
     FROM salary_package_master spm
     JOIN grade_band_master gbm ON gbm.id = spm.grade_id
     JOIN salary_slab_master ssm ON ssm.id = spm.slab_id
-    LEFT JOIN location_master lm ON lm.id = spm.location_id
+    LEFT JOIN location_master lm
+      ON CONVERT(lm.id USING utf8mb4) COLLATE utf8mb4_unicode_ci = spm.location_id
     LEFT JOIN cost_centre_master ccm ON ccm.id = spm.cost_centre_id
-    WHERE 1=1`;
+    WHERE spm.active_status = 1`;
   const params: unknown[] = [];
   if (filters.grade_id)    { sql += ' AND spm.grade_id = ?';    params.push(filters.grade_id); }
   if (filters.slab_id)     { sql += ' AND spm.slab_id = ?';     params.push(filters.slab_id); }

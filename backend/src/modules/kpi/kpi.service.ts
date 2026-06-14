@@ -261,7 +261,7 @@ export const kpiService = {
     if (filters.branchId)  { conds.push("e.branch_id = ?");  params.push(filters.branchId); }
     if (filters.processId) { conds.push("e.process_id = ?"); params.push(filters.processId); }
     if (filters.family)    { conds.push("m.family = ?");     params.push(filters.family); }
-    params.push(filters.limit ?? 50);
+    const limit = filters.limit ?? 50;
 
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT
@@ -281,7 +281,7 @@ export const kpiService = {
        WHERE ${conds.join(" AND ")}
        GROUP BY e.id, e.employee_code, e.full_name
        ORDER BY weighted_score_pct DESC
-       LIMIT ?`,
+       LIMIT ${limit}`,
       params
     );
 
