@@ -1,10 +1,10 @@
 {
-  "id": "session-1781201779357",
-  "startedAt": "2026-06-11T18:16:19.357Z",
+  "id": "session-1781421893236",
+  "startedAt": "2026-06-14T07:24:53.236Z",
   "cwd": "/home/shuvam/hrms-audit",
   "context": {},
   "metrics": {
-    "edits": 44,
+    "edits": 4,
     "commands": 0,
     "tasks": 0,
     "errors": 0
