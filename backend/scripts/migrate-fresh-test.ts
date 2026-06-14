@@ -121,6 +121,20 @@ const MIGRATION_MANIFEST: string[] = [
   "099_ats_candidate_uploads.sql",
   "100_user_page_access.sql",
   "125_kpi_process_role_engine.sql",
+  "135_payroll_masters.sql",
+  "137_schema_gaps.sql",
+  "141_branch_head_approval.sql",
+  "142_offer_letter_system.sql",
+  "143_report_builder.sql",
+  "150_leave_policy_engine.sql",
+  "160_kpi_master_config.sql",
+  "170_access_improvements.sql",
+  "171_attendance_regularization_v2.sql",
+  "172_employee_photo.sql",
+  "173_employees_ctc_column.sql",
+  "174_apr_attendance_rule.sql",
+  "176_employee_work_schedule.sql",
+  "177_employee_profile_sensitive_details.sql",
 ];
 
 async function main() {

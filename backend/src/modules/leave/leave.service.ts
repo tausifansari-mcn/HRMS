@@ -344,7 +344,14 @@ export const leaveService = {
        LEFT JOIN employees e    ON e.id = lr.employee_id
        LEFT JOIN department_master dept ON dept.id = e.department_id
        LEFT JOIN leave_type_master lt   ON lt.id = lr.leave_type_id
-       LEFT JOIN employees rev  ON rev.id = lr.reviewed_by
+       LEFT JOIN leave_approval_log approval ON approval.id = (
+         SELECT latest.id
+         FROM leave_approval_log latest
+         WHERE latest.leave_request_id = lr.id
+         ORDER BY latest.action_at DESC
+         LIMIT 1
+       )
+       LEFT JOIN employees rev ON rev.user_id = approval.action_by
        ${where}
        ORDER BY lr.applied_at DESC
        LIMIT ${limit} OFFSET ${offset}`,
