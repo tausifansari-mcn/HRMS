@@ -171,6 +171,17 @@ const RUN_STATUS_COLORS: Record<string, string> = {
 const TABS = ["Overview", "Run History", "Connector Config"] as const;
 type Tab = (typeof TABS)[number];
 
+function canRunConnector(connector: Connector): boolean {
+  return connector.status === "active" && (connector.type === "api" || connector.type === "db");
+}
+
+function runDisabledReason(connector: Connector): string | null {
+  if (connector.status !== "active") return "Activate and configure this connector before running sync.";
+  if (connector.type === "manual") return "Manual/file connectors do not support Run Now. Upload or configure a live API/database connector.";
+  if (connector.type === "scheduled") return "Scheduled-only connectors run from the background worker. Configure the schedule instead.";
+  return null;
+}
+
 function TypeBadge({ type }: { type: ConnectorType }) {
   return (
     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${TYPE_COLORS[type]}`}>
@@ -338,14 +349,30 @@ export default function NativeIntegrationHub() {
   // ─── Actions ───────────────────────────────────────────────────────────────
 
   const triggerRun = async (key: string) => {
+    const connector = connectors.find((item) => item.key === key);
+    if (!connector) {
+      setMessage("Connector not found. Refresh the page and try again.");
+      return;
+    }
+
+    const disabledReason = runDisabledReason(connector);
+    if (disabledReason) {
+      setMessage(disabledReason);
+      return;
+    }
+
     setRunningKey(key);
     try {
       const response = await hrmsApi.post<{
         success: boolean;
-        data: { rows_fetched: number; rows_promoted: number; rows_failed: number };
-        message: string;
+        data?: { rows_fetched?: number; rows_promoted?: number; rows_failed?: number; status?: string };
+        message?: string;
       }>(`/api/integration-hub/${key}/run`, {});
-      setMessage(response.message);
+      const summary = response.data;
+      setMessage(
+        response.message ??
+          `Run ${summary?.status ?? "completed"}: fetched ${summary?.rows_fetched ?? 0}, promoted ${summary?.rows_promoted ?? 0}, failed ${summary?.rows_failed ?? 0}.`
+      );
       await loadConnectors();
       await loadRuns();
     } catch (err: unknown) {
@@ -599,49 +626,54 @@ export default function NativeIntegrationHub() {
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {connectors.map((c) => (
-                  <div
-                    key={c.key}
-                    className="group relative overflow-hidden rounded-3xl border bg-white p-6 shadow-sm hover:shadow-md transition-shadow"
-                  >
-                    {/* Status dot */}
-                    <span
-                      className={`absolute right-5 top-5 h-3 w-3 rounded-full ${STATUS_DOT[c.status] ?? "bg-slate-300"}`}
-                      title={c.status}
-                    />
-                    <div className="mb-3 flex items-start gap-3">
-                      <div className="rounded-2xl bg-slate-100 p-2.5 text-slate-700">
-                        <Database className="h-5 w-5" />
+                {connectors.map((c) => {
+                  const disabledReason = runDisabledReason(c);
+                  const runnable = canRunConnector(c);
+                  return (
+                    <div
+                      key={c.key}
+                      className="group relative overflow-hidden rounded-3xl border bg-white p-6 shadow-sm hover:shadow-md transition-shadow"
+                    >
+                      {/* Status dot */}
+                      <span
+                        className={`absolute right-5 top-5 h-3 w-3 rounded-full ${STATUS_DOT[c.status] ?? "bg-slate-300"}`}
+                        title={c.status}
+                      />
+                      <div className="mb-3 flex items-start gap-3">
+                        <div className="rounded-2xl bg-slate-100 p-2.5 text-slate-700">
+                          <Database className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="truncate font-black text-slate-950">{c.name}</h3>
+                          <p className="font-mono text-xs text-slate-400">{c.key}</p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="truncate font-black text-slate-950">{c.name}</h3>
-                        <p className="font-mono text-xs text-slate-400">{c.key}</p>
+                      <p className="mb-4 text-sm text-slate-500 line-clamp-2">{c.description || "No description."}</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <TypeBadge type={c.type} />
+                          <span className="text-xs text-slate-400 flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {c.last_run_at ? c.last_run_at.slice(0, 16).replace("T", " ") : "Never"}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => void triggerRun(c.key)}
+                          disabled={runningKey === c.key || !runnable}
+                          title={disabledReason ?? "Run this connector now"}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          {runningKey === c.key ? (
+                            <Loader className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Zap className="h-3.5 w-3.5" />
+                          )}
+                          Run Now
+                        </button>
                       </div>
                     </div>
-                    <p className="mb-4 text-sm text-slate-500 line-clamp-2">{c.description || "No description."}</p>
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <TypeBadge type={c.type} />
-                        <span className="text-xs text-slate-400 flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {c.last_run_at ? c.last_run_at.slice(0, 16).replace("T", " ") : "Never"}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => void triggerRun(c.key)}
-                        disabled={runningKey === c.key}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        {runningKey === c.key ? (
-                          <Loader className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Zap className="h-3.5 w-3.5" />
-                        )}
-                        Run Now
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

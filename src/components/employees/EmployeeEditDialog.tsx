@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { hrmsApi } from "@/lib/hrmsApi";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { isValidEmployeeCode } from "@/hooks/useNextEmployeeCode";
 import {
   Dialog,
   DialogContent,
@@ -339,19 +338,14 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.employee_code || !isValidEmployeeCode(formData.employee_code)) {
-      toast.error("Employee code must be in format ACQ001");
+    if (!formData.employee_code.trim()) {
+      toast.error("Employee code is required");
       return;
     }
     if (!formData.first_name || !formData.last_name || !formData.email || !formData.designation) {
       toast.error("Please fill in all required fields");
       return;
     }
-    if (!isDepartmentManager && !formData.manager_id) {
-      toast.error("Reporting manager is required for employees who are not department managers");
-      return;
-    }
-
     try {
       // Update employee details and department manager status
       await updateMutation.mutateAsync({ data: formData, isDeptManager: isDepartmentManager });

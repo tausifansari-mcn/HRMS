@@ -124,7 +124,11 @@ export async function executeConnector(
   input: { fromDate?: string; toDate?: string } = {},
   triggeredBy = "manual",
 ): Promise<ConnectorRunSummary> {
-  if (!connector.active_status) throw new Error("Integration is inactive");
+  if (!connector.active_status) {
+    throw Object.assign(new Error("Integration is inactive. Activate and configure it before running sync."), {
+      statusCode: 400,
+    });
+  }
   const config = parseConfig(connector.config_json);
 
   let rows: Record<string, unknown>[];
