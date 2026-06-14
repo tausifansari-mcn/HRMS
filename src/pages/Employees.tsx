@@ -20,6 +20,7 @@ import { EmployeeTable, type Employee } from "@/components/employees/EmployeeTab
 import { EmployeeDocuments } from "@/components/documents/EmployeeDocuments";
 import { EmployeeViewDialog } from "@/components/employees/EmployeeViewDialog";
 import { EmployeeEditDialog } from "@/components/employees/EmployeeEditDialog";
+import { AdminPasswordResetDialog } from "@/components/admin/AdminPasswordResetDialog";
 import { BulkDeleteDialog } from "@/components/employees/BulkDeleteDialog";
 import { BulkAssignManagerDialog } from "@/components/employees/BulkAssignManagerDialog";
 import { DateRangeExportDialog } from "@/components/export/DateRangeExportDialog";
@@ -126,6 +127,7 @@ const Employees = () => {
   const [documentsEmployee, setDocumentsEmployee] = useState<Employee | null>(null);
   const [viewEmployee, setViewEmployee] = useState<Employee | null>(null);
   const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
+  const [resetPasswordEmployee, setResetPasswordEmployee] = useState<Employee | null>(null);
 
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -670,6 +672,7 @@ const Employees = () => {
                   onManageDocuments={
                     isAdminOrHR ? (employee) => setDocumentsEmployee(employee) : undefined
                   }
+                  onResetPassword={isAdminOrHR ? (employee) => setResetPasswordEmployee(employee) : undefined}
                   isAdminOrHR={isAdminOrHR}
                   sortKey={sortConfig.key}
                   sortDirection={sortConfig.direction}
@@ -776,6 +779,13 @@ const Employees = () => {
           employee={editEmployee}
           open={!!editEmployee}
           onOpenChange={(open) => !open && setEditEmployee(null)}
+        />
+
+        {/* Admin Password Reset Dialog */}
+        <AdminPasswordResetDialog
+          employee={resetPasswordEmployee}
+          open={!!resetPasswordEmployee}
+          onOpenChange={(open) => !open && setResetPasswordEmployee(null)}
         />
 
         {/* Documents Dialog */}

@@ -17,18 +17,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { 
-  MoreHorizontal, 
-  Eye, 
-  Edit, 
-  FileText, 
+import {
+  MoreHorizontal,
+  Eye,
+  Edit,
+  FileText,
   ChevronDown,
   UserX,
   UserCheck,
   Mail,
   Download,
   UserCog,
-  Trash2
+  Trash2,
+  KeyRound
 } from "lucide-react";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { SortDirection } from "@/hooks/useSorting";
@@ -51,7 +52,7 @@ interface EmployeeTableProps {
   employees: Employee[];
   onView?: (employee: Employee) => void;
   onEdit?: (employee: Employee) => void;
-  
+  onResetPassword?: (employee: Employee) => void;
   onManageDocuments?: (employee: Employee) => void;
   isAdminOrHR?: boolean;
   sortKey?: keyof Employee | null;
@@ -65,12 +66,12 @@ interface EmployeeTableProps {
 
 const statusStyles = employeeStatusStyles;
 
-export function EmployeeTable({ 
-  employees, 
-  onView, 
-  onEdit, 
-   
-  onManageDocuments, 
+export function EmployeeTable({
+  employees,
+  onView,
+  onEdit,
+  onResetPassword,
+  onManageDocuments,
   isAdminOrHR = false,
   sortKey,
   sortDirection,
@@ -306,6 +307,14 @@ export function EmployeeTable({
                           <DropdownMenuItem onClick={() => onManageDocuments?.(employee)}>
                             <FileText className="mr-2 h-4 w-4" />
                             Documents
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => onResetPassword?.(employee)}
+                            className="text-amber-600 focus:text-amber-700"
+                          >
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            Reset Password
                           </DropdownMenuItem>
                         </>
                       )}
