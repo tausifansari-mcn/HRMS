@@ -34,7 +34,7 @@ export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
 
   // Role-restricted route: user must have one of the required roles
   if (roles && roles.length > 0) {
-    const hasRequiredRole = roles.some((r) => roleKeys.includes(r));
+    const hasRequiredRole = roleKeys.includes("super_admin") || roles.some((r) => roleKeys.includes(r));
     if (!hasRequiredRole) {
       return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">

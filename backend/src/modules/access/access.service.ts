@@ -173,7 +173,18 @@ export async function getAccessMe(userId: string): Promise<AccessMeResponse> {
 
   // 2. Employee record linked to this user
   const [empRows] = await db.execute<RowDataPacket[]>(
-    "SELECT id, employee_code, full_name FROM employees WHERE user_id = ? AND active_status = 1 LIMIT 1",
+    `SELECT e.id, e.employee_code, e.full_name
+       FROM employees e
+      WHERE e.user_id = ? AND e.active_status = 1
+      ORDER BY
+        EXISTS (
+          SELECT 1
+            FROM employee_salary_assignment esa
+           WHERE esa.employee_id = e.id AND esa.active_status = 1
+        ) DESC,
+        CASE WHEN e.employee_code LIKE 'ADMIN%' THEN 1 ELSE 0 END,
+        e.updated_at DESC
+      LIMIT 1`,
     [userId]
   );
   const emp = (empRows as RowDataPacket[])[0] as any ?? null;
@@ -189,7 +200,22 @@ export async function getAccessMe(userId: string): Promise<AccessMeResponse> {
   // 4. Page permissions — union of all role grants (most permissive wins)
   const allRoleKeys = [...new Set([...roles, ...scopes.map((s: any) => s.role_key)])];
   let pages: AccessMeResponse["pages"] = [];
-  if (allRoleKeys.length > 0) {
+  if (roles.includes("super_admin")) {
+    const [pageRows] = await db.execute<RowDataPacket[]>(
+      `SELECT page_code
+         FROM page_catalog
+        WHERE active_status = 1
+        ORDER BY page_code`
+    );
+    pages = (pageRows as RowDataPacket[]).map((row: any) => ({
+      page_code: String(row.page_code),
+      can_view: true,
+      can_create: true,
+      can_edit: true,
+      can_delete: true,
+      can_export: true,
+    }));
+  } else if (allRoleKeys.length > 0) {
     const placeholders = allRoleKeys.map(() => "?").join(",");
     const [pageRows] = await db.execute<RowDataPacket[]>(
       `SELECT page_code,
