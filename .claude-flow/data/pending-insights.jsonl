@@ -361,3 +361,10 @@
 {"type":"edit","file":"/home/shuvam/hrms-audit/backend/src/modules/auth/auth.service.ts","timestamp":1781425344207,"sessionId":null}
 {"type":"edit","file":"/home/shuvam/hrms-audit/backend/sql/999_password_expiry_policy.sql","timestamp":1781425386783,"sessionId":null}
 {"type":"edit","file":"/tmp/PASSWORD_SECURITY_COMPLETE.md","timestamp":1781425460902,"sessionId":null}
+{"type":"edit","file":"/tmp/BULK_AUTH_ACCOUNTS_SUMMARY.md","timestamp":1781426176862,"sessionId":null}
+{"type":"edit","file":"/tmp/COSEC_INTEGRATION_SETUP.md","timestamp":1781426399654,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/src/components/integrations/SimpleConnectorWizard.tsx","timestamp":1781426457648,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/src/pages/NativeIntegrationHub.tsx","timestamp":1781426475120,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/src/pages/NativeIntegrationHub.tsx","timestamp":1781426481732,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/src/pages/NativeIntegrationHub.tsx","timestamp":1781426494946,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/src/pages/NativeIntegrationHub.tsx","timestamp":1781426510709,"sessionId":null}

@@ -19,6 +19,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { hrmsApi } from "@/lib/hrmsApi";
 import { DatabaseConnectorCard } from "@/components/integrations/DatabaseConnectorCard";
 import { DatabaseConfigModal } from "@/components/integrations/DatabaseConfigModal";
+import { SimpleConnectorWizard } from "@/components/integrations/SimpleConnectorWizard";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -166,6 +167,7 @@ export default function NativeIntegrationHub() {
 
   // Connector Config
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showSimpleWizard, setShowSimpleWizard] = useState(false);
   const [selectedConnector, setSelectedConnector] = useState<Connector | null>(null);
   const [fieldMaps, setFieldMaps] = useState<FieldMap[]>([]);
   const [suggestions, setSuggestions] = useState<SuggestedMapping[]>([]);
@@ -608,13 +610,20 @@ export default function NativeIntegrationHub() {
         {activeTab === "Connector Config" && (
           <div className="space-y-5">
             {/* Add Connector */}
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowSimpleWizard(true)}
+                className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 transition-colors cursor-pointer shadow-lg shadow-blue-600/30"
+              >
+                <Zap className="h-4 w-4" />
+                Quick Connect
+              </button>
               <button
                 onClick={() => setShowAddModal(true)}
                 className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
-                Add Connector
+                Advanced
               </button>
             </div>
 
@@ -1013,6 +1022,16 @@ export default function NativeIntegrationHub() {
           </div>
         </div>
       )}
+
+      {/* Simple Connector Wizard */}
+      <SimpleConnectorWizard
+        open={showSimpleWizard}
+        onOpenChange={setShowSimpleWizard}
+        onSuccess={() => {
+          loadConnectors();
+          loadDbConnectors();
+        }}
+      />
     </DashboardLayout>
   );
 }
