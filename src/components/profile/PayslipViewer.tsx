@@ -255,7 +255,7 @@ export function PayslipViewer({ employeeId, employeeName, employeeCode }: Paysli
     return items;
   };
 
-  const handleDownloadPayslip = (record: PayslipRecord) => {
+  const handleDownloadPayslip = async (record: PayslipRecord) => {
     // run_month is "YYYY-MM" format
     const [recYear, recMonthNum] = (record.run_month || "").split("-");
     const monthName = MONTHS.find((m) => m.value === String(Number(recMonthNum)))?.label || record.run_month || "";
@@ -272,7 +272,7 @@ export function PayslipViewer({ employeeId, employeeName, employeeCode }: Paysli
       return Number(comp?.amount ?? 0);
     };
 
-    downloadMasCallnetPayslip({
+    await downloadMasCallnetPayslip({
       // Header
       companyName: "Mas Callnet India Pvt Ltd",
       monthYear: `${monthName} - ${recYear}`,

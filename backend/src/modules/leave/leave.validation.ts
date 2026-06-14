@@ -44,6 +44,7 @@ export const leaveRequestFiltersSchema = z.object({
   fromDate: z.string().regex(DATE_REGEX).optional(),
   toDate: z.string().regex(DATE_REGEX).optional(),
   activeOn: z.string().regex(DATE_REGEX).optional(),
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
