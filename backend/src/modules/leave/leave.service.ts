@@ -320,7 +320,7 @@ export const leaveService = {
   },
 
   async listRequests(filters: LeaveRequestFilters): Promise<PaginatedResult<LeaveRequest>> {
-    const { page, limit, employeeId, leaveTypeId, status, fromDate, toDate, activeOn } = filters;
+    const { page, limit, employeeId, leaveTypeId, status, fromDate, toDate, activeOn, year } = filters;
     const offset = (page - 1) * limit;
     const conds: string[] = [];
     const params: unknown[] = [];
@@ -331,6 +331,7 @@ export const leaveService = {
     if (toDate)      { conds.push("lr.to_date <= ?");      params.push(toDate); }
     if (activeOn)    { conds.push("lr.from_date <= ?");    params.push(activeOn);
                        conds.push("lr.to_date >= ?");      params.push(activeOn); }
+    if (year)        { conds.push("YEAR(lr.from_date) = ?"); params.push(year); }
     const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT lr.*,
