@@ -42,6 +42,8 @@ interface Connector {
 interface FieldMap {
   id: string;
   source_field: string;
+  target_table?: string;
+  target_column?: string;
   target_field: string;
   transform: string | null;
   is_active: boolean;
@@ -60,6 +62,13 @@ interface Schedule {
   is_enabled: boolean;
   last_run_at: string | null;
   next_run_at: string | null;
+}
+
+interface FieldMapForm {
+  source_field: string;
+  target_table: string;
+  target_column: string;
+  transform: string;
 }
 
 interface RunRecord {
@@ -143,6 +152,13 @@ const emptyConnectorForm = (): NewConnectorForm => ({
   sheets_auth_mode: "service_account",
   service_account_email: "",
   sync_direction: "pull",
+});
+
+const emptyFieldMapForm = (): FieldMapForm => ({
+  source_field: "",
+  target_table: "",
+  target_column: "",
+  transform: "",
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -253,6 +269,8 @@ export default function NativeIntegrationHub() {
   const [scheduleEditing, setScheduleEditing] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [mappingSaving, setMappingSaving] = useState(false);
+  const [fieldMapForm, setFieldMapForm] = useState<FieldMapForm>(emptyFieldMapForm);
 
   const [newForm, setNewForm] = useState<NewConnectorForm>(emptyConnectorForm);
 
@@ -313,6 +331,7 @@ export default function NativeIntegrationHub() {
     setFieldMaps([]);
     setSuggestions([]);
     setSchedule(null);
+    setFieldMapForm(emptyFieldMapForm());
     setDetailLoading(true);
     try {
       const [fmRes, sugRes, schedRes] = await Promise.all([
@@ -498,15 +517,53 @@ export default function NativeIntegrationHub() {
     }
   };
 
+  const editFieldMap = (fieldMap: FieldMap) => {
+    setFieldMapForm({
+      source_field: fieldMap.source_field,
+      target_table: fieldMap.target_table ?? fieldMap.target_field?.split(".")[0] ?? "",
+      target_column: fieldMap.target_column ?? fieldMap.target_field?.split(".").slice(1).join(".") ?? "",
+      transform: fieldMap.transform ?? "",
+    });
+  };
+
+  const saveFieldMap = async () => {
+    if (!selectedConnector) return;
+    if (!fieldMapForm.source_field.trim() || !fieldMapForm.target_table.trim() || !fieldMapForm.target_column.trim()) {
+      setMessage("Source field, target table, and target column are required for field mapping.");
+      return;
+    }
+
+    setMappingSaving(true);
+    try {
+      await hrmsApi.post("/api/integration-hub/field-maps/confirm", {
+        integrationKey: selectedConnector.key,
+        sourceField: fieldMapForm.source_field.trim(),
+        targetTable: fieldMapForm.target_table.trim(),
+        targetColumn: fieldMapForm.target_column.trim(),
+        transform: fieldMapForm.transform.trim() || null,
+      });
+      setFieldMapForm(emptyFieldMapForm());
+      await loadConnectorDetail(selectedConnector);
+      setMessage("Field mapping saved.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Field mapping save failed";
+      setMessage(msg);
+    } finally {
+      setMappingSaving(false);
+    }
+  };
+
   const saveSchedule = async () => {
     if (!selectedConnector || !schedule) return;
     try {
-      await hrmsApi.put(`/api/integration-hub/${selectedConnector.key}/schedule`, {
+      const response = await hrmsApi.put<{ success: boolean; data: Schedule; message?: string }>(`/api/integration-hub/${selectedConnector.key}/schedule`, {
         cron_expression: schedule.cron_expression,
         is_enabled: schedule.is_enabled,
       });
+      setSchedule(response.data);
       setScheduleEditing(false);
-      setMessage("Schedule updated.");
+      setMessage(response.message ?? "Schedule updated.");
+      await loadConnectors();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Schedule update failed";
       setMessage(msg);
@@ -879,7 +936,79 @@ export default function NativeIntegrationHub() {
 
                     {/* Field Mapping */}
                     <div className="rounded-3xl border bg-white p-5 shadow-sm">
-                      <h3 className="mb-4 font-black text-slate-950">Field Mappings</h3>
+                      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h3 className="font-black text-slate-950">Field Mappings</h3>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Map source fields from this connector into HRMS target tables and columns.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setFieldMapForm(emptyFieldMapForm())}
+                          className="w-fit cursor-pointer rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                        >
+                          New Mapping
+                        </button>
+                      </div>
+
+                      <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+                        <div className="grid gap-3 md:grid-cols-4">
+                          <div>
+                            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Source Field
+                            </label>
+                            <input
+                              value={fieldMapForm.source_field}
+                              onChange={(event) => setFieldMapForm({ ...fieldMapForm, source_field: event.target.value })}
+                              placeholder="agent_user"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-blue-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Target Table
+                            </label>
+                            <input
+                              value={fieldMapForm.target_table}
+                              onChange={(event) => setFieldMapForm({ ...fieldMapForm, target_table: event.target.value })}
+                              placeholder="employees"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-blue-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Target Column
+                            </label>
+                            <input
+                              value={fieldMapForm.target_column}
+                              onChange={(event) => setFieldMapForm({ ...fieldMapForm, target_column: event.target.value })}
+                              placeholder="employee_code"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-blue-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Transform
+                            </label>
+                            <input
+                              value={fieldMapForm.transform}
+                              onChange={(event) => setFieldMapForm({ ...fieldMapForm, transform: event.target.value })}
+                              placeholder="trim|upper"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-blue-400"
+                            />
+                          </div>
+                        </div>
+                        <div className="mt-3 flex justify-end">
+                          <button
+                            onClick={() => void saveFieldMap()}
+                            disabled={mappingSaving}
+                            className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-950 px-4 py-2 text-xs font-black text-white hover:bg-slate-800 disabled:opacity-60"
+                          >
+                            {mappingSaving && <Loader className="h-3.5 w-3.5 animate-spin" />}
+                            Save Mapping
+                          </button>
+                        </div>
+                      </div>
 
                       {/* Confirmed Mappings */}
                       {fieldMaps.length > 0 && (
@@ -901,11 +1030,17 @@ export default function NativeIntegrationHub() {
                                   {fm.target_field}
                                 </span>
                                 {fm.transform && (
-                                  <span className="ml-auto rounded-lg bg-white px-2 py-1 text-xs text-slate-500 border">
+                                  <span className="rounded-lg bg-white px-2 py-1 text-xs text-slate-500 border">
                                     {fm.transform}
                                   </span>
                                 )}
-                                <CheckCircle2 className="ml-auto h-4 w-4 flex-shrink-0 text-emerald-600" />
+                                <button
+                                  onClick={() => editFieldMap(fm)}
+                                  className="ml-auto cursor-pointer rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                                >
+                                  Edit
+                                </button>
+                                <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-emerald-600" />
                               </div>
                             ))}
                           </div>
@@ -969,7 +1104,7 @@ export default function NativeIntegrationHub() {
 
                       {fieldMaps.length === 0 && suggestions.length === 0 && (
                         <div className="rounded-2xl border border-dashed py-8 text-center text-sm text-slate-400">
-                          No field mappings or suggestions for this connector.
+                          No field mappings yet. Add one above or confirm a suggestion when available.
                         </div>
                       )}
                     </div>
@@ -1004,6 +1139,15 @@ export default function NativeIntegrationHub() {
                       </div>
                       {schedule ? (
                         <div className="space-y-4">
+                          <div className={`rounded-2xl border px-4 py-3 text-sm ${
+                            schedule.is_enabled
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                              : "border-amber-200 bg-amber-50 text-amber-800"
+                          }`}>
+                            {schedule.is_enabled
+                              ? "Automatic sync is enabled. This runs on the backend server even when Super Admin is logged out."
+                              : "Automatic sync is disabled. Turn Enabled on and save to start backend scheduled sync."}
+                          </div>
                           <div>
                             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
                               Cron Expression
