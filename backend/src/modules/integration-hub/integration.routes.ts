@@ -16,6 +16,10 @@ integrationRouter.get("/runs", (req, res, next) => {
   integrationController.listRuns(req as any, res).catch(next);
 });
 
+integrationRouter.get("/mapping-catalog", (req, res, next) => {
+  integrationController.mappingCatalog(req as any, res).catch(next);
+});
+
 integrationRouter.post("/field-maps/confirm", (req, res, next) => {
   integrationController.confirmFieldMap(req as any, res).catch(next);
 });
@@ -65,6 +69,18 @@ integrationRouter.post("/:key/run", async (req: any, res: any, next: any) => {
 
 integrationRouter.get("/:key/field-maps", (req, res, next) => {
   integrationController.listFieldMaps(req as any, res).catch(next);
+});
+
+integrationRouter.get("/:key/table-maps", (req, res, next) => {
+  integrationController.listTableMaps(req as any, res).catch(next);
+});
+
+integrationRouter.put("/:key/table-maps", (req, res, next) => {
+  integrationController.upsertTableMap(req as any, res).catch(next);
+});
+
+integrationRouter.get("/:key/source-schema", (req, res, next) => {
+  integrationController.sourceSchema(req as any, res).catch(next);
 });
 
 integrationRouter.get("/:key/suggestions", (req, res, next) => {

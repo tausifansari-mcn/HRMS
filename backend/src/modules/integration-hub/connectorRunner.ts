@@ -4,12 +4,15 @@ import { fetchFromDatabase, quoteIdentifier, type DbDialect } from "./adapters/d
 import { runConnector, type ConnectorRunSummary } from "./connectorService.js";
 import { integrationService } from "./integration.service.js";
 import type { IntegrationConfig } from "./integration.types.js";
+import { syncDatabaseConnector } from "./adapters/dbSyncService.js";
 
 interface ConnectorConfig {
   method?: "GET" | "POST";
   connector_kind?: string;
   source_tables?: string[];
   tables?: string[];
+  syncTables?: string[];
+  target_table?: string;
   date_column?: string;
   pagination?: string;
   request_body?: Record<string, unknown>;
@@ -48,7 +51,7 @@ async function readDatabaseRows(
   if (!credentials) throw new Error("Database credentials are not configured");
 
   const dialect: DbDialect = credentials.db_type === "mssql" ? "mssql" : "mysql";
-  const tables = config.source_tables ?? config.tables ?? credentials.tables ?? [];
+  const tables = config.source_tables ?? config.tables ?? config.syncTables ?? credentials.tables ?? [];
   if (tables.length === 0) throw new Error("At least one approved source table is required");
 
   const rows: Record<string, unknown>[] = [];
@@ -130,6 +133,53 @@ export async function executeConnector(
     });
   }
   const config = parseConfig(connector.config_json);
+
+  if (connector.integration_type === "database") {
+    const tableMaps = await integrationService.listTableMaps(connector.integration_key);
+    if (tableMaps.length > 0 || config.target_table === "dialer_session_log") {
+      const run = await integrationService.createRun(connector.integration_key, triggeredBy, userId);
+      const result = await syncDatabaseConnector(connector, {
+        fromDate: input.fromDate,
+        toDate: input.toDate,
+        userId: userId ?? undefined,
+      });
+      if (result.affected_dates.length > 0) {
+        const { attendanceEngineService } = await import("../wfm/attendance-engine.service.js");
+        for (const date of result.affected_dates) {
+          const attendance = await attendanceEngineService.processDateBatch(date, 50);
+          if (attendance.failed > 0) {
+            result.errors.push(
+              `Attendance rebuild ${date}: ${attendance.failed} employee record(s) failed`,
+            );
+          }
+        }
+      }
+      const completed = result.rows_inserted > 0 || (result.rows_fetched === 0 && result.errors.length === 0);
+      const status = completed ? "complete" : "failed";
+      await db.execute(
+        `UPDATE integration_connector_run
+            SET status = ?, rows_fetched = ?, rows_promoted = ?, rows_failed = ?,
+                duration_ms = ?, error_message = ?, completed_at = NOW()
+          WHERE id = ?`,
+        [
+          status,
+          result.rows_fetched,
+          result.rows_inserted,
+          result.rows_skipped,
+          result.duration_ms,
+          result.errors.length > 0 ? result.errors.slice(0, 10).join("; ") : null,
+          run.id,
+        ],
+      );
+      return {
+        run_id: run.id,
+        rows_fetched: result.rows_fetched,
+        rows_promoted: result.rows_inserted,
+        rows_failed: result.rows_skipped,
+        status,
+      };
+    }
+  }
 
   let rows: Record<string, unknown>[];
   try {

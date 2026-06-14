@@ -29,10 +29,21 @@ export const updateIntegrationSchema = z.object({
 
 export const confirmFieldMapSchema = z.object({
   integrationKey: z.string().trim().min(1).max(100),
+  sourceTable: z.string().trim().min(1).max(255).default("*"),
   sourceField: z.string().trim().min(1).max(255),
   targetTable: z.string().trim().min(1).max(100),
   targetColumn: z.string().trim().min(1).max(100),
   transform: z.string().trim().max(500).nullable().optional(),
+});
+
+export const upsertTableMapSchema = z.object({
+  sourceTable: z.string().trim().min(1).max(255),
+  targetTable: z.enum([
+    "dialer_session_log",
+    "integration_call_daily",
+    "integration_biometric_daily",
+  ]),
+  syncMode: z.enum(["daily_aggregate"]).default("daily_aggregate"),
 });
 
 export const runFiltersSchema = z.object({
@@ -68,5 +79,6 @@ export const upsertScheduleSchema = z.object({
 export type CreateIntegrationInput = z.infer<typeof createIntegrationSchema>;
 export type UpdateIntegrationInput = z.infer<typeof updateIntegrationSchema>;
 export type ConfirmFieldMapInput = z.infer<typeof confirmFieldMapSchema>;
+export type UpsertTableMapInput = z.infer<typeof upsertTableMapSchema>;
 export type RunFilters = z.infer<typeof runFiltersSchema>;
 export type UpsertScheduleInput = z.infer<typeof upsertScheduleSchema>;

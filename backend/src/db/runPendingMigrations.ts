@@ -112,6 +112,10 @@ const MIGRATION_MANIFEST: string[] = [
   "185_integration_run_integrity.sql",
   "186_runtime_configuration_integrity.sql",
   "187_employee_official_email.sql",
+  "188_integration_table_header_mapping.sql",
+  "189_integration_call_daily.sql",
+  "190_integration_biometric_daily.sql",
+  "191_attendance_source_lineage.sql",
 ];
 
 export type MigrationHealth = {

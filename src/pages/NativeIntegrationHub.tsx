@@ -41,6 +41,7 @@ interface Connector {
 
 interface FieldMap {
   id: string;
+  source_table: string;
   source_field: string;
   target_table?: string;
   target_column?: string;
@@ -65,10 +66,36 @@ interface Schedule {
 }
 
 interface FieldMapForm {
+  source_table: string;
   source_field: string;
   target_table: string;
   target_column: string;
   transform: string;
+}
+
+interface TableMap {
+  id: string;
+  source_table: string;
+  target_table: string;
+  sync_mode: "daily_aggregate";
+  is_active: boolean;
+}
+
+interface SourceSchema {
+  table: string;
+  columns: Array<{ name: string; type: string }>;
+}
+
+interface MappingTarget {
+  table: string;
+  columns: string[];
+  sync_modes: Array<"daily_aggregate">;
+}
+
+interface TableMapForm {
+  source_table: string;
+  target_table: string;
+  sync_mode: "daily_aggregate";
 }
 
 interface RunRecord {
@@ -155,10 +182,17 @@ const emptyConnectorForm = (): NewConnectorForm => ({
 });
 
 const emptyFieldMapForm = (): FieldMapForm => ({
+  source_table: "",
   source_field: "",
   target_table: "",
   target_column: "",
   transform: "",
+});
+
+const emptyTableMapForm = (): TableMapForm => ({
+  source_table: "",
+  target_table: "dialer_session_log",
+  sync_mode: "daily_aggregate",
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -264,13 +298,18 @@ export default function NativeIntegrationHub() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedConnector, setSelectedConnector] = useState<Connector | null>(null);
   const [fieldMaps, setFieldMaps] = useState<FieldMap[]>([]);
+  const [tableMaps, setTableMaps] = useState<TableMap[]>([]);
+  const [sourceSchemas, setSourceSchemas] = useState<SourceSchema[]>([]);
+  const [mappingTargets, setMappingTargets] = useState<MappingTarget[]>([]);
   const [suggestions, setSuggestions] = useState<SuggestedMapping[]>([]);
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [scheduleEditing, setScheduleEditing] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [mappingSaving, setMappingSaving] = useState(false);
+  const [tableMappingSaving, setTableMappingSaving] = useState(false);
   const [fieldMapForm, setFieldMapForm] = useState<FieldMapForm>(emptyFieldMapForm);
+  const [tableMapForm, setTableMapForm] = useState<TableMapForm>(emptyTableMapForm);
 
   const [newForm, setNewForm] = useState<NewConnectorForm>(emptyConnectorForm);
 
@@ -329,14 +368,26 @@ export default function NativeIntegrationHub() {
   const loadConnectorDetail = async (connector: Connector) => {
     setSelectedConnector(connector);
     setFieldMaps([]);
+    setTableMaps([]);
+    setSourceSchemas([]);
     setSuggestions([]);
     setSchedule(null);
     setFieldMapForm(emptyFieldMapForm());
+    setTableMapForm(emptyTableMapForm());
     setDetailLoading(true);
     try {
-      const [fmRes, sugRes, schedRes] = await Promise.all([
+      const [fmRes, tableRes, schemaRes, catalogRes, sugRes, schedRes] = await Promise.all([
         hrmsApi.get<{ success: boolean; data: FieldMap[] }>(
           `/api/integration-hub/${connector.key}/field-maps`
+        ),
+        hrmsApi.get<{ success: boolean; data: TableMap[] }>(
+          `/api/integration-hub/${connector.key}/table-maps`
+        ),
+        hrmsApi.get<{ success: boolean; data: SourceSchema[] }>(
+          `/api/integration-hub/${connector.key}/source-schema`
+        ).catch(() => ({ success: false, data: [] })),
+        hrmsApi.get<{ success: boolean; data: MappingTarget[] }>(
+          "/api/integration-hub/mapping-catalog"
         ),
         hrmsApi.get<{ success: boolean; data: SuggestedMapping[] }>(
           `/api/integration-hub/${connector.key}/suggestions`
@@ -346,6 +397,9 @@ export default function NativeIntegrationHub() {
         ),
       ]);
       setFieldMaps(fmRes.data ?? []);
+      setTableMaps(tableRes.data ?? []);
+      setSourceSchemas(schemaRes.data ?? []);
+      setMappingTargets(catalogRes.data ?? []);
       setSuggestions(sugRes.data ?? []);
       setSchedule(schedRes.data ?? null);
     } catch (err: unknown) {
@@ -519,6 +573,7 @@ export default function NativeIntegrationHub() {
 
   const editFieldMap = (fieldMap: FieldMap) => {
     setFieldMapForm({
+      source_table: fieldMap.source_table ?? "*",
       source_field: fieldMap.source_field,
       target_table: fieldMap.target_table ?? fieldMap.target_field?.split(".")[0] ?? "",
       target_column: fieldMap.target_column ?? fieldMap.target_field?.split(".").slice(1).join(".") ?? "",
@@ -528,8 +583,8 @@ export default function NativeIntegrationHub() {
 
   const saveFieldMap = async () => {
     if (!selectedConnector) return;
-    if (!fieldMapForm.source_field.trim() || !fieldMapForm.target_table.trim() || !fieldMapForm.target_column.trim()) {
-      setMessage("Source field, target table, and target column are required for field mapping.");
+    if (!fieldMapForm.source_table.trim() || !fieldMapForm.source_field.trim() || !fieldMapForm.target_table.trim() || !fieldMapForm.target_column.trim()) {
+      setMessage("Source table, source header, target table, and target column are required.");
       return;
     }
 
@@ -537,6 +592,7 @@ export default function NativeIntegrationHub() {
     try {
       await hrmsApi.post("/api/integration-hub/field-maps/confirm", {
         integrationKey: selectedConnector.key,
+        sourceTable: fieldMapForm.source_table.trim(),
         sourceField: fieldMapForm.source_field.trim(),
         targetTable: fieldMapForm.target_table.trim(),
         targetColumn: fieldMapForm.target_column.trim(),
@@ -550,6 +606,37 @@ export default function NativeIntegrationHub() {
       setMessage(msg);
     } finally {
       setMappingSaving(false);
+    }
+  };
+
+  const editTableMap = (tableMap: TableMap) => {
+    setTableMapForm({
+      source_table: tableMap.source_table,
+      target_table: tableMap.target_table,
+      sync_mode: tableMap.sync_mode,
+    });
+  };
+
+  const saveTableMap = async () => {
+    if (!selectedConnector) return;
+    if (!tableMapForm.source_table.trim() || !tableMapForm.target_table.trim()) {
+      setMessage("Source and target tables are required.");
+      return;
+    }
+    setTableMappingSaving(true);
+    try {
+      await hrmsApi.put(`/api/integration-hub/${selectedConnector.key}/table-maps`, {
+        sourceTable: tableMapForm.source_table.trim(),
+        targetTable: tableMapForm.target_table.trim(),
+        syncMode: tableMapForm.sync_mode,
+      });
+      setTableMapForm(emptyTableMapForm());
+      await loadConnectorDetail(selectedConnector);
+      setMessage("Table mapping saved.");
+    } catch (err: unknown) {
+      setMessage(err instanceof Error ? err.message : "Table mapping save failed");
+    } finally {
+      setTableMappingSaving(false);
     }
   };
 
@@ -934,57 +1021,192 @@ export default function NativeIntegrationHub() {
                       </div>
                     </div>
 
-                    {/* Field Mapping */}
+                    {/* Table Mapping */}
                     <div className="rounded-3xl border bg-white p-5 shadow-sm">
                       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                          <h3 className="font-black text-slate-950">Field Mappings</h3>
+                          <h3 className="font-black text-slate-950">Table Mapping</h3>
                           <p className="mt-1 text-xs text-slate-500">
-                            Map source fields from this connector into HRMS target tables and columns.
+                            Choose which external source table feeds an approved HRMS destination.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setTableMapForm(emptyTableMapForm())}
+                          className="w-fit cursor-pointer rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          New Table Mapping
+                        </button>
+                      </div>
+
+                      <div className="mb-5 grid gap-3 rounded-2xl border border-violet-100 bg-violet-50/50 p-4 md:grid-cols-[1fr_auto_1fr_1fr_auto] md:items-end">
+                        <div>
+                          <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                            Source Table
+                          </label>
+                          <select
+                            value={tableMapForm.source_table}
+                            onChange={(event) => setTableMapForm({ ...tableMapForm, source_table: event.target.value })}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900"
+                          >
+                            <option value="">Select source table</option>
+                            {sourceSchemas.map((schema) => (
+                              <option key={schema.table} value={schema.table}>{schema.table}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <ChevronRight className="mb-2 hidden h-4 w-4 text-slate-400 md:block" />
+                        <div>
+                          <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                            HRMS Target Table
+                          </label>
+                          <select
+                            value={tableMapForm.target_table}
+                            onChange={(event) => setTableMapForm({ ...tableMapForm, target_table: event.target.value })}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900"
+                          >
+                            {mappingTargets.map((target) => (
+                              <option key={target.table} value={target.table}>{target.table}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                            Sync Mode
+                          </label>
+                          <select
+                            value={tableMapForm.sync_mode}
+                            onChange={(event) => setTableMapForm({ ...tableMapForm, sync_mode: event.target.value as "daily_aggregate" })}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900"
+                          >
+                            <option value="daily_aggregate">Daily aggregate</option>
+                          </select>
+                        </div>
+                        <button
+                          onClick={() => void saveTableMap()}
+                          disabled={tableMappingSaving || sourceSchemas.length === 0}
+                          className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 py-2 text-xs font-black text-white hover:bg-violet-800 disabled:opacity-50"
+                        >
+                          {tableMappingSaving && <Loader className="h-3.5 w-3.5 animate-spin" />}
+                          Save
+                        </button>
+                      </div>
+
+                      {sourceSchemas.length === 0 && (
+                        <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                          No live source schema could be loaded. Check credentials, source tables, and network access.
+                        </div>
+                      )}
+
+                      {tableMaps.length > 0 ? (
+                        <div className="space-y-2">
+                          {tableMaps.map((mapping) => (
+                            <div key={mapping.id} className="flex flex-wrap items-center gap-3 rounded-2xl bg-violet-50 px-4 py-3 text-sm">
+                              <span className="font-mono font-semibold text-slate-800">{mapping.source_table}</span>
+                              <ChevronRight className="h-4 w-4 text-violet-500" />
+                              <span className="font-mono font-semibold text-slate-800">{mapping.target_table}</span>
+                              <span className="rounded-lg bg-white px-2 py-1 text-xs font-bold text-violet-700">
+                                {mapping.sync_mode.replace("_", " ")}
+                              </span>
+                              <button
+                                onClick={() => editTableMap(mapping)}
+                                className="ml-auto cursor-pointer rounded-lg border border-violet-200 bg-white px-2 py-1 text-xs font-bold text-violet-700 hover:bg-violet-100"
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border border-dashed py-6 text-center text-sm text-slate-400">
+                          No table mappings configured. Automatic promotion stays blocked until one is saved.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Header Mapping */}
+                    <div className="rounded-3xl border bg-white p-5 shadow-sm">
+                      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h3 className="font-black text-slate-950">Header Mapping</h3>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Map actual source headers into columns of the selected HRMS target table.
                           </p>
                         </div>
                         <button
                           onClick={() => setFieldMapForm(emptyFieldMapForm())}
                           className="w-fit cursor-pointer rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                         >
-                          New Mapping
+                          New Header Mapping
                         </button>
                       </div>
 
                       <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
-                        <div className="grid gap-3 md:grid-cols-4">
+                        <div className="grid gap-3 md:grid-cols-5">
                           <div>
                             <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
-                              Source Field
+                              Source Table
                             </label>
-                            <input
+                            <select
+                              value={fieldMapForm.source_table}
+                              onChange={(event) => setFieldMapForm({
+                                ...fieldMapForm,
+                                source_table: event.target.value,
+                                source_field: "",
+                                target_table: tableMaps.find((mapping) => mapping.source_table === event.target.value)?.target_table
+                                  ?? fieldMapForm.target_table,
+                              })}
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900"
+                            >
+                              <option value="">Select table</option>
+                              {sourceSchemas.map((schema) => (
+                                <option key={schema.table} value={schema.table}>{schema.table}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Source Header
+                            </label>
+                            <select
                               value={fieldMapForm.source_field}
                               onChange={(event) => setFieldMapForm({ ...fieldMapForm, source_field: event.target.value })}
-                              placeholder="agent_user"
-                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-blue-400"
-                            />
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900"
+                            >
+                              <option value="">Select header</option>
+                              {(sourceSchemas.find((schema) => schema.table === fieldMapForm.source_table)?.columns ?? []).map((column) => (
+                                <option key={column.name} value={column.name}>{column.name} ({column.type})</option>
+                              ))}
+                            </select>
                           </div>
                           <div>
                             <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
                               Target Table
                             </label>
-                            <input
+                            <select
                               value={fieldMapForm.target_table}
-                              onChange={(event) => setFieldMapForm({ ...fieldMapForm, target_table: event.target.value })}
-                              placeholder="employees"
-                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-blue-400"
-                            />
+                              onChange={(event) => setFieldMapForm({ ...fieldMapForm, target_table: event.target.value, target_column: "" })}
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900"
+                            >
+                              <option value="">Select target</option>
+                              {mappingTargets.map((target) => (
+                                <option key={target.table} value={target.table}>{target.table}</option>
+                              ))}
+                            </select>
                           </div>
                           <div>
                             <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
                               Target Column
                             </label>
-                            <input
+                            <select
                               value={fieldMapForm.target_column}
                               onChange={(event) => setFieldMapForm({ ...fieldMapForm, target_column: event.target.value })}
-                              placeholder="employee_code"
-                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none focus:border-blue-400"
-                            />
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900"
+                            >
+                              <option value="">Select column</option>
+                              {(mappingTargets.find((target) => target.table === fieldMapForm.target_table)?.columns ?? []).map((column) => (
+                                <option key={column} value={column}>{column}</option>
+                              ))}
+                            </select>
                           </div>
                           <div>
                             <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -1023,7 +1245,7 @@ export default function NativeIntegrationHub() {
                                 className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm"
                               >
                                 <span className="font-mono font-semibold text-slate-700">
-                                  {fm.source_field}
+                                  {fm.source_table}.{fm.source_field}
                                 </span>
                                 <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400" />
                                 <span className="font-mono font-semibold text-slate-700">
@@ -1104,7 +1326,7 @@ export default function NativeIntegrationHub() {
 
                       {fieldMaps.length === 0 && suggestions.length === 0 && (
                         <div className="rounded-2xl border border-dashed py-8 text-center text-sm text-slate-400">
-                          No field mappings yet. Add one above or confirm a suggestion when available.
+                          No header mappings yet. Add one above or confirm a suggestion when available.
                         </div>
                       )}
                     </div>

@@ -23,6 +23,10 @@ vi.mock("../src/modules/integration-hub/integration.service.js", () => ({
     listFieldMaps: vi.fn(),
     confirmFieldMap: vi.fn(),
     listSuggestions: vi.fn(),
+    listTableMaps: vi.fn(),
+    upsertTableMap: vi.fn(),
+    getMappingCatalog: vi.fn(),
+    inspectSourceSchema: vi.fn(),
   },
 }));
 vi.mock("../src/modules/integration-hub/connectorRunner.js", () => ({
@@ -201,6 +205,70 @@ describe("GET /api/integration-hub/:key/field-maps", () => {
     const res = await request(app).get("/api/integration-hub/dialer_1/field-maps").set(AUTH);
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
+  });
+});
+
+describe("Integration table and header mapping metadata", () => {
+  it("returns approved target tables and columns", async () => {
+    svc.getMappingCatalog.mockReturnValueOnce([
+      { table: "dialer_session_log", columns: ["employee_code"], sync_modes: ["daily_aggregate"] },
+    ]);
+    const res = await request(app)
+      .get("/api/integration-hub/mapping-catalog")
+      .set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].table).toBe("dialer_session_log");
+  });
+
+  it("returns detected source table headers", async () => {
+    svc.inspectSourceSchema.mockResolvedValueOnce([
+      { table: "vicidial_agent_log_249", columns: [{ name: "user", type: "varchar(20)" }] },
+    ]);
+    const res = await request(app)
+      .get("/api/integration-hub/dialer_1/source-schema")
+      .set(AUTH);
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].columns[0].name).toBe("user");
+  });
+
+  it("saves a source-to-HRMS table mapping", async () => {
+    svc.upsertTableMap.mockResolvedValueOnce({
+      id: "tm-1",
+      integration_key: "dialer_1",
+      source_table: "vicidial_agent_log_249",
+      target_table: "dialer_session_log",
+      sync_mode: "daily_aggregate",
+    });
+    const res = await request(app)
+      .put("/api/integration-hub/dialer_1/table-maps")
+      .set(AUTH)
+      .send({
+        sourceTable: "vicidial_agent_log_249",
+        targetTable: "dialer_session_log",
+        syncMode: "daily_aggregate",
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.data.source_table).toBe("vicidial_agent_log_249");
+  });
+
+  it("accepts the approved COSEC biometric destination", async () => {
+    svc.upsertTableMap.mockResolvedValueOnce({
+      id: "tm-cosec",
+      integration_key: "Cosec",
+      source_table: "dbo.AttendanceEvents",
+      target_table: "integration_biometric_daily",
+      sync_mode: "daily_aggregate",
+    });
+    const res = await request(app)
+      .put("/api/integration-hub/Cosec/table-maps")
+      .set(AUTH)
+      .send({
+        sourceTable: "dbo.AttendanceEvents",
+        targetTable: "integration_biometric_daily",
+        syncMode: "daily_aggregate",
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.data.target_table).toBe("integration_biometric_daily");
   });
 });
 

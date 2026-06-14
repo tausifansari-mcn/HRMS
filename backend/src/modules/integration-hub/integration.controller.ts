@@ -6,6 +6,7 @@ import {
   createIntegrationSchema,
   runFiltersSchema,
   updateIntegrationSchema,
+  upsertTableMapSchema,
   upsertScheduleSchema,
 } from "./integration.validation.js";
 
@@ -167,6 +168,36 @@ export const integrationController = {
         is_active: Boolean(map.active_status),
       })),
     });
+  },
+
+  async listTableMaps(req: AuthenticatedRequest, res: Response) {
+    const data = await integrationService.listTableMaps(req.params.key);
+    return res.json({
+      success: true,
+      data: data.map((map) => ({
+        ...map,
+        is_active: Boolean(map.active_status),
+      })),
+    });
+  },
+
+  async upsertTableMap(req: AuthenticatedRequest, res: Response) {
+    const input = upsertTableMapSchema.parse({
+      sourceTable: req.body?.sourceTable ?? req.body?.source_table,
+      targetTable: req.body?.targetTable ?? req.body?.target_table,
+      syncMode: req.body?.syncMode ?? req.body?.sync_mode,
+    });
+    const data = await integrationService.upsertTableMap(req.params.key, input, req.authUser!.id);
+    return res.json({ success: true, data, message: "Table mapping saved" });
+  },
+
+  async mappingCatalog(_req: AuthenticatedRequest, res: Response) {
+    return res.json({ success: true, data: integrationService.getMappingCatalog() });
+  },
+
+  async sourceSchema(req: AuthenticatedRequest, res: Response) {
+    const data = await integrationService.inspectSourceSchema(req.params.key);
+    return res.json({ success: true, data });
   },
 
   async confirmFieldMap(req: AuthenticatedRequest, res: Response) {
