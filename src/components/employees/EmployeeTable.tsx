@@ -214,6 +214,22 @@ export function EmployeeTable({
                     Department
                   </SortableTableHead>
                   <SortableTableHead
+                    sortKey="process"
+                    currentSortKey={sortKey ?? null}
+                    direction={sortKey === "process" ? sortDirection ?? null : null}
+                    onSort={handleSort}
+                  >
+                    Process / Cost Centre
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="reportingManager"
+                    currentSortKey={sortKey ?? null}
+                    direction={sortKey === "reportingManager" ? sortDirection ?? null : null}
+                    onSort={handleSort}
+                  >
+                    Reporting Manager
+                  </SortableTableHead>
+                  <SortableTableHead
                     sortKey="designation"
                     currentSortKey={sortKey ?? null}
                     direction={sortKey === "designation" ? sortDirection ?? null : null}

@@ -144,13 +144,56 @@ export const employeeService = {
       conds.push("(e.active_status = 1 OR LOWER(COALESCE(e.employment_status, '')) IN ('inactive', 'terminated', 'offboarded', 'absconded'))");
     }
 
-    if (status)    { conds.push("e.employment_status = ?"); params.push(status); }
-    if (processId) { conds.push("e.process_id = ?");        params.push(processId); }
-    if (branchId)  { conds.push("e.branch_id = ?");         params.push(branchId); }
-    if (departmentId) { conds.push("e.department_id = ?");  params.push(departmentId); }
+    if (status)    { conds.push("LOWER(e.employment_status) = LOWER(?)"); params.push(status); }
+    if (processId) {
+      conds.push(`(
+        e.process_id = ?
+        OR LOWER(TRIM(p.process_name)) = (
+          SELECT LOWER(TRIM(process_name)) FROM process_master WHERE id = ? LIMIT 1
+        )
+      )`);
+      params.push(processId, processId);
+    }
+    if (branchId)  {
+      conds.push(`(
+        e.branch_id = ?
+        OR LOWER(TRIM(b.branch_name)) = (
+          SELECT LOWER(TRIM(branch_name)) FROM branch_master WHERE id = ? LIMIT 1
+        )
+      )`);
+      params.push(branchId, branchId);
+    }
+    if (departmentId) {
+      conds.push(`(
+        e.department_id = ?
+        OR LOWER(TRIM(dept.dept_name)) = (
+          SELECT LOWER(TRIM(dept_name)) FROM department_master WHERE id = ? LIMIT 1
+        )
+      )`);
+      params.push(departmentId, departmentId);
+    }
     if (search)    {
-      conds.push("(CONCAT(e.first_name,' ',COALESCE(e.last_name,'')) LIKE ? OR e.employee_code LIKE ? OR COALESCE(NULLIF(TRIM(e.official_email), ''), e.email) LIKE ?)");
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      const term = `%${search}%`;
+      conds.push(`(
+        CONCAT(e.first_name,' ',COALESCE(e.last_name,'')) LIKE ?
+        OR e.first_name LIKE ?
+        OR COALESCE(e.last_name, '') LIKE ?
+        OR e.employee_code LIKE ?
+        OR COALESCE(e.biometric_code, '') LIKE ?
+        OR COALESCE(NULLIF(TRIM(e.official_email), ''), NULLIF(TRIM(e.office_email), ''), e.email, '') LIKE ?
+        OR COALESCE(e.email, '') LIKE ?
+        OR COALESCE(e.mobile, '') LIKE ?
+        OR COALESCE(e.alternate_mobile, '') LIKE ?
+        OR COALESCE(dept.dept_name, '') LIKE ?
+        OR COALESCE(desig.designation_name, '') LIKE ?
+        OR COALESCE(b.branch_name, '') LIKE ?
+        OR COALESCE(p.process_name, '') LIKE ?
+        OR COALESCE(cc.cost_centre_name, '') LIKE ?
+        OR COALESCE(e.cost_center_code, '') LIKE ?
+        OR COALESCE(TRIM(CONCAT(m.first_name, ' ', COALESCE(m.last_name, ''))), '') LIKE ?
+        OR CAST(COALESCE(e.legacy_emp_id, e.legacy_id, '') AS CHAR) LIKE ?
+      )`);
+      params.push(term, term, term, term, term, term, term, term, term, term, term, term, term, term, term, term, term);
     }
 
     // Apply scope filter from middleware (object {sql, params} or legacy string)
@@ -168,30 +211,32 @@ export const employeeService = {
     }
 
     const where = `WHERE ${conds.join(" AND ")}`;
-
-    const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT e.*,
-         COALESCE(NULLIF(TRIM(e.official_email), ''), e.email) AS email,
-         dept.dept_name         AS department_name,
-         desig.designation_name AS designation_name,
-         b.branch_name,
-         p.process_name,
-         cc.cost_centre_name,
-         TRIM(CONCAT(m.first_name, ' ', COALESCE(m.last_name, ''))) AS reporting_manager_name
+    const fromWithJoins = `
        FROM employees e
        LEFT JOIN department_master  dept  ON dept.id  = e.department_id
        LEFT JOIN designation_master desig ON desig.id = e.designation_id
        LEFT JOIN branch_master      b     ON b.id     = e.branch_id
        LEFT JOIN process_master     p     ON p.id     = e.process_id
        LEFT JOIN cost_centre_master cc    ON cc.id    = e.cost_centre_id
-       LEFT JOIN employees          m     ON m.id     = e.reporting_manager_id
+       LEFT JOIN employees          m     ON m.id     = e.reporting_manager_id`;
+
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT e.*,
+         COALESCE(NULLIF(TRIM(e.official_email), ''), NULLIF(TRIM(e.office_email), ''), e.email) AS email,
+         dept.dept_name         AS department_name,
+         desig.designation_name AS designation_name,
+         b.branch_name,
+         p.process_name,
+         cc.cost_centre_name,
+         TRIM(CONCAT(m.first_name, ' ', COALESCE(m.last_name, ''))) AS reporting_manager_name
+       ${fromWithJoins}
        ${where}
        ORDER BY e.employee_code ASC
        LIMIT ${limit} OFFSET ${offset}`,
       params
     );
     const [countRows] = await db.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) AS total FROM employees e ${where}`, params
+      `SELECT COUNT(*) AS total ${fromWithJoins} ${where}`, params
     );
     return { data: rows as Employee[], total: (countRows as any)[0]?.total ?? 0, page, limit };
   },

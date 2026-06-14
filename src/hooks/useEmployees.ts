@@ -93,6 +93,7 @@ interface NamedMasterRow {
   id: string;
   process_name?: string;
   branch_name?: string;
+  employee_count?: number;
 }
 
 export async function fetchAllEmployeeRows(recordStatus: "active" | "inactive" | "all" = "active"): Promise<RawEmployee[]> {
@@ -223,18 +224,22 @@ export function useEmployeeDirectoryMasters() {
   return useQuery({
     queryKey: ["employee-directory-masters"],
     queryFn: async () => {
-      const [processResponse, branchResponse] = await Promise.all([
-        hrmsApi.get<{ data: NamedMasterRow[] }>("/api/org/processes"),
-        hrmsApi.get<{ data: NamedMasterRow[] }>("/api/org/branches"),
-      ]);
+      const res = await hrmsApi.get<{
+        data: {
+          processes?: NamedMasterRow[];
+          branches?: NamedMasterRow[];
+        };
+      }>("/api/employees/directory-masters");
       return {
-        processes: (processResponse.data ?? []).map((row) => ({
+        processes: (res.data?.processes ?? []).map((row) => ({
           id: row.id,
           name: row.process_name ?? "",
+          employeeCount: Number(row.employee_count ?? 0),
         })).filter((row) => row.name),
-        branches: (branchResponse.data ?? []).map((row) => ({
+        branches: (res.data?.branches ?? []).map((row) => ({
           id: row.id,
           name: row.branch_name ?? "",
+          employeeCount: Number(row.employee_count ?? 0),
         })).filter((row) => row.name),
       };
     },

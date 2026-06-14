@@ -568,15 +568,15 @@ const Employees = () => {
             </div>
 
             <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm shadow-sm">
+              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm text-slate-900 shadow-sm [&>span]:text-slate-900">
                 <SelectValue placeholder="Department" />
               </SelectTrigger>
 
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
+              <SelectContent className="bg-white text-slate-900">
+                <SelectItem value="all" className="text-slate-900">All Departments</SelectItem>
 
                 {departments.map((dept) => (
-                  <SelectItem key={dept.id} value={dept.id}>
+                  <SelectItem key={dept.id} value={dept.id} className="text-slate-900">
                     {dept.name}
                   </SelectItem>
                 ))}
@@ -584,35 +584,43 @@ const Employees = () => {
             </Select>
 
             <Select value={processFilter} onValueChange={setProcessFilter}>
-              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm shadow-sm">
+              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm text-slate-900 shadow-sm [&>span]:text-slate-900">
                 <SelectValue placeholder="Process" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Processes</SelectItem>
-                {processes.map((process) => <SelectItem key={process.id} value={process.id}>{process.name}</SelectItem>)}
+              <SelectContent className="bg-white text-slate-900">
+                <SelectItem value="all" className="text-slate-900">All Processes</SelectItem>
+                {processes.map((process) => (
+                  <SelectItem key={process.id} value={process.id} className="text-slate-900">
+                    {process.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
             <Select value={branchFilter} onValueChange={setBranchFilter}>
-              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm shadow-sm">
+              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm text-slate-900 shadow-sm [&>span]:text-slate-900">
                 <SelectValue placeholder="Branch" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Branches</SelectItem>
-                {branches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
+              <SelectContent className="bg-white text-slate-900">
+                <SelectItem value="all" className="text-slate-900">All Branches</SelectItem>
+                {branches.map((branch) => (
+                  <SelectItem key={branch.id} value={branch.id} className="text-slate-900">
+                    {branch.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm shadow-sm">
+              <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm text-slate-900 shadow-sm [&>span]:text-slate-900">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Active & Inactive</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="onboarding">Onboarding</SelectItem>
-                <SelectItem value="offboarded">Offboarded</SelectItem>
+              <SelectContent className="bg-white text-slate-900">
+                <SelectItem value="all" className="text-slate-900">Active & Inactive</SelectItem>
+                <SelectItem value="active" className="text-slate-900">Active</SelectItem>
+                <SelectItem value="inactive" className="text-slate-900">Inactive</SelectItem>
+                <SelectItem value="onboarding" className="text-slate-900">Onboarding</SelectItem>
+                <SelectItem value="offboarded" className="text-slate-900">Offboarded</SelectItem>
               </SelectContent>
             </Select>
           </div>
