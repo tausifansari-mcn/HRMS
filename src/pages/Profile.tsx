@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { ReportingManagerChangeDialog } from "@/components/profile/ReportingManagerChangeDialog";
+import { ChangePasswordDialog } from "@/components/profile/ChangePasswordDialog";
 import { useMyRMChangeRequests } from "@/hooks/useReportingManagerChange";
 import { hrmsApi } from "@/lib/hrmsApi";
 import { useSearchParams } from "react-router-dom";
@@ -233,6 +234,7 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [isEditing, setIsEditing] = useState(false);
   const [rmChangeOpen, setRmChangeOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState<ProfileForm>({
     phone: "", address: "", city: "", country: "",
@@ -477,6 +479,14 @@ const Profile = () => {
                           ) : (
                             <>Request Manager Change <ChevronRight className="ml-1 h-3 w-3" /></>
                           )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setChangePasswordOpen(true)}
+                          className="w-full rounded-xl text-xs font-bold"
+                        >
+                          Change Password
                         </Button>
                       </div>
                     </div>
@@ -775,6 +785,10 @@ const Profile = () => {
         open={rmChangeOpen}
         onOpenChange={setRmChangeOpen}
         currentManagerName={employee?.reporting_manager_name}
+      />
+      <ChangePasswordDialog
+        open={changePasswordOpen}
+        onOpenChange={setChangePasswordOpen}
       />
     </DashboardLayout>
   );

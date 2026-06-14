@@ -145,6 +145,147 @@ router.post("/reset-password", h(async (req: any, res: any) => {
   }
 }));
 
+// POST /api/auth/change-password — Employee self-service password change
+// Employee can only change their own password
+router.post("/change-password", requireAuth, h(async (req: any, res: any) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({
+      success: false,
+      error: "Current password and new password are required"
+    });
+  }
+
+  if (currentPassword === newPassword) {
+    return res.status(400).json({
+      success: false,
+      error: "New password must be different from current password"
+    });
+  }
+
+  // Password strength validation
+  if (newPassword.length < 8) {
+    return res.status(400).json({
+      success: false,
+      error: "Password must be at least 8 characters long"
+    });
+  }
+
+  if (!/[A-Z]/.test(newPassword)) {
+    return res.status(400).json({
+      success: false,
+      error: "Password must contain at least one uppercase letter"
+    });
+  }
+
+  if (!/[a-z]/.test(newPassword)) {
+    return res.status(400).json({
+      success: false,
+      error: "Password must contain at least one lowercase letter"
+    });
+  }
+
+  if (!/\d/.test(newPassword)) {
+    return res.status(400).json({
+      success: false,
+      error: "Password must contain at least one number"
+    });
+  }
+
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(newPassword)) {
+    return res.status(400).json({
+      success: false,
+      error: "Password must contain at least one special character"
+    });
+  }
+
+  const { db } = await import("../../db/mysql.js");
+  const bcrypt = await import("bcrypt");
+
+  // Get user's current password hash
+  const [userRows] = await db.execute(
+    `SELECT id, email, password_hash FROM users WHERE id = ?`,
+    [req.authUser.id]
+  );
+
+  if (!(userRows as any[]).length) {
+    return res.status(404).json({ success: false, error: "User not found" });
+  }
+
+  const user = (userRows as any[])[0];
+
+  // Verify current password
+  const isValid = await bcrypt.compare(currentPassword, user.password_hash);
+  if (!isValid) {
+    return res.status(401).json({
+      success: false,
+      error: "Current password is incorrect"
+    });
+  }
+
+  // Hash new password
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+  // Update password and clear force_password_change flag
+  await db.execute(
+    `UPDATE users
+     SET password_hash = ?,
+         force_password_change = 0,
+         password_changed_at = NOW(),
+         updated_at = NOW()
+     WHERE id = ?`,
+    [hashedPassword, req.authUser.id]
+  );
+
+  // Log password change action
+  await db.execute(
+    `INSERT INTO audit_log (user_id, action, entity_type, entity_id, details, ip_address)
+     VALUES (?, 'PASSWORD_CHANGE', 'user', ?, ?, ?)`,
+    [
+      req.authUser.id,
+      req.authUser.id,
+      JSON.stringify({ self_service: true }),
+      req.ip || req.connection?.remoteAddress
+    ]
+  );
+
+  // Send confirmation email
+  try {
+    await emailService.sendEmail({
+      to: user.email,
+      subject: "Password Changed Successfully",
+      html: `
+        <div style="font-family:Arial,sans-serif;background:#f6f8fc;padding:24px;color:#0f172a">
+          <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden">
+            <div style="background:#0f172a;color:#ffffff;padding:22px 26px">
+              <h2 style="margin:0;font-size:22px">Password Changed</h2>
+            </div>
+            <div style="padding:26px">
+              <p style="font-size:15px;line-height:1.6;margin:0 0 16px">Your HRMS password was successfully changed.</p>
+              <div style="background:#f1f5f9;padding:16px;border-radius:8px;margin:20px 0">
+                <p style="margin:0;font-size:13px;color:#64748b">Changed at: ${new Date().toLocaleString()}</p>
+                <p style="margin:8px 0 0;font-size:13px;color:#64748b">IP Address: ${req.ip || req.connection?.remoteAddress || "Unknown"}</p>
+              </div>
+              <p style="font-size:14px;line-height:1.6;margin:16px 0;color:#dc2626;font-weight:600">⚠️ If you did not make this change, please contact IT support immediately.</p>
+              <p style="font-size:13px;line-height:1.6;color:#64748b;margin:16px 0 0">Remember: Never share your password with anyone.</p>
+            </div>
+          </div>
+        </div>
+      `,
+      text: `Your HRMS password was successfully changed.\n\nChanged at: ${new Date().toLocaleString()}\nIP Address: ${req.ip || "Unknown"}\n\nIf you did not make this change, please contact IT support immediately.\n\nRemember: Never share your password with anyone.`
+    });
+  } catch (emailError) {
+    console.error("Failed to send password change confirmation email:", emailError);
+    // Don't fail the request if email fails
+  }
+
+  return res.json({
+    success: true,
+    message: "Password changed successfully"
+  });
+}));
+
 // POST /api/auth/admin-reset-password — Admin password reset for employees
 // Super Admin can reset for positions <= Level 8 (Manager, Team Lead, Staff, etc.)
 // WFM Admin can reset for positions <= Level 6 (Assistant Manager and below)
