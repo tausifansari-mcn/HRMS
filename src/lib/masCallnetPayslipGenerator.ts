@@ -72,37 +72,31 @@ export async function generateMasCallnetPayslip(data: MasCallnetPayslipData): Pr
   });
 
   const pageWidth = doc.internal.pageSize.getWidth();
-  let currentY = 12;
+  let currentY = 15;
 
-  // === MAS LOGO (Top Left) - EXACT TEMPLATE ===
+  // === MAS LOGO (Top Left) ===
   const logoBase64 = await loadLogoBase64();
   if (logoBase64) {
     try {
-      doc.addImage(logoBase64, 'PNG', 10, currentY, 35, 12);
+      doc.addImage(logoBase64, 'PNG', 14, currentY, 30, 10);
     } catch (e) {
       console.error('Error adding logo:', e);
     }
   }
 
   // === COMPANY NAME (Centered) ===
-  doc.setFontSize(18);
+  doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(0, 0, 0);
-  doc.text(data.companyName, pageWidth / 2, currentY + 6, { align: "center" });
+  doc.text(data.companyName, pageWidth / 2, currentY + 3, { align: "center" });
 
-  currentY += 14;
+  currentY += 8;
 
-  // === SALARY SLIP HEADER ===
-  doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(27, 106, 181); // MAS Blue
-  doc.text("SALARY SLIP", pageWidth / 2, currentY, { align: "center" });
-
-  currentY += 6;
+  // === MONTH SUBTITLE (Centered) ===
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(80, 80, 80);
-  doc.text(`Month: ${data.monthYear}`, pageWidth / 2, currentY, { align: "center" });
+  doc.text(`Month For : ${data.monthYear}`, pageWidth / 2, currentY, { align: "center" });
 
   currentY += 6;
 
