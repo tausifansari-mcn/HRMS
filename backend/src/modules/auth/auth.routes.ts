@@ -145,4 +145,173 @@ router.post("/reset-password", h(async (req: any, res: any) => {
   }
 }));
 
+// POST /api/auth/admin-reset-password — Admin password reset for employees
+// Super Admin can reset for positions <= Level 8 (Manager, Team Lead, Staff, etc.)
+// WFM Admin can reset for positions <= Level 6 (Assistant Manager and below)
+// Cannot reset for: CEO, Directors, VPs, Admin, HR Manager, Payroll Manager, etc.
+router.post("/admin-reset-password", requireAuth, h(async (req: any, res: any) => {
+  const { userId, employeeId } = req.body;
+
+  if (!userId && !employeeId) {
+    return res.status(400).json({
+      success: false,
+      error: "Either userId or employeeId is required"
+    });
+  }
+
+  const { db } = await import("../../db/mysql.js");
+  const { hasRole, getEmployeeForUser } = await import("../../shared/accessGuard.js");
+  const { canResetPassword, generateTemporaryPassword } = await import("../../shared/positionHierarchy.js");
+  const bcrypt = await import("bcrypt");
+
+  // Check if requester has admin/wfm role
+  const isAdmin = await hasRole(req.authUser.id, "admin", "super_admin");
+  const isWFMAdmin = await hasRole(req.authUser.id, "wfm", "wfm_admin");
+
+  if (!isAdmin && !isWFMAdmin) {
+    return res.status(403).json({
+      success: false,
+      error: "Only Admin or WFM Admin can reset employee passwords"
+    });
+  }
+
+  // Get requester's employee record and designation
+  const requesterEmployee = await getEmployeeForUser(req.authUser.id);
+  const requesterDesignation = requesterEmployee?.designation || null;
+  const requesterRole = isAdmin ? "admin" : "wfm_admin";
+
+  // Get target user and employee info
+  let targetUserId = userId;
+  let targetEmployee: any = null;
+
+  if (employeeId) {
+    const [empRows] = await db.execute(
+      `SELECT e.*, u.id AS user_id
+       FROM employees e
+       LEFT JOIN users u ON u.id = e.user_id
+       WHERE e.id = ?`,
+      [employeeId]
+    );
+    if (!(empRows as any[]).length) {
+      return res.status(404).json({ success: false, error: "Employee not found" });
+    }
+    targetEmployee = (empRows as any[])[0];
+    targetUserId = targetEmployee.user_id;
+  } else {
+    const [userRows] = await db.execute(
+      `SELECT u.id, e.designation, e.id AS employee_id
+       FROM users u
+       LEFT JOIN employees e ON e.user_id = u.id
+       WHERE u.id = ?`,
+      [userId]
+    );
+    if (!(userRows as any[]).length) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+    const userInfo = (userRows as any[])[0];
+    targetEmployee = { designation: userInfo.designation, id: userInfo.employee_id };
+    targetUserId = userInfo.id;
+  }
+
+  if (!targetUserId) {
+    return res.status(400).json({
+      success: false,
+      error: "Target employee does not have a user account"
+    });
+  }
+
+  // Check hierarchical permission
+  const targetDesignation = targetEmployee?.designation || null;
+  const permissionCheck = canResetPassword(
+    requesterRole,
+    requesterDesignation,
+    targetDesignation,
+    targetUserId,
+    req.authUser.id
+  );
+
+  if (!permissionCheck.allowed) {
+    return res.status(403).json({
+      success: false,
+      error: permissionCheck.reason
+    });
+  }
+
+  // Generate temporary password
+  const tempPassword = generateTemporaryPassword();
+  const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+  // Update password and set force_password_change flag
+  await db.execute(
+    `UPDATE users
+     SET password_hash = ?,
+         force_password_change = 1,
+         updated_at = NOW()
+     WHERE id = ?`,
+    [hashedPassword, targetUserId]
+  );
+
+  // Log password reset action
+  await db.execute(
+    `INSERT INTO audit_log (user_id, action, entity_type, entity_id, details, ip_address)
+     VALUES (?, 'ADMIN_PASSWORD_RESET', 'user', ?, ?, ?)`,
+    [
+      req.authUser.id,
+      targetUserId,
+      JSON.stringify({
+        target_user_id: targetUserId,
+        target_designation: targetDesignation,
+        requester_role: requesterRole,
+        requester_designation: requesterDesignation
+      }),
+      req.ip || req.connection?.remoteAddress
+    ]
+  );
+
+  // Get target user email for notification
+  const [targetUserRows] = await db.execute(
+    `SELECT email FROM users WHERE id = ?`,
+    [targetUserId]
+  );
+  const targetUserEmail = (targetUserRows as any[])[0]?.email;
+
+  // Send email notification with temporary password
+  if (targetUserEmail) {
+    try {
+      await emailService.sendEmail({
+        to: targetUserEmail,
+        subject: "Your HRMS Password Has Been Reset",
+        html: `
+          <div style="font-family:Arial,sans-serif;background:#f6f8fc;padding:24px;color:#0f172a">
+            <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden">
+              <div style="background:#0f172a;color:#ffffff;padding:22px 26px">
+                <h2 style="margin:0;font-size:22px">Password Reset</h2>
+              </div>
+              <div style="padding:26px">
+                <p style="font-size:15px;line-height:1.6;margin:0 0 16px">Your HRMS password has been reset by an administrator.</p>
+                <div style="background:#f1f5f9;padding:16px;border-radius:8px;margin:20px 0">
+                  <p style="margin:0 0 8px;font-size:13px;color:#64748b;font-weight:600">TEMPORARY PASSWORD</p>
+                  <p style="margin:0;font-size:18px;font-family:monospace;font-weight:700;color:#0f172a">${tempPassword}</p>
+                </div>
+                <p style="font-size:14px;line-height:1.6;margin:16px 0;color:#dc2626;font-weight:600">⚠️ You will be required to change this password on your next login.</p>
+                <p style="font-size:13px;line-height:1.6;color:#64748b;margin:16px 0 0">For security reasons, please log in and change your password immediately.</p>
+              </div>
+            </div>
+          </div>
+        `,
+        text: `Your HRMS password has been reset.\n\nTemporary Password: ${tempPassword}\n\nYou will be required to change this password on your next login.\nFor security, please log in and change your password immediately.`
+      });
+    } catch (emailError) {
+      console.error("Failed to send password reset email:", emailError);
+      // Don't fail the request if email fails
+    }
+  }
+
+  return res.json({
+    success: true,
+    temporaryPassword: tempPassword,
+    message: "Password reset successfully. Temporary password has been sent to the employee's email."
+  });
+}));
+
 export { router as authRouter };
