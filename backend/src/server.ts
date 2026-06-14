@@ -11,14 +11,15 @@ import { migrateLegacyIntegrationSecrets } from "./modules/external-db/external-
 
 function startServer() {
   app.listen(env.PORT, () => {
+    startOfficialEmailComplianceScheduler();
+    console.log("[scheduler] official-email compliance reminder started");
     if (env.ENABLE_SCHEDULERS) {
       startTenureBadgeScheduler();
       startCommunicationCleanup();
       startAttendanceEngineScheduler();
       legacySyncWorker.start();
       startAccessExpiryScheduler();
-      startOfficialEmailComplianceScheduler();
-      console.log(`[schedulers] tenure, communication, attendance, legacy-sync, access-expiry, official-email started`);
+      console.log(`[schedulers] tenure, communication, attendance, legacy-sync, access-expiry started`);
     } else {
       console.log(`[schedulers] disabled (set ENABLE_SCHEDULERS=true to enable)`);
     }
