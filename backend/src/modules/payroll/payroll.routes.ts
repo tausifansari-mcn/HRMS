@@ -297,8 +297,11 @@ router.get("/tax-declaration/:employeeId/:year", h(async (req: AuthenticatedRequ
     }
   }
 
-  const data = await taxDeclarationService.get(employeeId, year);
-  return res.json({ success: true, data });
+  const [data, history] = await Promise.all([
+    taxDeclarationService.find(employeeId, year),
+    taxDeclarationService.listHistory(employeeId),
+  ]);
+  return res.json({ success: true, data, history });
 }));
 
 // POST /api/payroll/tax-declaration/:employeeId/:year — admin/hr/finance/payroll or employee own
@@ -522,12 +525,17 @@ router.get(
     // Derive financial year for declaration lookup
     const [yr, mo] = run.run_month.split("-").map(Number);
     const fyStart = mo >= 4 ? yr : yr - 1;
-    const financialYear = `${fyStart}-${String(fyStart + 1).slice(2)}`;
+    const financialYear = `${fyStart}-${fyStart + 1}`;
+    const legacyFinancialYear = `${fyStart}-${String(fyStart + 1).slice(2)}`;
 
     // Load tax declaration
     const [declRows] = await db.execute<RowDataPacket[]>(
-      "SELECT declared_hra, declared_80c, declared_80d, regime FROM tax_declaration WHERE employee_id = ? AND financial_year = ? LIMIT 1",
-      [employeeId, financialYear]
+      `SELECT declared_hra, declared_80c, declared_80d, regime
+         FROM tax_declaration
+        WHERE employee_id = ? AND financial_year IN (?, ?)
+        ORDER BY financial_year = ? DESC
+        LIMIT 1`,
+      [employeeId, financialYear, legacyFinancialYear, financialYear]
     );
     const decl = (declRows as Array<{
       declared_hra: number; declared_80c: number; declared_80d: number; regime: string;
