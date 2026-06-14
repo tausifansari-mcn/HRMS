@@ -17,6 +17,8 @@ import type {
   UpsertScheduleInput,
 } from "./integration.validation.js";
 import type { IntegrationSchedule } from "./integration.types.js";
+import { DEFAULT_INTEGRATION_CRON, nextCronRun } from "./cronSchedule.js";
+import { env } from "../../config/env.js";
 
 export const integrationService = {
   async list(filters?: IntegrationListFilters): Promise<IntegrationConfig[]> {
@@ -157,7 +159,7 @@ export const integrationService = {
   async createRun(
     integrationKey: string,
     triggeredBy: string,
-    triggeredUser: string,
+    triggeredUser: string | null,
   ): Promise<IntegrationConnectorRun> {
     const connector = await this.getByKey(integrationKey);
     if (!connector.active_status) {
@@ -267,7 +269,7 @@ export const integrationService = {
     return {
       id: "",
       integration_key: integrationKey,
-      cron_expression: "0 * * * *",
+      cron_expression: DEFAULT_INTEGRATION_CRON,
       enabled: 0,
       last_run_at: null,
       next_run_at: null,
@@ -276,13 +278,22 @@ export const integrationService = {
 
   async upsertSchedule(integrationKey: string, input: UpsertScheduleInput): Promise<IntegrationSchedule> {
     await this.getByKey(integrationKey);
+    const current = await this.getSchedule(integrationKey);
+    const cronExpression = input.cronExpression ?? current.cron_expression;
+    const enabled = input.enabled !== undefined ? input.enabled : Boolean(current.enabled);
+    const nextRunAt = enabled
+      ? nextCronRun(cronExpression, new Date(), env.INTEGRATION_SCHEDULER_TIMEZONE)
+      : null;
+
     await db.execute(
-      `INSERT INTO integration_schedule (id, integration_key, cron_expression, enabled)
-       VALUES (UUID(), ?, ?, ?)
+      `INSERT INTO integration_schedule
+         (id, integration_key, cron_expression, enabled, next_run_at)
+       VALUES (UUID(), ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          cron_expression = VALUES(cron_expression),
-         enabled = VALUES(enabled)`,
-      [integrationKey, input.cronExpression, input.enabled !== undefined ? (input.enabled ? 1 : 0) : 0],
+         enabled = VALUES(enabled),
+         next_run_at = VALUES(next_run_at)`,
+      [integrationKey, cronExpression, enabled ? 1 : 0, nextRunAt],
     );
     return this.getSchedule(integrationKey);
   },

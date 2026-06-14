@@ -17,9 +17,10 @@ export interface ConnectorRunSummary {
 export async function runConnector(
   integrationKey: string,
   rawRows: Record<string, unknown>[],
-  userId: string
+  userId: string | null,
+  triggeredBy = "manual",
 ): Promise<ConnectorRunSummary> {
-  const run = await integrationService.createRun(integrationKey, "manual", userId);
+  const run = await integrationService.createRun(integrationKey, triggeredBy, userId);
   const runId = run.id;
   const startedAt = Date.now();
 

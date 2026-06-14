@@ -7,12 +7,14 @@ import { startAttendanceEngineScheduler } from "./modules/wfm/attendance-engine.
 import { legacySyncWorker } from "./workers/legacy-sync-worker.js";
 import { startAccessExpiryScheduler } from "./workers/access-expiry.worker.js";
 import { startOfficialEmailComplianceScheduler } from "./workers/official-email-compliance.worker.js";
+import { startIntegrationScheduler } from "./workers/integration-scheduler.worker.js";
 import { migrateLegacyIntegrationSecrets } from "./modules/external-db/external-db.service.js";
 
 function startServer() {
   app.listen(env.PORT, () => {
     startOfficialEmailComplianceScheduler();
-    console.log("[scheduler] official-email compliance reminder started");
+    startIntegrationScheduler();
+    console.log("[scheduler] official-email compliance and Integration Hub schedules started");
     if (env.ENABLE_SCHEDULERS) {
       startTenureBadgeScheduler();
       startCommunicationCleanup();

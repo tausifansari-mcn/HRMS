@@ -120,8 +120,9 @@ async function readRestRows(
 
 export async function executeConnector(
   connector: IntegrationConfig,
-  userId: string,
-  input: { fromDate?: string; toDate?: string } = {}
+  userId: string | null,
+  input: { fromDate?: string; toDate?: string } = {},
+  triggeredBy = "manual",
 ): Promise<ConnectorRunSummary> {
   if (!connector.active_status) throw new Error("Integration is inactive");
   const config = parseConfig(connector.config_json);
@@ -139,7 +140,7 @@ export async function executeConnector(
       );
     }
   } catch (error) {
-    const run = await integrationService.createRun(connector.integration_key, "manual", userId);
+    const run = await integrationService.createRun(connector.integration_key, triggeredBy, userId);
     const message = error instanceof Error ? error.message : String(error);
     await db.execute(
       `UPDATE integration_connector_run
@@ -150,5 +151,5 @@ export async function executeConnector(
     throw error;
   }
 
-  return runConnector(connector.integration_key, rows, userId);
+  return runConnector(connector.integration_key, rows, userId, triggeredBy);
 }

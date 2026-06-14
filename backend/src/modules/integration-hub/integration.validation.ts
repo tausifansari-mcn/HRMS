@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validateCronExpression } from "./cronSchedule.js";
 
 const INTEGRATION_TYPES = ["rest_pull", "rest_push", "database", "sftp", "file_upload"] as const;
 
@@ -41,19 +42,28 @@ export const runFiltersSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-// Basic cron: 5 or 6 space-separated tokens — enough to reject obviously wrong input
-const CRON_RE = /^(\S+\s+){4}\S+(\s+\S+)?$/;
-
 export const upsertScheduleSchema = z.object({
   cronExpression: z
     .string()
     .trim()
-    .min(9)
-    .regex(CRON_RE, "Invalid cron expression"),
+    .min(5)
+    .optional(),
   enabled: z.boolean().optional(),
-}).refine((d) => d.cronExpression !== undefined || d.enabled !== undefined, {
-  message: "Provide at least cronExpression or enabled",
-});
+})
+  .refine((d) => d.cronExpression !== undefined || d.enabled !== undefined, {
+    message: "Provide at least cronExpression or enabled",
+  })
+  .superRefine((data, ctx) => {
+    if (!data.cronExpression) return;
+    const error = validateCronExpression(data.cronExpression);
+    if (error) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["cronExpression"],
+        message: `Invalid cron expression: ${error}`,
+      });
+    }
+  });
 
 export type CreateIntegrationInput = z.infer<typeof createIntegrationSchema>;
 export type UpdateIntegrationInput = z.infer<typeof updateIntegrationSchema>;
