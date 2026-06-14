@@ -24,6 +24,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { EmployeeJourneyTimeline } from "@/components/employees/EmployeeJourneyTimeline";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,6 +48,8 @@ interface Employee {
   process_name: string | null;
   dept_name: string | null;
   days_employed: number;
+  avatar_url?: string | null;
+  photo_url?: string | null;
 }
 
 interface LeaveBalance {
@@ -72,10 +76,16 @@ interface GamificationTier {
 }
 
 interface JourneyEvent {
+  id?: string;
   event_type: string;
   event_date: string;
   description: string | null;
   module: string | null;
+  old_value?: string | null;
+  new_value?: string | null;
+  actor_name?: string | null;
+  status?: string | null;
+  source?: string | null;
 }
 
 interface StatCardData {
@@ -177,7 +187,7 @@ export default function NativeEmployeeStatCard() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6 max-w-5xl mx-auto">
+      <div className="mx-auto max-w-7xl space-y-6">
 
         {/* ── Page header ────────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -235,19 +245,25 @@ export default function NativeEmployeeStatCard() {
         {card && (
           <>
             {/* ── Identity header ───────────────────────────────────────────── */}
-            <Card className="overflow-hidden">
-              <CardContent className="p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
+            <Card className="overflow-hidden border-0 bg-[#073f78] text-white shadow-lg">
+              <CardContent className="p-7">
+                <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-7">
                   {/* Avatar */}
-                  <div className="shrink-0 flex h-20 w-20 items-center justify-center rounded-full bg-blue-600 text-white text-2xl font-bold shadow-lg">
-                    {card.employee.first_name?.[0]?.toUpperCase() ?? "?"}
-                    {card.employee.last_name?.[0]?.toUpperCase() ?? ""}
-                  </div>
+                  <Avatar className="size-36 shrink-0 border-4 border-white shadow-xl ring-2 ring-green-300">
+                    <AvatarImage
+                      src={card.employee.avatar_url || card.employee.photo_url || undefined}
+                      alt={`${card.employee.full_name} profile photo`}
+                    />
+                    <AvatarFallback className="bg-[#1B6AB5] text-3xl font-black text-white">
+                      {card.employee.first_name?.[0]?.toUpperCase() ?? "?"}
+                      {card.employee.last_name?.[0]?.toUpperCase() ?? ""}
+                    </AvatarFallback>
+                  </Avatar>
 
                   {/* Details */}
-                  <div className="flex-1 min-w-0 space-y-2">
+                  <div className="min-w-0 flex-1 space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-xl font-bold text-slate-900 truncate">{card.employee.full_name}</h2>
+                      <h2 className="text-balance text-3xl font-black text-white">{card.employee.full_name}</h2>
                       <Badge
                         className={cn(
                           "text-xs font-semibold",
@@ -260,8 +276,8 @@ export default function NativeEmployeeStatCard() {
                       </Badge>
                     </div>
 
-                    <p className="text-sm text-slate-500">
-                      <span className="font-medium text-slate-700">{card.employee.employee_code}</span>
+                    <p className="text-base text-blue-100">
+                      <span className="font-bold text-white">{card.employee.employee_code}</span>
                       {card.employee.designation_name && (
                         <> &bull; {card.employee.designation_name}</>
                       )}
@@ -290,11 +306,11 @@ export default function NativeEmployeeStatCard() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+                    <div className="mt-2 flex items-center gap-1.5 text-sm text-blue-100">
                       <CalendarDays className="h-3.5 w-3.5" />
                       <span>
                         Joined {fmtDate(card.employee.date_of_joining)} &bull;{" "}
-                        <span className="font-medium text-slate-700">
+                        <span className="font-bold text-white">
                           {calcTenure(card.employee.date_of_joining)}
                         </span>{" "}
                         tenure
@@ -440,52 +456,10 @@ export default function NativeEmployeeStatCard() {
             </div>
 
             {/* ── Journey Timeline ──────────────────────────────────────────── */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold text-slate-800">Employee Journey</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {card.journey.length === 0 ? (
-                  <p className="text-sm text-slate-400 text-center py-6">No journey events recorded yet.</p>
-                ) : (
-                  <ol className="relative border-l-2 border-slate-100 ml-4 space-y-6">
-                    {card.journey.map((evt, idx) => {
-                      const cfg = journeyConfig(evt.event_type);
-                      return (
-                        <li key={idx} className="ml-6">
-                          {/* Icon bullet */}
-                          <span
-                            className={cn(
-                              "absolute -left-4 flex h-8 w-8 items-center justify-center rounded-full ring-4 ring-white",
-                              cfg.colour
-                            )}
-                          >
-                            {cfg.icon}
-                          </span>
-
-                          <div className="flex flex-col gap-0.5">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-sm font-semibold text-slate-800 capitalize">
-                                {cfg.label !== "Event" ? cfg.label : (evt.event_type ?? "Event")}
-                              </span>
-                              {evt.module && (
-                                <Badge variant="outline" className="text-[10px] py-0">
-                                  {evt.module}
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-xs text-slate-400">{fmtDate(evt.event_date)}</p>
-                            {evt.description && (
-                              <p className="text-sm text-slate-600 mt-0.5">{evt.description}</p>
-                            )}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ol>
-                )}
-              </CardContent>
-            </Card>
+            <EmployeeJourneyTimeline
+              employeeName={card.employee.full_name}
+              events={card.journey}
+            />
           </>
         )}
       </div>

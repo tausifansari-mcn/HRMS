@@ -99,6 +99,8 @@ const MIGRATION_MANIFEST: string[] = [
   "172_employee_photo.sql",
   "173_employees_ctc_column.sql",
   "174_apr_attendance_rule.sql",
+  "176_employee_work_schedule.sql",
+  "177_employee_profile_sensitive_details.sql",
 ];
 
 export type MigrationHealth = {

@@ -4,8 +4,20 @@ import { db } from "../../db/mysql.js";
 import type { Employee, PaginatedResult } from "./employee.types.js";
 import type { CreateEmployeeInput, EmployeeFilters, UpdateEmployeeInput } from "./employee.validation.js";
 import { assignRole } from "../access/access.service.js";
+import { appendJourneyEvent } from "./journeyLog.service.js";
 
-const assignSalary = async (employeeId: string, structureId: string, ctcAnnual: number, effectiveFrom: string) => {
+const assignSalary = async (
+  employeeId: string,
+  structureId: string,
+  ctcAnnual: number,
+  effectiveFrom: string,
+  actorUserId: string
+) => {
+  const [currentRows] = await db.execute<RowDataPacket[]>(
+    "SELECT ctc_annual FROM employee_salary_assignment WHERE employee_id = ? AND active_status = 1 LIMIT 1",
+    [employeeId]
+  );
+  const previousCtc = currentRows[0]?.ctc_annual ?? null;
   await db.execute(
     "UPDATE employee_salary_assignment SET active_status = 0 WHERE employee_id = ? AND active_status = 1",
     [employeeId]
@@ -17,10 +29,38 @@ const assignSalary = async (employeeId: string, structureId: string, ctcAnnual: 
   );
   // Mirror CTC onto employees.ctc for fast payslip joins
   await db.execute("UPDATE employees SET ctc = ? WHERE id = ?", [ctcAnnual, employeeId]);
+  await appendJourneyEvent({
+    employeeId,
+    eventType: previousCtc == null ? "salary_setup" : "increment",
+    eventDate: effectiveFrom,
+    description: previousCtc == null ? "Initial annual CTC assigned" : "Annual compensation revised",
+    oldValue: previousCtc == null ? undefined : String(previousCtc),
+    newValue: String(ctcAnnual),
+    module: "PAYROLL",
+    triggeredBy: actorUserId,
+    metadata: { structure_id: structureId, salary_assignment_id: asgId },
+  });
 };
 
+async function getEmployeeContext(id: string) {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT e.*,
+            d.designation_name, dept.dept_name, b.branch_name, p.process_name,
+            CONCAT(m.first_name, ' ', COALESCE(m.last_name, '')) AS manager_name
+       FROM employees e
+       LEFT JOIN designation_master d ON d.id = e.designation_id
+       LEFT JOIN department_master dept ON dept.id = e.department_id
+       LEFT JOIN branch_master b ON b.id = e.branch_id
+       LEFT JOIN process_master p ON p.id = e.process_id
+       LEFT JOIN employees m ON m.id = e.reporting_manager_id
+      WHERE e.id = ? LIMIT 1`,
+    [id]
+  );
+  return rows[0] ?? null;
+}
+
 export const employeeService = {
-  async createEmployee(input: CreateEmployeeInput, _userId: string): Promise<Employee> {
+  async createEmployee(input: CreateEmployeeInput, userId: string): Promise<Employee> {
     const [dup] = await db.execute<RowDataPacket[]>(
       "SELECT id FROM employees WHERE employee_code = ? LIMIT 1",
       [input.employeeCode]
@@ -60,8 +100,24 @@ export const employeeService = {
     // Auto-assign salary when structureId + ctcAnnual provided at creation
     if (input.structureId && input.ctcAnnual) {
       const salaryDate = input.salaryStartDate ?? input.dateOfJoining;
-      await assignSalary(id, input.structureId, input.ctcAnnual, salaryDate);
+      await assignSalary(id, input.structureId, input.ctcAnnual, salaryDate, userId);
     }
+
+    await appendJourneyEvent({
+      employeeId: id,
+      eventType: "joining",
+      eventDate: input.dateOfJoining,
+      description: `Employee joined as ${employee.designation_id ? "a designated team member" : "an employee"}`,
+      module: "ONBOARDING",
+      triggeredBy: userId,
+      metadata: {
+        branch_id: input.branchId,
+        department_id: input.departmentId,
+        process_id: input.processId,
+        designation_id: input.designationId,
+        reporting_manager_id: input.reportingManagerId,
+      },
+    });
 
     return employee;
   },
@@ -128,7 +184,8 @@ export const employeeService = {
   },
 
   async updateEmployee(id: string, input: UpdateEmployeeInput, _userId: string): Promise<Employee> {
-    await this.getEmployee(id);
+    const before = await getEmployeeContext(id);
+    if (!before) throw new Error("Employee not found");
     const sets: string[] = [];
     const params: unknown[] = [];
 
@@ -177,7 +234,52 @@ export const employeeService = {
       }
     }
 
-    return this.getEmployee(id);
+    const updated = await this.getEmployee(id);
+    const after = await getEmployeeContext(id);
+
+    if (after) {
+      const changes = [
+        ["designation_id", "designation_change", before.designation_name, after.designation_name],
+        ["department_id", "department_change", before.dept_name, after.dept_name],
+        ["branch_id", "branch_change", before.branch_name, after.branch_name],
+        ["process_id", "process_change", before.process_name, after.process_name],
+        ["reporting_manager_id", "reporting_change", before.manager_name, after.manager_name],
+        ["employment_status", "status_change", before.employment_status, after.employment_status],
+        ["employment_type", "employment_type_change", before.employment_type, after.employment_type],
+        ["date_of_exit", "exit_date_change", before.date_of_exit, after.date_of_exit],
+      ] as const;
+
+      for (const [field, eventType, oldValue, newValue] of changes) {
+        if (String(before[field] ?? "") === String(after[field] ?? "")) continue;
+        await appendJourneyEvent({
+          employeeId: id,
+          eventType,
+          eventDate: new Date().toISOString().slice(0, 10),
+          description: `${field.replace(/_/g, " ")} updated`,
+          oldValue: oldValue == null ? undefined : String(oldValue),
+          newValue: newValue == null ? undefined : String(newValue),
+          module: "EMPLOYEE",
+          triggeredBy: _userId,
+          metadata: { field },
+        });
+      }
+
+      if ((input as any).ctc !== undefined && Number(before.ctc ?? 0) !== Number(after.ctc ?? 0)) {
+        await appendJourneyEvent({
+          employeeId: id,
+          eventType: before.ctc == null ? "salary_setup" : "increment",
+          eventDate: new Date().toISOString().slice(0, 10),
+          description: before.ctc == null ? "Initial annual CTC assigned" : "Annual compensation revised",
+          oldValue: before.ctc == null ? undefined : String(before.ctc),
+          newValue: after.ctc == null ? undefined : String(after.ctc),
+          module: "PAYROLL",
+          triggeredBy: _userId,
+          metadata: { field: "ctc" },
+        });
+      }
+    }
+
+    return updated;
   },
 
   async deactivateEmployee(id: string, _userId: string): Promise<void> {
@@ -186,5 +288,15 @@ export const employeeService = {
       "UPDATE employees SET active_status = 0, employment_status = 'Inactive' WHERE id = ?",
       [id]
     );
+    await appendJourneyEvent({
+      employeeId: id,
+      eventType: "status_change",
+      eventDate: new Date().toISOString().slice(0, 10),
+      description: "Employee profile deactivated",
+      oldValue: "Active",
+      newValue: "Inactive",
+      module: "EMPLOYEE",
+      triggeredBy: _userId,
+    });
   },
 };
