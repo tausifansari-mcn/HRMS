@@ -55,7 +55,9 @@ const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-IN", {
+  // Handle timezone issues by parsing as local date
+  const date = new Date(dateStr + 'T00:00:00');
+  return date.toLocaleDateString("en-IN", {
     year: "numeric", month: "long", day: "numeric",
   });
 };
