@@ -69,13 +69,48 @@ export function usePayrollStats() {
   return useQuery<PayrollStats>({
     queryKey: ["payroll-stats"],
     queryFn: async (): Promise<PayrollStats> => {
-      console.warn("Payroll run management requires backend payroll module");
-      return {
-        totalPayroll: null,
-        employeeCount: null,
-        avgSalary: null,
-        pending: null,
-      };
+      try {
+        // Get current month's payroll run
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+
+        const res = await hrmsApi.get<{ success: boolean; data: any[] }>(
+          `/api/payroll/runs?month=${currentMonth}&year=${currentYear}`
+        );
+
+        const runs = res.data || [];
+
+        if (runs.length === 0) {
+          return {
+            totalPayroll: 0,
+            employeeCount: 0,
+            avgSalary: 0,
+            pending: 0,
+          };
+        }
+
+        // Calculate stats from run data
+        const totalPayroll = runs.reduce((sum: number, run: any) => sum + Number(run.total_net || 0), 0);
+        const employeeCount = runs.reduce((sum: number, run: any) => sum + Number(run.total_employees || 0), 0);
+        const avgSalary = employeeCount > 0 ? totalPayroll / employeeCount : 0;
+        const pending = runs.filter((run: any) => run.status === "pending" || run.status === "draft").length;
+
+        return {
+          totalPayroll,
+          employeeCount,
+          avgSalary,
+          pending,
+        };
+      } catch (error) {
+        console.error("Failed to fetch payroll stats:", error);
+        return {
+          totalPayroll: 0,
+          employeeCount: 0,
+          avgSalary: 0,
+          pending: 0,
+        };
+      }
     },
   });
 }
