@@ -47,7 +47,24 @@ const formatINR = (amount: number): string => {
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(amount);
 };
 
-export function generateMasCallnetPayslip(data: MasCallnetPayslipData): jsPDF {
+// Load logo as base64 from public folder
+async function loadLogoBase64(): Promise<string | null> {
+  try {
+    const response = await fetch('/mcn-logo.png');
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('Failed to load logo:', error);
+    return null;
+  }
+}
+
+export async function generateMasCallnetPayslip(data: MasCallnetPayslipData): Promise<jsPDF> {
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
@@ -57,32 +74,35 @@ export function generateMasCallnetPayslip(data: MasCallnetPayslipData): jsPDF {
   const pageWidth = doc.internal.pageSize.getWidth();
   let currentY = 12;
 
-  // === MAS LOGO (Top Left) ===
-  // Draw Mas logo with colored circles
-  doc.setFillColor(231, 76, 60); // Red circle
-  doc.circle(18, currentY + 3, 2.5, 'F');
-  doc.setFillColor(46, 204, 113); // Green circle
-  doc.circle(23, currentY + 3, 2.5, 'F');
-  doc.setFillColor(52, 152, 219); // Blue circle
-  doc.circle(28, currentY + 3, 2.5, 'F');
-
-  // "Mas" text next to logo
-  doc.setFontSize(11);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(50, 50, 50);
-  doc.text("Mas", 31, currentY + 4.5);
+  // === MAS LOGO (Top Left) - EXACT TEMPLATE ===
+  const logoBase64 = await loadLogoBase64();
+  if (logoBase64) {
+    try {
+      doc.addImage(logoBase64, 'PNG', 10, currentY, 35, 12);
+    } catch (e) {
+      console.error('Error adding logo:', e);
+    }
+  }
 
   // === COMPANY NAME (Centered) ===
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(0, 0, 0);
-  doc.text(data.companyName, pageWidth / 2, currentY + 4, { align: "center" });
+  doc.text(data.companyName, pageWidth / 2, currentY + 6, { align: "center" });
 
-  currentY += 10;
+  currentY += 14;
+
+  // === SALARY SLIP HEADER ===
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(27, 106, 181); // MAS Blue
+  doc.text("SALARY SLIP", pageWidth / 2, currentY, { align: "center" });
+
+  currentY += 6;
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(80, 80, 80);
-  doc.text(`Month For : ${data.monthYear}`, pageWidth / 2, currentY, { align: "center" });
+  doc.text(`Month: ${data.monthYear}`, pageWidth / 2, currentY, { align: "center" });
 
   currentY += 6;
 
@@ -129,115 +149,68 @@ export function generateMasCallnetPayslip(data: MasCallnetPayslipData): jsPDF {
       halign: "left",
     },
     columnStyles: {
-      0: { cellWidth: 20, fillColor: [250, 250, 250] },
-      1: { cellWidth: 35 },
-      2: { cellWidth: 15, fillColor: [250, 250, 250] },
-      3: { cellWidth: 42 },
-      4: { cellWidth: 20, fillColor: [250, 250, 250] },
-      5: { cellWidth: 28 },
-      6: { cellWidth: 21 },
+      0: { cellWidth: 25, fillColor: [240, 240, 240], fontStyle: 'bold' },
+      1: { cellWidth: 40 },
+      2: { cellWidth: 20, fillColor: [240, 240, 240], fontStyle: 'bold' },
+      3: { cellWidth: 40 },
+      4: { cellWidth: 25, fillColor: [240, 240, 240], fontStyle: 'bold' },
+      5: { cellWidth: 30 },
+      6: { cellWidth: 20 },
     },
   });
 
   currentY = (doc as any).lastAutoTable.finalY + 1;
 
-  // === EARNINGS & DEDUCTIONS TABLES ===
+  // === EARNINGS & DEDUCTIONS TABLES (SIDE BY SIDE) ===
   const totalEarnings = data.basic + data.hra + data.bonus + data.conv + data.pa + data.ma + data.sa + data.oa + data.arrear + data.incentive;
   const totalDeductions = data.pf + data.esic + data.loan + data.adDed + data.otherDed;
 
-  // Earnings Header + Data
+  // Combined Earnings and Deductions Table
   autoTable(doc, {
     startY: currentY,
     head: [[
-      "",
-      { content: "Basic", styles: { halign: "center" } },
-      { content: "HRA", styles: { halign: "center" } },
-      { content: "Bonus", styles: { halign: "center" } },
-      { content: "Conv", styles: { halign: "center" } },
-      { content: "PA", styles: { halign: "center" } },
-      { content: "MA", styles: { halign: "center" } },
-      { content: "SA", styles: { halign: "center" } },
-      { content: "OA", styles: { halign: "center" } },
-      { content: "Arrear", styles: { halign: "center" } },
-      { content: "Incentive", styles: { halign: "center" } },
-      { content: "Total Earn", styles: { halign: "center" } },
+      { content: 'EARNINGS', colSpan: 2, styles: { halign: 'center', fillColor: [27, 106, 181], textColor: [255, 255, 255], fontStyle: 'bold' } },
+      null,
+      { content: 'DEDUCTIONS', colSpan: 2, styles: { halign: 'center', fillColor: [220, 53, 69], textColor: [255, 255, 255], fontStyle: 'bold' } },
+      null,
     ]],
-    body: [[
-      { content: "Earnings", styles: { fontStyle: "bold" } },
-      data.basic,
-      data.hra,
-      data.bonus,
-      data.conv,
-      data.pa,
-      data.ma,
-      data.sa,
-      data.oa,
-      data.arrear,
-      data.incentive,
-      formatINR(totalEarnings),
-    ]],
+    body: [
+      [
+        { content: 'Particulars', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+        { content: 'Amount (₹)', styles: { fontStyle: 'bold', fillColor: [240, 240, 240], halign: 'right' } },
+        { content: 'Particulars', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+        { content: 'Amount (₹)', styles: { fontStyle: 'bold', fillColor: [240, 240, 240], halign: 'right' } },
+      ],
+      ['Basic Salary', formatINR(data.basic), 'PF', formatINR(data.pf)],
+      ['HRA', formatINR(data.hra), 'ESIC', formatINR(data.esic)],
+      ['Bonus', formatINR(data.bonus), 'Loan', formatINR(data.loan)],
+      ['Conveyance', formatINR(data.conv), 'Advance Deduction', formatINR(data.adDed)],
+      ['Performance Allowance', formatINR(data.pa), 'Other Deductions', formatINR(data.otherDed)],
+      ['Medical Allowance', formatINR(data.ma), '', ''],
+      ['Special Allowance', formatINR(data.sa), '', ''],
+      ['Other Allowance', formatINR(data.oa), '', ''],
+      ['Arrear', formatINR(data.arrear), '', ''],
+      ['Incentive', formatINR(data.incentive), '', ''],
+      [
+        { content: 'GROSS EARNINGS', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+        { content: formatINR(totalEarnings), styles: { fontStyle: 'bold', fillColor: [240, 240, 240], halign: 'right' } },
+        { content: 'TOTAL DEDUCTIONS', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+        { content: formatINR(totalDeductions), styles: { fontStyle: 'bold', fillColor: [240, 240, 240], halign: 'right' } },
+      ],
+    ],
     theme: "grid",
     styles: {
       fontSize: 9,
       cellPadding: 2.5,
       lineColor: [0, 0, 0],
       lineWidth: 0.1,
-      halign: "right",
       textColor: [0, 0, 0],
-    },
-    headStyles: {
-      fillColor: [255, 255, 255],
-      textColor: [0, 0, 0],
-      fontStyle: "bold",
-      fontSize: 8,
     },
     columnStyles: {
-      0: { cellWidth: 16, halign: "center", fillColor: [250, 250, 250], fontStyle: "bold" },
-    },
-  });
-
-  currentY = (doc as any).lastAutoTable.finalY;
-
-  // Deductions Header + Data
-  autoTable(doc, {
-    startY: currentY,
-    head: [[
-      "",
-      { content: "PF", styles: { halign: "center" } },
-      { content: "ESIC", styles: { halign: "center" } },
-      { content: "Loan", styles: { halign: "center" } },
-      { content: "Ad.Ded", styles: { halign: "center" } },
-      { content: "Other Ded", styles: { halign: "center", colSpan: 6 } },
-      null, null, null, null, null,
-      { content: "Total Ded", styles: { halign: "center" } },
-    ]],
-    body: [[
-      { content: "Deductions", styles: { fontStyle: "bold" } },
-      data.pf,
-      data.esic,
-      data.loan,
-      data.adDed,
-      { content: data.otherDed, styles: { colSpan: 6 } },
-      null, null, null, null, null,
-      formatINR(totalDeductions),
-    ]],
-    theme: "grid",
-    styles: {
-      fontSize: 9,
-      cellPadding: 2.5,
-      lineColor: [0, 0, 0],
-      lineWidth: 0.1,
-      halign: "right",
-      textColor: [0, 0, 0],
-    },
-    headStyles: {
-      fillColor: [255, 255, 255],
-      textColor: [0, 0, 0],
-      fontStyle: "bold",
-      fontSize: 8,
-    },
-    columnStyles: {
-      0: { cellWidth: 16, halign: "center", fillColor: [250, 250, 250], fontStyle: "bold" },
+      0: { cellWidth: 50 },
+      1: { cellWidth: 45, halign: 'right' },
+      2: { cellWidth: 50 },
+      3: { cellWidth: 45, halign: 'right' },
     },
   });
 
@@ -293,19 +266,34 @@ export function generateMasCallnetPayslip(data: MasCallnetPayslipData): jsPDF {
     },
   });
 
-  currentY = (doc as any).lastAutoTable.finalY + 5;
+  currentY = (doc as any).lastAutoTable.finalY + 6;
 
-  // === NET SALARY ===
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(0, 0, 0);
-  doc.text(`Cheque No : ${data.chequeNo || ""}`, 15, currentY);
-  doc.text(`Net Salary : ${formatINR(data.netSalary)}`, pageWidth - 15, currentY, { align: "right" });
+  // === NET SALARY (Prominent Box) ===
+  doc.setFillColor(27, 106, 181); // MAS Blue
+  doc.rect(15, currentY - 2, pageWidth - 30, 12, 'F');
 
-  currentY += 5;
-  doc.setFontSize(10);
+  doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
-  doc.text(data.netSalaryWords, pageWidth / 2, currentY, { align: "center" });
+  doc.setTextColor(255, 255, 255);
+  doc.text(`NET SALARY: ${formatINR(data.netSalary)}`, pageWidth / 2, currentY + 5, { align: "center" });
+
+  currentY += 14;
+
+  // Net Salary in Words
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(0, 0, 0);
+  doc.text(`In Words: ${data.netSalaryWords}`, pageWidth / 2, currentY, { align: "center" });
+
+  currentY += 8;
+
+  // Cheque Number (if provided)
+  if (data.chequeNo) {
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Cheque No: ${data.chequeNo}`, 15, currentY);
+    currentY += 5;
+  }
 
   currentY += 8;
 
@@ -323,7 +311,7 @@ export function generateMasCallnetPayslip(data: MasCallnetPayslipData): jsPDF {
   return doc;
 }
 
-export function downloadMasCallnetPayslip(data: MasCallnetPayslipData, filename: string) {
-  const doc = generateMasCallnetPayslip(data);
+export async function downloadMasCallnetPayslip(data: MasCallnetPayslipData, filename: string) {
+  const doc = await generateMasCallnetPayslip(data);
   doc.save(filename);
 }
