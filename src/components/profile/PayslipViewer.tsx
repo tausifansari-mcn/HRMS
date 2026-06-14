@@ -40,7 +40,7 @@ import {
   ShieldCheck,
   Wallet,
 } from "lucide-react";
-import { downloadMasCallnetPayslip } from "@/lib/masCallnetPayslipGenerator";
+import { downloadMasCallnetPayslip } from "@/lib/masCallnetPayslipGeneratorV2";
 import { numberToWords } from "@/lib/numberToWords";
 
 interface PayslipViewerProps {
