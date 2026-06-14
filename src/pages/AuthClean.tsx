@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LoginSmartGreeting } from "@/components/integrations/LoginSmartGreeting";
 
 const companyLogo = "/mcn-logo.png?v=999";
 const currentYear = new Date().getFullYear();
@@ -176,10 +177,12 @@ export default function AuthClean() {
             <div className="px-7 pb-8 pt-7">
               {!showForgot ? (
                 <>
-                  <div className="mb-7">
+                  <div className="mb-5">
                     <h2 className="text-2xl font-black tracking-tight text-slate-950">Welcome Back</h2>
                     <p className="mt-1.5 text-sm text-slate-500">Sign in with your official email or employee code</p>
                   </div>
+
+                  <LoginSmartGreeting employeeName={identifier} />
 
                   <form onSubmit={handleLogin} className="space-y-5">
                     {/* Email / Employee code */}
