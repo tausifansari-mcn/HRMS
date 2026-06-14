@@ -148,6 +148,13 @@ exitRouter.patch(
   h(exitController.updateExitStatus.bind(exitController))
 );
 
+// POST endpoint for frontend compatibility
+exitRouter.post(
+  "/:id/status",
+  requireRole("admin", "hr", "manager"),
+  h(exitController.updateExitStatus.bind(exitController))
+);
+
 exitRouter.get(
   "/ff/:exitRequestId",
   requireRole("admin", "hr", "finance", "payroll"),

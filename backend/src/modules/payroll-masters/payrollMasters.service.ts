@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 
 export async function listSlabs() {
   const [rows] = await db.execute<RowDataPacket[]>(
-    'SELECT * FROM salary_slab_master ORDER BY seq_order ASC'
+    'SELECT * FROM salary_slab_master WHERE active_status = 1 ORDER BY seq_order ASC'
   );
   return rows;
 }
