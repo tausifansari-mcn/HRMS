@@ -87,6 +87,34 @@ async function savePhotoForEmployee(employeeId: string, uploadedFile: Express.Mu
   return fileUrl;
 }
 
+employeePhotoCompatRouter.get("/my-team", h(async (req: any, res: any) => {
+  const emp = await getEmployeeForUser(req.authUser.id);
+  if (!emp?.id) return res.json({ success: true, data: [] });
+
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT e.id,
+            e.employee_code,
+            COALESCE(NULLIF(e.full_name, ''), CONCAT(e.first_name, ' ', COALESCE(e.last_name, ''))) AS full_name,
+            e.department_id,
+            e.designation_id,
+            e.process_id,
+            e.cost_centre_id,
+            dm.dept_name,
+            desm.designation_name,
+            pm.process_name
+       FROM employees e
+       LEFT JOIN department_master  dm   ON dm.id   = e.department_id
+       LEFT JOIN designation_master desm ON desm.id  = e.designation_id
+       LEFT JOIN process_master     pm   ON pm.id    = e.process_id
+      WHERE e.active_status = 1
+        AND (e.reporting_manager_id = ? OR e.manager_id = ?)
+      ORDER BY full_name`,
+    [emp.id, emp.id],
+  );
+
+  return res.json({ success: true, data: rows });
+}));
+
 employeePhotoCompatRouter.post("/me/photo", photoMiddleware, h(async (req: any, res: any) => {
   if (!req.file) return res.status(400).json({ success: false, error: "No image uploaded" });
   const emp = await getEmployeeForUser(req.authUser.id);
