@@ -112,10 +112,10 @@ export const employeeService = {
          b.branch_name,
          p.process_name
        FROM employees e
-       LEFT JOIN department_master  dept  ON dept.id  = e.department_id
-       LEFT JOIN designation_master desig ON desig.id = e.designation_id
-       LEFT JOIN branch_master      b     ON b.id     = e.branch_id
-       LEFT JOIN process_master     p     ON p.id     = e.process_id
+       LEFT JOIN department_master  dept  ON dept.id  = e.department_id  AND dept.active_status  = 1
+       LEFT JOIN designation_master desig ON desig.id = e.designation_id AND desig.active_status = 1
+       LEFT JOIN branch_master      b     ON b.id     = e.branch_id      AND b.active_status     = 1
+       LEFT JOIN process_master     p     ON p.id     = e.process_id     AND p.active_status     = 1
        ${where}
        ORDER BY e.employee_code ASC
        LIMIT ${limit} OFFSET ${offset}`,
