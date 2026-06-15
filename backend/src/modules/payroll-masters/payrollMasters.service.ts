@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 
 export async function listSlabs() {
   const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT *, CASE WHEN active_status = 1 THEN 'active' ELSE 'inactive' END AS status
+    `SELECT *, label AS name, CASE WHEN active_status = 1 THEN 'active' ELSE 'inactive' END AS status
        FROM salary_slab_master
       WHERE active_status = 1
       ORDER BY seq_order ASC`
@@ -16,7 +16,7 @@ export async function listSlabs() {
 
 export async function getSlabById(id: string) {
   const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT *, CASE WHEN active_status = 1 THEN 'active' ELSE 'inactive' END AS status
+    `SELECT *, label AS name, CASE WHEN active_status = 1 THEN 'active' ELSE 'inactive' END AS status
        FROM salary_slab_master WHERE id = ?`, [id]
   );
   return rows[0] ?? null;
