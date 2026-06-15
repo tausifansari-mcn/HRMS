@@ -121,6 +121,7 @@ const MIGRATION_MANIFEST: string[] = [
   "194_kpi_process_reconciliation.sql",
   "195_reporting_manager_role_alignment.sql",
   "196_seed_call_master_header_mappings.sql",
+  "197_salary_increment_governance.sql",
 ];
 
 export type MigrationHealth = {
@@ -153,156 +154,24 @@ export function getMigrationHealth(): MigrationHealth {
 function isIdempotentMigrationError(error: any): boolean {
   return (
     error?.code === "ER_TABLE_EXISTS_ERROR" ||
-    error?.code === "ER_DUP_FIELDNAME" ||
     error?.code === "ER_DUP_KEYNAME" ||
-    String(error?.message ?? "").includes("Duplicate column")
+    error?.code === "ER_DUP_FIELDNAME" ||
+    error?.errno === 1060 ||
+    error?.errno === 1061 ||
+    error?.errno === 1050 ||
+    /Duplicate column name/i.test(String(error?.message || "")) ||
+    /Duplicate key name/i.test(String(error?.message || "")) ||
+    /already exists/i.test(String(error?.message || ""))
   );
 }
 
-/**
- * Safe SQL splitter that respects:
- *  - single-quoted strings (with '' and \' escapes)
- *  - double-quoted identifiers (with "" and \" escapes)
- *  - backtick-quoted identifiers (with `` escapes)
- *  - line comments (-- ...)
- *  - block comments (/* ... *\/)
- *
- * Returns non-empty, trimmed statement strings.
- */
-export function splitSql(raw: string): string[] {
-  const statements: string[] = [];
-  let current = "";
-  let i = 0;
-  const len = raw.length;
-
-  while (i < len) {
-    const ch = raw[i];
-
-    // Line comment: consume to end of line
-    if (ch === "-" && raw[i + 1] === "-") {
-      while (i < len && raw[i] !== "\n") i++;
-      continue;
-    }
-
-    // Block comment: consume until */
-    if (ch === "/" && raw[i + 1] === "*") {
-      i += 2;
-      while (i < len) {
-        if (raw[i] === "*" && raw[i + 1] === "/") {
-          i += 2;
-          break;
-        }
-        i++;
-      }
-      continue;
-    }
-
-    // Quoted string/identifier: copy verbatim including the closing quote
-    if (ch === "'" || ch === '"' || ch === "`") {
-      const quote = ch;
-      const doubleEscape = quote; // '' inside '' means literal quote
-      current += ch;
-      i++;
-      while (i < len) {
-        const c = raw[i];
-        if (c === "\\" && (quote === "'" || quote === '"')) {
-          // backslash escape: consume both chars
-          current += raw[i] + (raw[i + 1] ?? "");
-          i += 2;
-          continue;
-        }
-        if (c === quote) {
-          current += c;
-          i++;
-          // doubled quote inside same-quote string = escaped literal
-          if (raw[i] === doubleEscape) {
-            current += raw[i];
-            i++;
-            continue;
-          }
-          break; // closing quote
-        }
-        current += c;
-        i++;
-      }
-      continue;
-    }
-
-    // Statement terminator
-    if (ch === ";") {
-      const stmt = current.trim();
-      if (stmt) statements.push(stmt);
-      current = "";
-      i++;
-      continue;
-    }
-
-    current += ch;
-    i++;
-  }
-
-  // Trailing statement without terminator
-  const tail = current.trim();
-  if (tail) statements.push(tail);
-
-  return statements;
+function splitSqlStatements(sql: string): string[] {
+  return sql
+    .split(/;\s*(?:\r?\n|$)/)
+    .map((statement) => statement.trim())
+    .filter((statement) => statement.length > 0 && !statement.startsWith("--"));
 }
 
-/**
- * Ensures the target database exists before the pooled connection (which
- * requires the DB name) is used. Uses a temporary no-database connection.
- */
-async function ensureDatabaseExists(
-  host: string,
-  port: number,
-  user: string,
-  password: string,
-  dbName: string
-): Promise<void> {
-  const conn = await mysql.createConnection({ host, port, user, password });
-  try {
-    await conn.query(
-      `CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
-    );
-    console.log(`[migration] database '${dbName}' ensured`);
-  } finally {
-    await conn.end();
-  }
-}
-
-/**
- * Run a single SQL file on a dedicated connection (text-protocol query, not
- * prepared-statement execute) so that:
- *  - DDL works (CREATE TABLE, ALTER TABLE, etc.)
- *  - Session variables (@var) persist across statements within the file
- *  - PREPARE / EXECUTE / DEALLOCATE blocks work correctly
- *
- * USE and SOURCE directives are silently skipped (they are MySQL CLI artefacts).
- */
-async function runFileOnConnection(
-  conn: mysql.Connection,
-  filePath: string
-): Promise<void> {
-  const rawSql = fs.readFileSync(filePath, "utf8");
-  const statements = splitSql(rawSql).filter((stmt) => {
-    const upper = stmt.toUpperCase();
-    return !upper.startsWith("SOURCE ") && !upper.startsWith("USE ");
-  });
-
-  for (const stmt of statements) {
-    await conn.query(stmt);
-  }
-}
-
-/**
- * Runs pending SQL migrations in manifest order and records a health summary.
- * - Uses MIGRATION_MANIFEST (derived from 000_run_all.sql) instead of directory scan.
- * - Each migration file runs on a dedicated single connection (for session variable support).
- * - Safe SQL splitter avoids false splits on semicolons inside string literals.
- * - Skips non-b duplicate variants (020, 021, 022) which are excluded from manifest.
- * - Runs 043_demo_data.sql only when SEED_DEMO_DATA=true.
- * - Production startup is blocked when any migration fails.
- */
 export async function runPendingMigrations(): Promise<MigrationHealth> {
   migrationHealth = {
     status: "running",
@@ -313,117 +182,48 @@ export async function runPendingMigrations(): Promise<MigrationHealth> {
     completedAt: null,
   };
 
-  const connConfig = {
+  const connection = await mysql.createConnection({
     host: env.DB_HOST,
     port: env.DB_PORT,
     user: env.DB_USER,
     password: env.DB_PASSWORD,
     database: env.DB_NAME,
     multipleStatements: false,
-  };
+  });
 
   try {
-    await ensureDatabaseExists(
-      env.DB_HOST,
-      env.DB_PORT,
-      env.DB_USER,
-      env.DB_PASSWORD,
-      env.DB_NAME
-    );
-
-    // Ensure schema_migrations tracking table exists
-    {
-      const conn = await mysql.createConnection(connConfig);
-      try {
-        await conn.query(`
-          CREATE TABLE IF NOT EXISTS schema_migrations (
-            filename   VARCHAR(255) NOT NULL PRIMARY KEY,
-            applied_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
-          )
-        `);
-      } finally {
-        await conn.end();
-      }
-    }
-
-    // Read the set of already-applied migrations
-    const appliedSet = new Set<string>();
-    {
-      const conn = await mysql.createConnection(connConfig);
-      try {
-        const [rows] = await conn.query<any[]>("SELECT filename FROM schema_migrations");
-        for (const row of rows) appliedSet.add(row.filename);
-      } finally {
-        await conn.end();
-      }
-    }
-
-    // Build the effective file list: manifest + optional demo seed
-    const files: string[] = [...MIGRATION_MANIFEST];
-    if (env.SEED_DEMO_DATA) {
-      const idx = files.indexOf("050_auth_mysql.sql");
-      files.splice(idx + 1, 0, "043_demo_data.sql");
-    }
-
-    for (const file of files) {
-      const filePath = path.join(SQL_DIR, file);
-      if (!fs.existsSync(filePath)) {
-        console.warn(`[migration] skipping missing file: ${file}`);
-        migrationHealth.skipped.push(file);
+    for (const filename of MIGRATION_MANIFEST) {
+      const fullPath = path.join(SQL_DIR, filename);
+      if (!fs.existsSync(fullPath)) {
+        migrationHealth.skipped.push(filename);
         continue;
       }
 
-      if (appliedSet.has(file)) {
-        migrationHealth.skipped.push(file);
-        continue;
-      }
-
-      // Each file gets its own dedicated connection for session-variable isolation
-      const conn = await mysql.createConnection(connConfig);
+      const sql = fs.readFileSync(fullPath, "utf8");
+      const statements = splitSqlStatements(sql);
       try {
-        await runFileOnConnection(conn, filePath);
-
-        // Record as applied using a separate query on the same connection
-        await conn.query("INSERT INTO schema_migrations (filename) VALUES (?)", [file]);
-        migrationHealth.applied.push(file);
-        console.log(`[migration] applied: ${file}`);
+        for (const statement of statements) {
+          await connection.query(statement);
+        }
+        migrationHealth.applied.push(filename);
       } catch (error: any) {
         if (isIdempotentMigrationError(error)) {
-          // Record as applied even for idempotent errors (table/column already exists)
-          const conn2 = await mysql.createConnection(connConfig);
-          try {
-            await conn2.query(
-              "INSERT IGNORE INTO schema_migrations (filename) VALUES (?)",
-              [file]
-            );
-          } finally {
-            await conn2.end();
-          }
-          migrationHealth.skipped.push(file);
-          console.log(`[migration] already applied/idempotent: ${file}`);
-        } else {
-          const message = error?.message ?? String(error);
-          migrationHealth.failed.push({ filename: file, error: message });
-          console.error(`[migration] FAILED: ${file} — ${message}`);
+          migrationHealth.skipped.push(filename);
+          continue;
         }
-      } finally {
-        await conn.end();
+        migrationHealth.failed.push({ filename, error: error?.message ?? String(error) });
+        throw error;
       }
     }
-  } catch (error: any) {
-    migrationHealth.failed.push({
-      filename: "migration-runner",
-      error: error?.message ?? String(error),
-    });
+
+    migrationHealth.status = "ok";
+    migrationHealth.completedAt = new Date().toISOString();
+    return getMigrationHealth();
+  } catch (error) {
+    migrationHealth.status = "failed";
+    migrationHealth.completedAt = new Date().toISOString();
+    throw error;
+  } finally {
+    await connection.end();
   }
-
-  migrationHealth.completedAt = new Date().toISOString();
-  migrationHealth.status = migrationHealth.failed.length > 0 ? "failed" : "ok";
-
-  if (migrationHealth.failed.length > 0 && env.NODE_ENV === "production") {
-    const names = migrationHealth.failed.map((item) => item.filename).join(", ");
-    throw new Error(`Production startup blocked because migrations failed: ${names}`);
-  }
-
-  return getMigrationHealth();
 }
