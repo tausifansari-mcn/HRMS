@@ -88,6 +88,7 @@ const NativeLMSIntegration          = lazy(() => import("./pages/NativeLMSIntegr
 const NativeWFMRoster               = lazy(() => import("./pages/NativeWFMRoster"));
 const NativeWFMExtensions           = lazy(() => import("./pages/NativeWFMExtensions"));
 const NativeWFMManagerApproval      = lazy(() => import("./pages/NativeWFMManagerApproval"));
+const NativeBiometricCommandCenter  = lazy(() => import("./pages/NativeBiometricCommandCenter"));
 
 // Performance & Management
 const UnifiedPerformanceCommandCenter = lazy(() => import("./pages/UnifiedPerformanceCommandCenter"));
@@ -258,7 +259,6 @@ const App = () => (
               <Route path="/calendar" element={<ProtectedRoute><CompanyCalendar /></ProtectedRoute>} />
               <Route path="/notification-preferences" element={<ProtectedRoute><NotificationPreferences /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-
               <Route path="/modules" element={<ProtectedRoute><ModuleLauncher /></ProtectedRoute>} />
 
               {/* ATS */}
@@ -282,15 +282,9 @@ const App = () => (
               <Route path="/ats/recruiter-portal" element={<ProtectedRoute><Gate pageCode="ATS_RECRUITER_PORTAL"><NativeRecruiterPortal /></Gate></ProtectedRoute>} />
               <Route path="/ats/payroll-hr-validation" element={<ProtectedRoute><Gate pageCode="ATS_PAYROLL_HR"><NativePayrollHRValidation /></Gate></ProtectedRoute>} />
               <Route path="/ats/walkin-queue" element={<ProtectedRoute><Gate pageCode="ATS_WALKIN_QUEUE"><NativeWalkinQueue /></Gate></ProtectedRoute>} />
-
-              {/* Candidate Portal (Public - No Auth Required) */}
               <Route path="/candidate-portal/login" element={<CandidatePortalLogin />} />
               <Route path="/candidate-portal/dashboard" element={<CandidatePortalDashboard />} />
-
-              {/* Branch Head Approval (Protected - HRMS Auth) */}
               <Route path="/ats/branch-head-approval" element={<ProtectedRoute><Gate pageCode="ATS_BRANCH_HEAD_APPROVAL"><BranchHeadApproval /></Gate></ProtectedRoute>} />
-
-              {/* Super Admin Module Access (Protected - Admin Only) */}
               <Route path="/super-admin/module-access" element={<ProtectedRoute roles={['admin']}><SuperAdminModuleAccess /></ProtectedRoute>} />
               <Route path="/super-admin/dashboard" element={<ProtectedRoute roles={['admin']}><SuperAdminDashboardV2 /></ProtectedRoute>} />
               <Route path="/ats/command-centre" element={<ProtectedRoute roles={['admin', 'manager', 'hr']}><ATSCommandCentre /></ProtectedRoute>} />
@@ -306,7 +300,9 @@ const App = () => (
               {/* WFM */}
               <Route path="/wfm/roster" element={<ProtectedRoute><Gate pageCode="WFM_ROSTER"><NativeWFMRoster /></Gate></ProtectedRoute>} />
               <Route path="/wfm-roster" element={<Navigate to="/wfm/roster" replace />} />
-              <Route path="/wfm/live-tracker" element={<ProtectedRoute><Gate pageCode="WFM_LIVE_TRACKER"><NativePlaceholderPage title="WFM Live Tracker" module="WFM" /></Gate></ProtectedRoute>} />
+              <Route path="/wfm/live-tracker" element={<ProtectedRoute><Gate pageCode="WFM_LIVE_TRACKER"><NativeBiometricCommandCenter /></Gate></ProtectedRoute>} />
+              <Route path="/wfm/adherence-command-center" element={<ProtectedRoute><Gate pageCode="WFM_LIVE_TRACKER"><NativeBiometricCommandCenter /></Gate></ProtectedRoute>} />
+              <Route path="/wfm/agent-attendance-view" element={<ProtectedRoute><Gate pageCode="WFM_LIVE_TRACKER"><NativeBiometricCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/wfm/extensions" element={<ProtectedRoute><Gate pageCode="WFM_EXTENSIONS"><NativeWFMExtensions /></Gate></ProtectedRoute>} />
               <Route path="/wfm-manager-approvals" element={<ProtectedRoute><Gate pageCode="WFM_ROSTER"><NativeWFMManagerApproval /></Gate></ProtectedRoute>} />
               <Route path="/roster-preference" element={<ProtectedRoute><Gate pageCode="WFM_ROSTER"><NativeRosterPreference /></Gate></ProtectedRoute>} />
