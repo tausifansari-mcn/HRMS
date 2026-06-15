@@ -654,9 +654,12 @@ export const attendanceEngineService = {
         adr.clock_in_location    AS clock_in_location_name,
         adr.clock_out_location   AS clock_out_location_name,
         e.first_name, e.last_name, e.employee_code,
-        e.working_hours_start, e.working_hours_end
+        CONCAT(e.first_name, ' ', COALESCE(e.last_name, '')) AS employee_name,
+        e.working_hours_start, e.working_hours_end,
+        dm.dept_name AS department_name
       FROM attendance_daily_record adr
       LEFT JOIN employees e ON e.id = adr.employee_id
+      LEFT JOIN department_master dm ON dm.id = e.department_id
       WHERE 1=1`;
     const p: unknown[] = [];
     if (filters.employeeId) { q += ' AND adr.employee_id = ?'; p.push(filters.employeeId); }
