@@ -145,8 +145,16 @@ export async function executeConnector(
       });
       if (result.affected_dates.length > 0) {
         const { attendanceEngineService } = await import("../wfm/attendance-engine.service.js");
+        const {
+          syncAttendanceMetrics,
+          syncIntegrationCallMetrics,
+        } = await import("../kpi/kpi-data-connector.service.js");
         for (const date of result.affected_dates) {
           const attendance = await attendanceEngineService.processDateBatch(date, 50);
+          await Promise.all([
+            syncIntegrationCallMetrics(date),
+            syncAttendanceMetrics(date),
+          ]);
           if (attendance.failed > 0) {
             result.errors.push(
               `Attendance rebuild ${date}: ${attendance.failed} employee record(s) failed`,

@@ -116,6 +116,10 @@ const MIGRATION_MANIFEST: string[] = [
   "189_integration_call_daily.sql",
   "190_integration_biometric_daily.sql",
   "191_attendance_source_lineage.sql",
+  "192_seed_current_leave_balances.sql",
+  "193_kpi_live_data_bridge.sql",
+  "194_kpi_process_reconciliation.sql",
+  "195_reporting_manager_role_alignment.sql",
 ];
 
 export type MigrationHealth = {

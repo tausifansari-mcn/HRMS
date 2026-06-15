@@ -8,7 +8,6 @@ import { emailService } from "../communication/email.service.js";
 import { env } from "../../config/env.js";
 import { db } from "../../db/mysql.js";
 import { logSensitiveAction } from "../../shared/auditLog.js";
-import { canResetPassword, generateTemporaryPassword } from "../../shared/positionHierarchy.js";
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -45,6 +44,39 @@ function resetEmailHtml(link: string) {
 
 function resetEmailText(link: string) {
   return `Reset your MAS Callnet HRMS password\n\nUse this secure link to reset your password: ${link}\n\nThis link is valid for 1 hour. If you did not request this, ignore this email.`;
+}
+
+function validateTemporaryPassword(password: string): string | null {
+  if (password.length < 10) return "Temporary password must be at least 10 characters";
+  if (!/[A-Z]/.test(password)) return "Temporary password must include an uppercase letter";
+  if (!/[a-z]/.test(password)) return "Temporary password must include a lowercase letter";
+  if (!/\d/.test(password)) return "Temporary password must include a number";
+  if (!/[^A-Za-z0-9]/.test(password)) return "Temporary password must include a special character";
+  return null;
+}
+
+async function isReportingDownline(requesterEmployeeId: string, targetEmployeeId: string): Promise<boolean> {
+  let currentEmployeeId: string | null = targetEmployeeId;
+  const visited = new Set<string>();
+
+  while (currentEmployeeId && !visited.has(currentEmployeeId)) {
+    visited.add(currentEmployeeId);
+    const result = await db.execute<RowDataPacket[]>(
+      `SELECT reporting_manager_id
+         FROM employees
+        WHERE id = ? AND active_status = 1
+        LIMIT 1`,
+      [currentEmployeeId]
+    );
+    const rows: RowDataPacket[] = result[0];
+    const managerId: string | null = rows[0]?.reporting_manager_id
+      ? String(rows[0].reporting_manager_id)
+      : null;
+    if (managerId === requesterEmployeeId) return true;
+    currentEmployeeId = managerId;
+  }
+
+  return false;
 }
 
 // POST /api/auth/login — public (rate limited)
@@ -164,16 +196,25 @@ router.post("/change-password", requireAuth, h(async (req: any, res: any) => {
 
 // POST /api/auth/admin-reset-password — Admin password reset for employees
 // Super Admin can reset for positions <= Level 8 (Manager, Team Lead, Staff, etc.)
-// WFM Admin can reset for positions <= Level 6 (Assistant Manager and below)
-// Cannot reset for: CEO, Directors, VPs, Admin, HR Manager, Payroll Manager, etc.
+// Super Admin can reset any other user; Admin and WFM are limited to reporting downlines.
 router.post("/admin-reset-password", requireAuth, h(async (req: any, res: any) => {
-  const { userId, employeeId } = req.body;
+  const { userId, employeeId, temporaryPassword } = req.body;
 
   if (!userId && !employeeId) {
     return res.status(400).json({
       success: false,
       error: "Either userId or employeeId is required"
     });
+  }
+  if (!temporaryPassword || typeof temporaryPassword !== "string") {
+    return res.status(400).json({
+      success: false,
+      error: "temporaryPassword is required"
+    });
+  }
+  const passwordError = validateTemporaryPassword(temporaryPassword);
+  if (passwordError) {
+    return res.status(400).json({ success: false, error: passwordError });
   }
 
   const [roleRows] = await db.execute<RowDataPacket[]>(
@@ -187,21 +228,20 @@ router.post("/admin-reset-password", requireAuth, h(async (req: any, res: any) =
     ? "super_admin"
     : roles.has("admin")
       ? "admin"
-      : roles.has("wfm_admin")
-        ? "wfm_admin"
-        : roles.has("wfm")
-          ? "wfm"
-          : null;
+      : roles.has("wfm")
+        ? "wfm"
+        : null;
 
   if (!requesterRole) {
     return res.status(403).json({
       success: false,
-      error: "Only Admin or WFM Admin can reset employee passwords"
+      error: "Only Super Admin, Admin or WFM can reset employee passwords"
     });
   }
 
   const [requesterRows] = await db.execute<RowDataPacket[]>(
-    `SELECT COALESCE(d.designation_name, e.emp_type, e.profile_type) AS designation
+    `SELECT e.id AS employee_id,
+            COALESCE(d.designation_name, e.emp_type, e.profile_type) AS designation
        FROM employees e
        LEFT JOIN designation_master d ON d.id = e.designation_id
       WHERE e.user_id = ? AND e.active_status = 1
@@ -211,6 +251,9 @@ router.post("/admin-reset-password", requireAuth, h(async (req: any, res: any) =
   );
   const requesterDesignation = requesterRows[0]?.designation
     ? String(requesterRows[0].designation)
+    : null;
+  const requesterEmployeeId = requesterRows[0]?.employee_id
+    ? String(requesterRows[0].employee_id)
     : null;
 
   let targetUserId = userId ? String(userId) : "";
@@ -265,25 +308,29 @@ router.post("/admin-reset-password", requireAuth, h(async (req: any, res: any) =
     });
   }
 
-  // Check hierarchical permission
-  const permissionCheck = canResetPassword(
-    requesterRole,
-    requesterDesignation,
-    targetDesignation,
-    targetUserId,
-    req.authUser.id
-  );
-
-  if (!permissionCheck.allowed) {
+  if (targetUserId === req.authUser.id) {
     return res.status(403).json({
       success: false,
-      error: permissionCheck.reason
+      error: "Use Change Password to update your own password"
     });
   }
 
-  // Generate temporary password
-  const tempPassword = generateTemporaryPassword();
-  const hashedPassword = await bcrypt.hash(tempPassword, 10);
+  if (requesterRole !== "super_admin") {
+    if (!requesterEmployeeId || !targetEmployeeId) {
+      return res.status(403).json({
+        success: false,
+        error: "Your employee profile and the target employee profile must be linked"
+      });
+    }
+    if (!(await isReportingDownline(requesterEmployeeId, targetEmployeeId))) {
+      return res.status(403).json({
+        success: false,
+        error: "You can reset passwords only for employees in your reporting downline"
+      });
+    }
+  }
+
+  const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
 
   await db.execute(
     `UPDATE auth_user
@@ -292,6 +339,12 @@ router.post("/admin-reset-password", requireAuth, h(async (req: any, res: any) =
          updated_at = NOW()
      WHERE id = ?`,
     [hashedPassword, targetUserId]
+  );
+  await db.execute(
+    `UPDATE auth_refresh_token
+        SET revoked = 1
+      WHERE user_id = ? AND revoked = 0`,
+    [targetUserId]
   );
 
   await logSensitiveAction({
@@ -305,6 +358,9 @@ router.post("/admin-reset-password", requireAuth, h(async (req: any, res: any) =
       target_designation: targetDesignation,
       requester_role: requesterRole,
       requester_designation: requesterDesignation,
+      reporting_scope_enforced: requesterRole !== "super_admin",
+      force_change_on_next_login: true,
+      refresh_sessions_revoked: true,
     },
     req,
   });
@@ -321,18 +377,14 @@ router.post("/admin-reset-password", requireAuth, h(async (req: any, res: any) =
                 <h2 style="margin:0;font-size:22px">Password Reset</h2>
               </div>
               <div style="padding:26px">
-                <p style="font-size:15px;line-height:1.6;margin:0 0 16px">Your HRMS password has been reset by an administrator.</p>
-                <div style="background:#f1f5f9;padding:16px;border-radius:8px;margin:20px 0">
-                  <p style="margin:0 0 8px;font-size:13px;color:#64748b;font-weight:600">TEMPORARY PASSWORD</p>
-                  <p style="margin:0;font-size:18px;font-family:monospace;font-weight:700;color:#0f172a">${tempPassword}</p>
-                </div>
-                <p style="font-size:14px;line-height:1.6;margin:16px 0;color:#dc2626;font-weight:600">Important: You will be required to change this password on your next login.</p>
-                <p style="font-size:13px;line-height:1.6;color:#64748b;margin:16px 0 0">For security reasons, please log in and change your password immediately.</p>
+                <p style="font-size:15px;line-height:1.6;margin:0 0 16px">Your HRMS password has been reset by an authorised administrator.</p>
+                <p style="font-size:14px;line-height:1.6;margin:16px 0;color:#dc2626;font-weight:600">Contact the administrator through the approved secure channel for your temporary password. You must change it immediately after login.</p>
+                <p style="font-size:13px;line-height:1.6;color:#64748b;margin:16px 0 0">All existing HRMS refresh sessions have been revoked for your security.</p>
               </div>
             </div>
           </div>
         `,
-        text: `Your HRMS password has been reset.\n\nTemporary Password: ${tempPassword}\n\nYou will be required to change this password on your next login.\nFor security, please log in and change your password immediately.`
+        text: "Your HRMS password has been reset by an authorised administrator. Contact the administrator through the approved secure channel for the temporary password. You must change it immediately after login. Existing HRMS refresh sessions have been revoked."
       });
     } catch (emailError) {
       console.error("Failed to send password reset email:", emailError);
@@ -341,8 +393,8 @@ router.post("/admin-reset-password", requireAuth, h(async (req: any, res: any) =
 
   return res.json({
     success: true,
-    temporaryPassword: tempPassword,
-    message: "Password reset successfully. Temporary password has been sent to the employee's email."
+    mustChangePassword: true,
+    message: "Temporary password set. Share it securely with the employee; they must change it after login."
   });
 }));
 

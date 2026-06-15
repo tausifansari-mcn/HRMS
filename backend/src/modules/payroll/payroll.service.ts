@@ -503,7 +503,9 @@ export const payrollService = {
               ELSE NULL END AS payslip_status
        FROM salary_prep_line spl
        LEFT JOIN employees e ON e.id = spl.employee_id
-       LEFT JOIN salary_payslip sp ON sp.run_id = spl.run_id AND sp.employee_id = spl.employee_id
+       LEFT JOIN salary_payslip sp
+         ON CONVERT(sp.prep_line_id USING utf8mb4) COLLATE utf8mb4_unicode_ci
+          = CONVERT(spl.id USING utf8mb4) COLLATE utf8mb4_unicode_ci
        WHERE spl.run_id = ?
        ORDER BY spl.employee_code ASC`,
       [runId]

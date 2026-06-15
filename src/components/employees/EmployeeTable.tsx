@@ -60,6 +60,7 @@ interface EmployeeTableProps {
   onResetPassword?: (employee: Employee) => void;
   onManageDocuments?: (employee: Employee) => void;
   isAdminOrHR?: boolean;
+  canResetPassword?: boolean;
   sortKey?: keyof Employee | null;
   sortDirection?: SortDirection;
   onSort?: (key: keyof Employee) => void;
@@ -78,6 +79,7 @@ export function EmployeeTable({
   onResetPassword,
   onManageDocuments,
   isAdminOrHR = false,
+  canResetPassword = false,
   sortKey,
   sortDirection,
   onSort,
@@ -341,6 +343,10 @@ export function EmployeeTable({
                             <FileText className="mr-2 h-4 w-4" />
                             Documents
                           </DropdownMenuItem>
+                        </>
+                      )}
+                      {canResetPassword && (
+                        <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => onResetPassword?.(employee)}

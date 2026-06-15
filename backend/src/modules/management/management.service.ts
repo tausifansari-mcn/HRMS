@@ -27,16 +27,46 @@ export const managementService = {
     const params: unknown[] = [];
     if (filters.process_id) { conds.push("e.process_id = ?"); params.push(filters.process_id); }
     if (filters.branch_id)  { conds.push("e.branch_id = ?");  params.push(filters.branch_id); }
-    const period = filters.period ?? "2026-05";
-    conds.push("mks.period = ?"); params.push(period);
+    const period = filters.period ?? new Date().toISOString().slice(0, 7);
+    conds.push("DATE_FORMAT(kda.score_date, '%Y-%m') = ?"); params.push(period);
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT mks.*, e.employee_code, e.full_name, p.process_name
-         FROM management_kpi_summary mks
-         JOIN employees e ON e.id = mks.employee_id
+      `SELECT
+         e.id AS employee_id,
+         e.employee_code,
+         e.full_name AS employee_name,
+         ? AS period,
+         ROUND(
+           SUM((
+             CASE WHEN kmm.direction = 'lower_is_better'
+                  THEN LEAST(kpc.target_value / NULLIF(kda.actual_value, 0), 1.2)
+                  ELSE LEAST(kda.actual_value / NULLIF(kpc.target_value, 0), 1.2)
+             END * 100
+           ) * kpc.weightage) / NULLIF(SUM(kpc.weightage), 0),
+           2
+         ) AS overall_score,
+         DENSE_RANK() OVER (
+           ORDER BY
+             SUM((
+               CASE WHEN kmm.direction = 'lower_is_better'
+                    THEN LEAST(kpc.target_value / NULLIF(kda.actual_value, 0), 1.2)
+                    ELSE LEAST(kda.actual_value / NULLIF(kpc.target_value, 0), 1.2)
+               END * 100
+             ) * kpc.weightage) / NULLIF(SUM(kpc.weightage), 0) DESC
+         ) AS rank_position,
+         'stable' AS trend,
+         p.process_name
+         FROM kpi_daily_actual kda
+         JOIN employees e ON e.id = kda.employee_id
+         JOIN kpi_process_config kpc
+           ON kpc.process_id = e.process_id
+          AND kpc.metric_id = kda.metric_id
+         JOIN kpi_metric_master kmm ON kmm.id = kda.metric_id
          LEFT JOIN process_master p ON p.id = e.process_id
         WHERE ${conds.join(" AND ")}
-        ORDER BY mks.rank_position ASC, mks.overall_score DESC LIMIT 200`,
-      params
+        GROUP BY e.id, e.employee_code, e.full_name, p.process_name
+        ORDER BY rank_position ASC, overall_score DESC
+        LIMIT 200`,
+      [period, ...params]
     );
     return rows as RowDataPacket[];
   },
@@ -48,7 +78,7 @@ export const managementService = {
     if (filters.coach_user_id) { conds.push("cs.coach_user_id = ?"); params.push(filters.coach_user_id); }
     if (filters.status)        { conds.push("cs.status = ?");        params.push(filters.status); }
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT cs.*, e.employee_code, e.full_name FROM coaching_session cs
+      `SELECT cs.*, e.employee_code, e.full_name AS employee_name FROM coaching_session cs
          JOIN employees e ON e.id = cs.employee_id
         WHERE ${conds.join(" AND ")} ORDER BY cs.session_date DESC LIMIT 200`,
       params
@@ -77,7 +107,7 @@ export const managementService = {
     if (filters.severity)                   { conds.push("pa.severity = ?");    params.push(filters.severity); }
     if (filters.acknowledged !== undefined) { conds.push("pa.acknowledged = ?"); params.push(filters.acknowledged ? 1 : 0); }
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT pa.*, e.employee_code, e.full_name FROM performance_alert pa
+      `SELECT pa.*, e.employee_code, e.full_name AS employee_name FROM performance_alert pa
          JOIN employees e ON e.id = pa.employee_id
         WHERE ${conds.join(" AND ")} ORDER BY pa.created_at DESC LIMIT 200`,
       params
@@ -179,15 +209,167 @@ export const managementService = {
   },
 
   async getDashboardSummary(processId?: string) {
-    const proc = processId ? "AND e.process_id = ?" : "";
+    const processClause = processId ? "AND e.process_id = ?" : "";
     const params: unknown[] = processId ? [processId] : [];
-    const [kpiRows] = await db.execute<RowDataPacket[]>(`SELECT COUNT(*) AS employees_with_kpi, AVG(overall_score) AS avg_score FROM management_kpi_summary mks JOIN employees e ON e.id = mks.employee_id WHERE 1=1 ${proc}`, params);
-    const [coachRows] = await db.execute<RowDataPacket[]>(`SELECT COUNT(*) AS pending_sessions FROM coaching_session cs JOIN employees e ON e.id = cs.employee_id WHERE cs.status = 'scheduled' ${proc}`, params);
-    const [alertRows] = await db.execute<RowDataPacket[]>(`SELECT COUNT(*) AS unacked_critical FROM performance_alert pa JOIN employees e ON e.id = pa.employee_id WHERE pa.acknowledged = 0 AND pa.severity IN ('high','critical') ${proc}`, params);
+    const [
+      workforceRows,
+      leaveRows,
+      ticketRows,
+      attendanceRows,
+      kpiRows,
+    ] = await Promise.all([
+      db.execute<RowDataPacket[]>(
+        `SELECT
+           SUM(e.active_status = 1 AND e.date_of_joining <= CURDATE()) AS headcount,
+           SUM(
+             COALESCE(e.date_of_leaving, e.resignation_date, e.date_of_exit)
+             BETWEEN DATE_SUB(CURDATE(), INTERVAL 29 DAY) AND CURDATE()
+           ) AS exits_30d
+         FROM employees e
+         WHERE 1=1 ${processClause}`,
+        params
+      ),
+      db.execute<RowDataPacket[]>(
+        `SELECT COUNT(*) AS pending_leaves
+           FROM leave_request lr
+           JOIN employees e ON e.id = lr.employee_id
+          WHERE LOWER(lr.status) = 'pending' ${processClause}`,
+        params
+      ),
+      db.execute<RowDataPacket[]>(
+        `SELECT COUNT(*) AS open_tickets
+           FROM helpdesk_ticket ht
+           JOIN employees e ON e.id = ht.employee_id
+          WHERE ht.status IN ('open', 'in_progress') ${processClause}`,
+        params
+      ),
+      db.execute<RowDataPacket[]>(
+        `SELECT
+           COUNT(*) AS total,
+           SUM(adr.attendance_status = 'present') AS present,
+           SUM(adr.attendance_status = 'half_day') AS half_day
+         FROM attendance_daily_record adr
+         JOIN employees e ON e.id = adr.employee_id
+         WHERE adr.record_date = (
+           SELECT MAX(record_date) FROM attendance_daily_record WHERE record_date <= CURDATE()
+         ) ${processClause}`,
+        params
+      ),
+      this.getTeamKpiSummary({
+        process_id: processId,
+        period: new Date().toISOString().slice(0, 7),
+      }),
+    ]);
+
+    const workforce = workforceRows[0][0] ?? {};
+    const attendance = attendanceRows[0][0] ?? {};
+    const headcount = numberValue(workforce.headcount);
+    const exits = numberValue(workforce.exits_30d);
+    const attendanceTotal = numberValue(attendance.total);
+    const averageKpi = kpiRows.length
+      ? kpiRows.reduce((sum, row) => sum + numberValue(row.overall_score), 0) / kpiRows.length
+      : 0;
+
     return {
-      kpi: (kpiRows as RowDataPacket[])[0],
-      coaching: (coachRows as RowDataPacket[])[0],
-      alerts: (alertRows as RowDataPacket[])[0],
+      headcount,
+      attrition_rate: headcount + exits > 0
+        ? Number(((exits / (headcount + exits / 2)) * 100).toFixed(2))
+        : 0,
+      avg_kpi_score: Number(averageKpi.toFixed(2)),
+      open_tickets: numberValue(ticketRows[0][0]?.open_tickets),
+      pending_leaves: numberValue(leaveRows[0][0]?.pending_leaves),
+      attendance_rate: attendanceTotal > 0
+        ? Number(
+            ((
+              (numberValue(attendance.present) + numberValue(attendance.half_day) * 0.5)
+              / attendanceTotal
+            ) * 100).toFixed(2)
+          )
+        : 0,
+    };
+  },
+
+  async getSystemDashboard() {
+    const [
+      usersRows,
+      employeeRows,
+      roleRows,
+      pageRows,
+      integrationRows,
+      moduleRows,
+      activityRows,
+    ] = await Promise.all([
+      db.execute<RowDataPacket[]>("SELECT COUNT(*) AS total FROM auth_user"),
+      db.execute<RowDataPacket[]>(
+        "SELECT COUNT(*) AS total FROM employees WHERE active_status = 1 AND date_of_joining <= CURDATE()"
+      ),
+      db.execute<RowDataPacket[]>("SELECT COUNT(*) AS total FROM workforce_role_catalog WHERE active_status = 1"),
+      db.execute<RowDataPacket[]>("SELECT COUNT(*) AS total FROM page_catalog"),
+      db.execute<RowDataPacket[]>(
+        `SELECT
+           COUNT(*) AS configured,
+           SUM(active_status = 1) AS active
+         FROM integration_config`
+      ),
+      db.execute<RowDataPacket[]>(
+        `SELECT 'ATS' AS module_name, COUNT(*) AS record_count, MAX(updated_at) AS last_activity, 0 AS error_count
+           FROM ats_candidate
+         UNION ALL
+         SELECT 'Payroll', COUNT(*), MAX(updated_at), SUM(status = 'failed')
+           FROM salary_prep_run
+         UNION ALL
+         SELECT 'Leave', COUNT(*), MAX(COALESCE(applied_at, created_at)), 0
+           FROM leave_request
+         UNION ALL
+         SELECT 'Attendance', COUNT(*), MAX(updated_at), 0
+           FROM attendance_daily_record
+         UNION ALL
+         SELECT 'Integration Hub', COUNT(*), MAX(completed_at),
+                SUM(status = 'failed' AND started_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR))
+           FROM integration_connector_run
+         UNION ALL
+         SELECT 'KPI', COUNT(*), MAX(created_at), 0
+           FROM kpi_daily_actual`
+      ),
+      db.execute<RowDataPacket[]>(
+        `SELECT
+           sal.id,
+           LOWER(sal.module_key) AS type,
+           COALESCE(au.email, 'System') AS user,
+           REPLACE(LOWER(sal.action_type), '_', ' ') AS action,
+           sal.acted_at AS timestamp,
+           'success' AS status
+         FROM sensitive_action_log sal
+         LEFT JOIN auth_user au ON au.id = sal.actor_user_id
+         ORDER BY sal.acted_at DESC
+         LIMIT 12`
+      ),
+    ]);
+
+    const modules = moduleRows[0].map((row) => {
+      const recordCount = numberValue(row.record_count);
+      const errorCount = numberValue(row.error_count);
+      return {
+        module: String(row.module_name),
+        status: errorCount > 0 ? "degraded" : recordCount > 0 ? "operational" : "degraded",
+        lastActivity: row.last_activity ?? null,
+        errorCount,
+        recordCount,
+      };
+    });
+
+    return {
+      metrics: {
+        totalUsers: numberValue(usersRows[0][0]?.total),
+        activeEmployees: numberValue(employeeRows[0][0]?.total),
+        totalRoles: numberValue(roleRows[0][0]?.total),
+        totalPages: numberValue(pageRows[0][0]?.total),
+        activeIntegrations: numberValue(integrationRows[0][0]?.active),
+        configuredIntegrations: numberValue(integrationRows[0][0]?.configured),
+        systemHealth: modules.some((module) => module.status === "degraded") ? "warning" : "healthy",
+      },
+      modules,
+      activities: activityRows[0],
     };
   },
 

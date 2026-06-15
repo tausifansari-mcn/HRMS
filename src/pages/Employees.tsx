@@ -169,7 +169,9 @@ const Employees = () => {
   const { data: departments = [] } = useDepartments();
   const { data: directoryMasters } = useEmployeeDirectoryMasters();
   const { data: employeeStats } = useEmployeeStats();
-  const { isAdminOrHR, isLoading: isLoadingRole } = useIsAdminOrHR();
+  const { isAdminOrHR, isLoading: isLoadingRole, roleKeys } = useIsAdminOrHR();
+  const canResetEmployeePassword =
+    roleKeys.includes("super_admin") || roleKeys.includes("admin") || roleKeys.includes("wfm");
 
   const bulkDeleteMutation = useBulkDeleteEmployees();
   const bulkStatusMutation = useBulkUpdateEmployeeStatus();
@@ -733,8 +735,9 @@ const Employees = () => {
                   onManageDocuments={
                     isAdminOrHR ? (employee) => setDocumentsEmployee(employee) : undefined
                   }
-                  onResetPassword={isAdminOrHR ? (employee) => setResetPasswordEmployee(employee) : undefined}
+                  onResetPassword={canResetEmployeePassword ? (employee) => setResetPasswordEmployee(employee) : undefined}
                   isAdminOrHR={isAdminOrHR}
+                  canResetPassword={canResetEmployeePassword}
                   sortKey={sortConfig.key}
                   sortDirection={sortConfig.direction}
                   onSort={requestSort}

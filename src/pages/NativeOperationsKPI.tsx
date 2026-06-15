@@ -223,7 +223,7 @@ function TniModal({ employeeId, employeeName, metrics, onClose, onCreated }: Tni
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
-const OPS_DISPLAY_CODES = ["AHT", "ADHERENCE", "SHRINKAGE", "FCR", "OCCUPANCY"];
+const OPS_DISPLAY_CODES = ["AHT", "TALK_TIME", "ADHERENCE", "SHRINKAGE", "FCR", "OCCUPANCY"];
 
 const TNI_THRESHOLD = 75;
 
@@ -249,13 +249,10 @@ export default function NativeOperationsKPI() {
     try {
       const res = await hrmsApi.get<{ success: boolean; data: Process[] }>("/api/processes");
       setProcesses(res.data ?? []);
-      if ((res.data ?? []).length > 0 && !selectedProcess) {
-        setSelectedProcess((res.data ?? [])[0].id);
-      }
     } catch {
       // Processes are optional
     }
-  }, [selectedProcess]);
+  }, []);
 
   const loadData = useCallback(async () => {
     if (!period) return;

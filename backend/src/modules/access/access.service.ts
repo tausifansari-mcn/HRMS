@@ -80,6 +80,13 @@ export async function getRbacReconciliation(): Promise<ReconciliationReport> {
 // ── Role administration (MySQL-authoritative writes) ─────────────────────────
 
 export async function assignRole(userId: string, roleKey: string, actorUserId: string, req?: Request): Promise<void> {
+  const [users] = await db.execute<RowDataPacket[]>(
+    "SELECT id FROM auth_user WHERE id = ? AND is_blocked = 0 LIMIT 1",
+    [userId]
+  );
+  if ((users as RowDataPacket[]).length === 0) {
+    throw Object.assign(new Error("User not found or blocked"), { statusCode: 404 });
+  }
   const [catalog] = await db.execute<RowDataPacket[]>(
     "SELECT role_key FROM workforce_role_catalog WHERE role_key = ? AND active_status = 1 LIMIT 1",
     [roleKey]

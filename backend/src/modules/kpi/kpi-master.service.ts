@@ -21,8 +21,8 @@ export interface DateRange {
   end: string;
 }
 
-export function getDateRange(period: Period): DateRange {
-  const now = new Date();
+export function getDateRange(period: Period, anchorDate?: string): DateRange {
+  const now = anchorDate ? new Date(`${anchorDate}T12:00:00`) : new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const today = fmt(now);
@@ -280,11 +280,14 @@ export async function getResolvedKpis(employeeId: string) {
 
 // ─── Live KPI performance ──────────────────────────────────────────────────────
 
-export async function getLiveKpiPerformance(employeeId: string, period: Period) {
+export async function getLiveKpiPerformance(employeeId: string, period: Period, anchorDate?: string) {
+  // Keep the employee cache aligned with the current process/designation/
+  // department configuration before reading source facts.
+  await resolveEmployeeKpis(employeeId);
   const resolved = await getResolvedKpis(employeeId);
-  if (!resolved.length) return { period, metrics: [] };
+  if (!resolved.length) return { period, metrics: [], daily_performance: [] };
 
-  const { start, end } = getDateRange(period);
+  const { start, end } = getDateRange(period, anchorDate);
 
   const metricIds = (resolved as any[]).map(r => r.metric_id);
   const placeholders = metricIds.map(() => '?').join(',');
@@ -379,6 +382,58 @@ export async function getLiveKpiPerformance(employeeId: string, period: Period) 
   const overallScore = weightSum > 0 ? totalWeight / weightSum * 100 : 0;
   const overallRating = scored.length ? getRating(overallScore) : null;
 
+  const resolvedByMetric = new Map((resolved as any[]).map((row) => [row.metric_id, row]));
+  const dailyActuals = new Map<string, any[]>();
+  for (const row of actuals as any[]) {
+    const date = row.score_date instanceof Date
+      ? row.score_date.toISOString().split('T')[0]
+      : String(row.score_date).split('T')[0];
+    if (!dailyActuals.has(date)) dailyActuals.set(date, []);
+    dailyActuals.get(date)!.push(row);
+  }
+
+  const dailyPerformance = Array.from(dailyActuals.entries())
+    .sort(([left], [right]) => right.localeCompare(left))
+    .map(([date, rows]) => {
+      let weightedScore = 0;
+      let dailyWeight = 0;
+      const dailyMetrics = rows.map((row) => {
+        const kpi = resolvedByMetric.get(row.metric_id);
+        if (!kpi) return null;
+        const actualValue = Number(row.actual_value);
+        const result = calculateMetricScore({
+          scoringType: kpi.direction === 'lower_is_better' ? 'lower_better' : 'higher_better',
+          actualValue,
+          targetValue: Number(kpi.target_value),
+          minValue: kpi.min_threshold,
+          maxValue: Number(kpi.max_achievement),
+          weightage: Number(kpi.weightage),
+        });
+        const weight = Number(kpi.weightage ?? 100);
+        weightedScore += result.metricScore * weight;
+        dailyWeight += weight;
+        return {
+          metric_id: row.metric_id,
+          metric_code: kpi.metric_code,
+          metric_name: kpi.metric_name,
+          unit: kpi.unit,
+          actual_value: actualValue,
+          target_value: Number(kpi.target_value),
+          score_pct: result.metricScore,
+          source: row.source,
+        };
+      }).filter(Boolean);
+      const score = dailyWeight > 0 ? weightedScore / dailyWeight : 0;
+      const rating = dailyMetrics.length ? getRating(score) : null;
+      return {
+        date,
+        overall_score: Math.round(score * 100) / 100,
+        overall_rating: rating?.label ?? null,
+        overall_rating_color: rating?.color ?? null,
+        metrics: dailyMetrics,
+      };
+    });
+
   return {
     period,
     date_range: { start, end },
@@ -386,6 +441,7 @@ export async function getLiveKpiPerformance(employeeId: string, period: Period) 
     overall_rating: overallRating?.label ?? null,
     overall_rating_color: overallRating?.color ?? null,
     metrics,
+    daily_performance: dailyPerformance,
   };
 }
 
@@ -412,7 +468,7 @@ export async function getOrgUnitOptions(type: OrgUnitType) {
 
 // ─── Team KPI summary (for manager view) ─────────────────────────────────────
 
-export async function getTeamKpiSummary(managerEmployeeId: string, period: Period) {
+export async function getTeamKpiSummary(managerEmployeeId: string, period: Period, anchorDate?: string) {
   // Fetch direct reports
   const [teamRows] = await db.execute<RowDataPacket[]>(
     `SELECT e.id, e.employee_code,
@@ -429,7 +485,7 @@ export async function getTeamKpiSummary(managerEmployeeId: string, period: Perio
   if (!teamMembers.length) {
     return {
       period,
-      date_range: getDateRange(period),
+      date_range: getDateRange(period, anchorDate),
       team_size: 0,
       team_avg_score: 0,
       team_rating: null,
@@ -458,7 +514,7 @@ export async function getTeamKpiSummary(managerEmployeeId: string, period: Perio
   // Fetch per-member live performance in parallel
   const memberResults = await Promise.all(
     teamMembers.map(async (m) => {
-      const perf = await getLiveKpiPerformance(m.id, period);
+      const perf = await getLiveKpiPerformance(m.id, period, anchorDate);
       return {
         employee_id: m.id,
         employee_code: m.employee_code,
@@ -537,7 +593,7 @@ export async function getTeamKpiSummary(managerEmployeeId: string, period: Perio
 
   return {
     period,
-    date_range: getDateRange(period),
+    date_range: getDateRange(period, anchorDate),
     team_size: teamMembers.length,
     team_avg_score: teamAvgScore,
     team_rating: teamRating,
