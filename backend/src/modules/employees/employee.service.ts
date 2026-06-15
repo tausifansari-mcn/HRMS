@@ -221,6 +221,8 @@ export const employeeService = {
 
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT e.*,
+         COALESCE(NULLIF(TRIM(e.first_name), ''), NULLIF(TRIM(e.full_name), ''), '') AS first_name,
+         COALESCE(e.last_name, '') AS last_name,
          e.id AS employee_id,
          COALESCE(NULLIF(TRIM(e.official_email), ''), NULLIF(TRIM(e.office_email), ''), e.email) AS email,
          dept.dept_name         AS department_name,
