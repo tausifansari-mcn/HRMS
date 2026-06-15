@@ -23,7 +23,8 @@ const ALLOWED_IMAGE_TYPES = new Map<string, string>([
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, PHOTOS_DIR),
   filename: (_req, file, cb) => {
-    const ext = ALLOWED_IMAGE_TYPES.get(file.mimetype) ?? path.extname(file.originalname).toLowerCase() || ".jpg";
+    const ext = ALLOWED_IMAGE_TYPES.get(file.mimetype)
+      ?? (path.extname(file.originalname).toLowerCase() || ".jpg");
     cb(null, `${randomUUID()}${ext}`);
   },
 });

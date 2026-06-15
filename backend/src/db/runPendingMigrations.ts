@@ -165,11 +165,65 @@ function isIdempotentMigrationError(error: any): boolean {
   );
 }
 
-function splitSqlStatements(sql: string): string[] {
-  return sql
-    .split(/;\s*(?:\r?\n|$)/)
-    .map((statement) => statement.trim())
-    .filter((statement) => statement.length > 0 && !statement.startsWith("--"));
+export function splitSqlStatements(sql: string): string[] {
+  const statements: string[] = [];
+  let current = "";
+  let i = 0;
+
+  while (i < sql.length) {
+    const ch = sql[i];
+
+    if (ch === "-" && sql[i + 1] === "-") {
+      while (i < sql.length && sql[i] !== "\n") i++;
+      continue;
+    }
+
+    if (ch === "/" && sql[i + 1] === "*") {
+      i += 2;
+      while (i < sql.length && !(sql[i] === "*" && sql[i + 1] === "/")) i++;
+      i += 2;
+      continue;
+    }
+
+    if (ch === "'" || ch === '"' || ch === "`") {
+      const quote = ch;
+      current += ch;
+      i++;
+      while (i < sql.length) {
+        const quoted = sql[i];
+        if (quoted === "\\" && quote !== "`") {
+          current += quoted + (sql[i + 1] ?? "");
+          i += 2;
+          continue;
+        }
+        current += quoted;
+        i++;
+        if (quoted !== quote) continue;
+        if (sql[i] === quote) {
+          current += sql[i];
+          i++;
+          continue;
+        }
+        break;
+      }
+      continue;
+    }
+
+    if (ch === ";") {
+      const statement = current.trim();
+      if (statement) statements.push(statement);
+      current = "";
+      i++;
+      continue;
+    }
+
+    current += ch;
+    i++;
+  }
+
+  const trailing = current.trim();
+  if (trailing) statements.push(trailing);
+  return statements;
 }
 
 export async function runPendingMigrations(): Promise<MigrationHealth> {
