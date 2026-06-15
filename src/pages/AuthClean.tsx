@@ -86,13 +86,13 @@ export default function AuthClean() {
 
         {/* Logo */}
         <div className="relative z-10">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/95 p-1.5 shadow-lg">
-              <img src={companyLogo} alt="MAS Callnet" className="h-full w-full object-contain" />
+          <div className="flex items-center gap-5">
+            <div className="flex h-60 w-60 shrink-0 items-center justify-center rounded-2xl bg-white/95 p-3 shadow-2xl shadow-[#1B6AB5]/30 ring-4 ring-[#1B6AB5]/40">
+              <img src={companyLogo} alt="Mas Call Net" className="h-full w-full object-contain drop-shadow-lg" />
             </div>
             <div>
-              <p className="text-lg font-black text-white">MAS Callnet</p>
-              <p className="text-xs font-bold" style={{ color: "#5aa0dd" }}>HRMS Platform</p>
+              <p className="text-2xl font-black text-white leading-tight">Mas Call Net</p>
+              <p className="text-sm font-bold mt-1" style={{ color: "#5aa0dd" }}>HRMS Platform</p>
             </div>
           </div>
         </div>
@@ -144,7 +144,7 @@ export default function AuthClean() {
         {/* Bottom tagline */}
         <div className="relative z-10">
           <p className="text-xs text-slate-500">
-            © 2025 MAS Callnet · Secure · Reliable · Enterprise-Grade
+            © 2025 Mas Call Net · Secure · Reliable · Enterprise-Grade
           </p>
         </div>
       </div>
@@ -157,7 +157,7 @@ export default function AuthClean() {
             <img src={companyLogo} alt="MAS Callnet" className="h-full w-full object-contain" />
           </div>
           <div>
-            <p className="font-black text-slate-950">MAS Callnet HRMS</p>
+            <p className="font-black text-slate-950">Mas Call Net HRMS</p>
             <p className="text-xs font-semibold text-slate-400">Employee Portal</p>
           </div>
         </div>
@@ -166,7 +166,7 @@ export default function AuthClean() {
           {/* Card */}
           <div className="overflow-hidden rounded-3xl border border-white bg-white shadow-2xl shadow-slate-200/80">
             {/* Top accent strip — 3 MAS colors */}
-            <div className="flex h-1.5">
+            <div className="flex h-3">
               <div className="flex-1" style={{ background: "#1B6AB5" }} />
               <div className="flex-1" style={{ background: "#3BAD49" }} />
               <div className="flex-1" style={{ background: "#E8231A" }} />
@@ -307,7 +307,7 @@ export default function AuthClean() {
           </div>
 
           <p className="mt-6 text-center text-xs text-slate-400">
-            MAS Callnet HRMS · All rights reserved
+            Mas Call Net HRMS · All rights reserved
           </p>
         </div>
       </div>
