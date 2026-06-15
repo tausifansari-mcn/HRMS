@@ -12,6 +12,7 @@ import { wfmRouter } from "./modules/wfm/wfm.routes.js";
 import { rosterRouter } from "./modules/wfm/roster.routes.js";
 import { leaveRouter } from "./modules/leave/leave.routes.js";
 import { payrollRouter } from "./modules/payroll/payroll.routes.js";
+import { payrollExtendedRouter } from "./modules/payroll/payroll-extended.routes.js";
 import { employeeRouter } from "./modules/employees/employee.routes.js";
 import { employeePhotoCompatRouter } from "./modules/employees/employee.photo.compat.routes.js";
 import { rmChangeRouter } from "./modules/employees/rm-change.routes.js";
@@ -146,6 +147,7 @@ app.use("/api/wfm", wfmRouter);
 app.use("/api/wfm/roster", rosterRouter);
 app.use("/api/leave", leaveRouter);
 app.use("/api/payroll", payrollRouter);
+app.use("/api/payroll", payrollExtendedRouter);
 app.use("/api/payroll-compliance", payrollComplianceRouter); // India statutory compliance & registers
 app.use("/api/employees", employeePhotoCompatRouter);
 app.use("/api/employees", employeeRouter);
