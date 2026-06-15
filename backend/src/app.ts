@@ -57,6 +57,7 @@ import { performanceFeedbackRouter } from "./modules/performance-feedback/perfor
 import { engagementRouter } from "./modules/engagement/engagement.routes.js";
 import { communicationRouter } from "./modules/communication/communication.routes.js";
 import { attendanceEngineRouter } from "./modules/wfm/attendance-engine.routes.js";
+import { attendanceDailyScopedRouter } from "./modules/wfm/attendance-daily-scoped.routes.js";
 import { biometricPunchRouter } from "./modules/wfm/biometric-punch.routes.js";
 import { cosecSyncRouter } from "./modules/wfm/cosec-sync.routes.js";
 import { biometricSummaryRouter } from "./modules/wfm/biometric-summary.routes.js";
@@ -123,7 +124,7 @@ app.use(express.json({
   limit: "5mb",
   verify: (req: express.Request & { rawBody?: Buffer }, _res, buf) => {
     req.rawBody = buf;
-  },
+  }
 }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
@@ -201,6 +202,7 @@ app.use("/api/external-db", externalDbRouter);
 app.use("/api/apr", aprRouter);
 app.use("/api/payroll-masters", payrollMastersRouter);
 app.use("/api/incentives", incentivesRouter);
+app.use('/api/wfm/attendance', attendanceDailyScopedRouter);
 app.use('/api/wfm/attendance', attendanceEngineRouter);
 app.use("/api/dialer", dialerRouter);
 app.use("/api/tasks", taskRouter);
