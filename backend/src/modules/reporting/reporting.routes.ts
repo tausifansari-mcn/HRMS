@@ -21,7 +21,11 @@ router.get('/analytics-overview', requireAuth, h(async (req, res) => {
 
 router.get('/leave-balances', requireAuth, h(async (req, res) => {
   const year = Number(req.query.year ?? new Date().getFullYear());
-  const data = await reportingService.leaveBalanceOverview(year, req.authUser!.id);
+  const filters = {
+    branchId:  req.query.branchId  as string | undefined,
+    processId: req.query.processId as string | undefined,
+  };
+  const data = await reportingService.leaveBalanceOverview(year, req.authUser!.id, filters);
   res.json({ success: true, data });
 }));
 

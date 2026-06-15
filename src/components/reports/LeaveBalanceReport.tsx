@@ -20,6 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Download, Calendar, Loader2, Search } from "lucide-react";
 import { useLeaveBalanceReport } from "@/hooks/useLeaveBalanceReport";
+import { useReportMasters } from "@/hooks/useReportMasters";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -33,11 +34,18 @@ const PAGE_SIZE = 50;
 
 export function LeaveBalanceReport() {
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
+  const [selectedBranch, setSelectedBranch] = useState<string>("all");
+  const [selectedProcess, setSelectedProcess] = useState<string>("all");
   const [isExporting, setIsExporting] = useState(false);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { data: report, isLoading } = useLeaveBalanceReport(parseInt(selectedYear));
+  const { data: masters } = useReportMasters();
+  const { data: report, isLoading } = useLeaveBalanceReport(
+    parseInt(selectedYear),
+    selectedBranch !== "all" ? selectedBranch : undefined,
+    selectedProcess !== "all" ? selectedProcess : undefined,
+  );
 
   const filteredRecords = useMemo(() => {
     if (!report) return [];
@@ -151,8 +159,8 @@ export function LeaveBalanceReport() {
             </CardTitle>
             <CardDescription>Employee leave balances by type</CardDescription>
           </div>
-          <div className="flex items-center gap-2">
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={selectedYear} onValueChange={(v) => { setSelectedYear(v); setCurrentPage(1); }}>
               <SelectTrigger className="w-[100px]">
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
@@ -164,6 +172,32 @@ export function LeaveBalanceReport() {
                 ))}
               </SelectContent>
             </Select>
+            {masters && masters.branches.length > 0 && (
+              <Select value={selectedBranch} onValueChange={(v) => { setSelectedBranch(v); setCurrentPage(1); }}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="All Branches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Branches</SelectItem>
+                  {masters.branches.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>{b.branch_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {masters && masters.processes.length > 0 && (
+              <Select value={selectedProcess} onValueChange={(v) => { setSelectedProcess(v); setCurrentPage(1); }}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="All Processes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Processes</SelectItem>
+                  {masters.processes.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.process_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button onClick={exportToPDF} disabled={isExporting || !report?.records.length}>
               {isExporting ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -29,14 +29,19 @@ export interface PayrollSummary {
   records: PayrollSummaryRecord[];
 }
 
-export function usePayrollSummary(month: number, year: number) {
+export function usePayrollSummary(month: number, year: number, branchId?: string, processId?: string) {
   const runMonth = `${year}-${String(month).padStart(2, '0')}`;
   return useQuery({
-    queryKey: ["payroll-summary", month, year],
+    queryKey: ["payroll-summary", month, year, branchId, processId],
     queryFn: async (): Promise<PayrollSummary> => {
       // Step 1: fetch runs for this month to get run IDs
+      const runFilters = [
+        `runMonth=${runMonth}`,
+        branchId  ? `branchId=${branchId}`   : "",
+        processId ? `processId=${processId}` : "",
+      ].filter(Boolean).join("&");
       const runsResult = await hrmsApi.get<{ success: boolean; data: any[] }>(
-        `/api/payroll/runs?runMonth=${runMonth}`
+        `/api/payroll/runs?${runFilters}`
       );
       const runs = runsResult.data ?? [];
       if (!runs.length) {

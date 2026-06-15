@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Download, Clock, AlertTriangle, Timer, Loader2, Search } from "lucide-react";
 import { useAttendanceReportData } from "@/hooks/useAttendanceReport";
+import { useReportMasters } from "@/hooks/useReportMasters";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -63,13 +64,18 @@ export function AttendanceReport() {
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(String(currentDate.getMonth() + 1));
   const [selectedYear, setSelectedYear] = useState(String(currentDate.getFullYear()));
+  const [selectedBranch, setSelectedBranch] = useState<string>("all");
+  const [selectedProcess, setSelectedProcess] = useState<string>("all");
   const [isExporting, setIsExporting] = useState(false);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
+  const { data: masters } = useReportMasters();
   const { data: summary, isLoading } = useAttendanceReportData(
     parseInt(selectedMonth),
-    parseInt(selectedYear)
+    parseInt(selectedYear),
+    selectedBranch !== "all" ? selectedBranch : undefined,
+    selectedProcess !== "all" ? selectedProcess : undefined,
   );
 
   const filteredRecords = useMemo(() => {
@@ -184,8 +190,8 @@ export function AttendanceReport() {
             </CardTitle>
             <CardDescription>Late arrivals and overtime tracking</CardDescription>
           </div>
-          <div className="flex items-center gap-2">
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={selectedMonth} onValueChange={(v) => { setSelectedMonth(v); setCurrentPage(1); }}>
               <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="Month" />
               </SelectTrigger>
@@ -197,7 +203,7 @@ export function AttendanceReport() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
+            <Select value={selectedYear} onValueChange={(v) => { setSelectedYear(v); setCurrentPage(1); }}>
               <SelectTrigger className="w-[100px]">
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
@@ -209,6 +215,32 @@ export function AttendanceReport() {
                 ))}
               </SelectContent>
             </Select>
+            {masters && masters.branches.length > 0 && (
+              <Select value={selectedBranch} onValueChange={(v) => { setSelectedBranch(v); setCurrentPage(1); }}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="All Branches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Branches</SelectItem>
+                  {masters.branches.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>{b.branch_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {masters && masters.processes.length > 0 && (
+              <Select value={selectedProcess} onValueChange={(v) => { setSelectedProcess(v); setCurrentPage(1); }}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="All Processes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Processes</SelectItem>
+                  {masters.processes.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.process_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button onClick={exportToPDF} disabled={isExporting || !summary?.records.length}>
               {isExporting ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

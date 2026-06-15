@@ -19,12 +19,17 @@ export interface LeaveBalanceReport {
   records: LeaveBalanceRecord[];
 }
 
-export function useLeaveBalanceReport(year: number) {
+export function useLeaveBalanceReport(year: number, branchId?: string, processId?: string) {
   return useQuery({
-    queryKey: ["leave-balance-report", year],
+    queryKey: ["leave-balance-report", year, branchId, processId],
     queryFn: async (): Promise<LeaveBalanceReport> => {
+      const params = [
+        `year=${year}`,
+        branchId  ? `branchId=${branchId}`   : "",
+        processId ? `processId=${processId}` : "",
+      ].filter(Boolean).join("&");
       const response = await hrmsApi.get<{ success: boolean; data: LeaveBalanceReport }>(
-        `/api/reports/leave-balances?year=${year}`
+        `/api/reports/leave-balances?${params}`
       );
       return response.data;
     },

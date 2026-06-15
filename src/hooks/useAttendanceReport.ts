@@ -25,21 +25,27 @@ interface AttendanceReportSummary {
   avgLateMinutes: number;
 }
 
-export function useAttendanceReportData(month: number, year: number) {
+export function useAttendanceReportData(month: number, year: number, branchId?: string, processId?: string) {
   const startDate = startOfMonth(new Date(year, month - 1));
   const endDate = endOfMonth(startDate);
   const start = format(startDate, "yyyy-MM-dd");
   const end = format(endDate, "yyyy-MM-dd");
 
   return useQuery({
-    queryKey: ["attendance-report-data", month, year],
+    queryKey: ["attendance-report-data", month, year, branchId, processId],
     queryFn: async (): Promise<AttendanceReportSummary> => {
       // Fetch all active employees from employee master (paginate if large)
       let empPage = 1;
       const allEmployees: any[] = [];
+      const empFilters = [
+        "recordStatus=active",
+        `limit=500`,
+        branchId  ? `branchId=${branchId}`   : "",
+        processId ? `processId=${processId}` : "",
+      ].filter(Boolean).join("&");
       while (true) {
         const empRes = await hrmsApi.get<{ success: boolean; data: any[]; total: number }>(
-          `/api/employees?recordStatus=active&limit=500&page=${empPage}`
+          `/api/employees?${empFilters}&page=${empPage}`
         );
         const batch = empRes.data ?? [];
         allEmployees.push(...batch);
@@ -51,9 +57,16 @@ export function useAttendanceReportData(month: number, year: number) {
       // Fetch all attendance pages — backend caps at 200 per page
       let page = 1;
       const allSessions: any[] = [];
+      const attFilters = [
+        `fromDate=${start}`,
+        `toDate=${end}`,
+        `limit=200`,
+        branchId  ? `branchId=${branchId}`   : "",
+        processId ? `processId=${processId}` : "",
+      ].filter(Boolean).join("&");
       while (true) {
         const res = await hrmsApi.get<{ success: boolean; data: any[]; total: number; limit: number }>(
-          `/api/wfm/attendance/daily?fromDate=${start}&toDate=${end}&limit=200&page=${page}`
+          `/api/wfm/attendance/daily?${attFilters}&page=${page}`
         );
         const batch = res.data ?? [];
         allSessions.push(...batch);
