@@ -52,7 +52,7 @@ async function getEmployeeContext(id: string) {
        LEFT JOIN department_master dept ON dept.id = e.department_id
        LEFT JOIN branch_master b ON b.id = e.branch_id
        LEFT JOIN process_master p ON p.id = e.process_id
-       LEFT JOIN employees m ON m.id = e.reporting_manager_id
+       LEFT JOIN employees m ON m.id = COALESCE(e.reporting_manager_id, e.manager_id)
       WHERE e.id = ? LIMIT 1`,
     [id]
   );
@@ -172,8 +172,9 @@ export const employeeService = {
     if (search)    {
       const term = `%${search}%`;
       conds.push(`(
-        CONCAT(e.first_name,' ',COALESCE(e.last_name,'')) LIKE ?
-        OR e.first_name LIKE ?
+        COALESCE(e.full_name, '') LIKE ?
+        OR CONCAT(COALESCE(e.first_name,''),' ',COALESCE(e.last_name,'')) LIKE ?
+        OR COALESCE(e.first_name, '') LIKE ?
         OR COALESCE(e.last_name, '') LIKE ?
         OR e.employee_code LIKE ?
         OR COALESCE(e.biometric_code, '') LIKE ?
@@ -191,7 +192,7 @@ export const employeeService = {
         OR CAST(COALESCE(e.legacy_emp_id, e.legacy_id, '') AS CHAR) LIKE ?
         OR COALESCE(eu.uan, '') LIKE ?
       )`);
-      params.push(term, term, term, term, term, term, term, term, term, term, term, term, term, term, term, term, term, term);
+      params.push(term, term, term, term, term, term, term, term, term, term, term, term, term, term, term, term, term, term, term);
     }
 
     if (scopeFilter) {
@@ -215,7 +216,7 @@ export const employeeService = {
        LEFT JOIN branch_master      b     ON b.id     = e.branch_id      AND b.active_status     = 1
        LEFT JOIN process_master     p     ON p.id     = e.process_id     AND p.active_status     = 1
        LEFT JOIN cost_centre_master cc    ON cc.id    = e.cost_centre_id
-       LEFT JOIN employees          m     ON m.id     = e.reporting_manager_id
+       LEFT JOIN employees          m     ON m.id     = COALESCE(e.reporting_manager_id, e.manager_id)
        LEFT JOIN employee_uan       eu    ON eu.employee_id = e.id AND eu.is_active = 1`;
 
     const [rows] = await db.execute<RowDataPacket[]>(
