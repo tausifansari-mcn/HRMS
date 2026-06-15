@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -6,9 +6,6 @@ import {
   Award,
   CalendarDays,
   FileText,
-  Eye,
-  EyeOff,
-  IndianRupee,
   LogOut,
   Package,
   Search,
@@ -27,8 +24,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { EmployeeJourneyTimeline } from "@/components/employees/EmployeeJourneyTimeline";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,11 +45,7 @@ interface Employee {
   call_centre_code: string | null;
   process_name: string | null;
   dept_name: string | null;
-  cost_centre_name: string | null;
-  reporting_manager_name: string | null;
   days_employed: number;
-  avatar_url?: string | null;
-  photo_url?: string | null;
 }
 
 interface LeaveBalance {
@@ -81,16 +72,10 @@ interface GamificationTier {
 }
 
 interface JourneyEvent {
-  id?: string;
   event_type: string;
   event_date: string;
   description: string | null;
   module: string | null;
-  old_value?: string | null;
-  new_value?: string | null;
-  actor_name?: string | null;
-  status?: string | null;
-  source?: string | null;
 }
 
 interface StatCardData {
@@ -102,15 +87,6 @@ interface StatCardData {
   pending_docs: number;
   gamification_tier: GamificationTier | null;
   journey: JourneyEvent[];
-  salary: {
-    structure_name: string;
-    ctc_annual: number;
-    monthly_ctc: number;
-    basic: number;
-    hra: number;
-    other_allowances: number;
-    effective_from: string;
-  } | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -173,8 +149,21 @@ export default function NativeEmployeeStatCard() {
   const { isAdminOrHR } = useIsAdminOrHR();
 
   const [searchInput, setSearchInput] = useState("");
+  const [searchResults, setSearchResults] = useState<Array<{id: string; name: string; code: string}>>([]);
+  const [showResults, setShowResults] = useState(false);
   const [targetId, setTargetId] = useState<string | null>(urlId ?? null);
-  const [salaryVisible, setSalaryVisible] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowResults(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // If not admin/HR, always load own record via /me first
   const { data: meData } = useQuery({
@@ -193,16 +182,41 @@ export default function NativeEmployeeStatCard() {
 
   const card = data?.data;
 
-  function handleSearch() {
-    const trimmed = searchInput.trim();
-    if (!trimmed) return;
-    setTargetId(trimmed);
-    navigate(`/employee-stat-card/${trimmed}`, { replace: true });
+  // Search employees by name or code
+  async function handleSearchInput(value: string) {
+    setSearchInput(value);
+    if (value.trim().length < 2) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    try {
+      const res = await hrmsApi.get<{ data: Array<{id: string; first_name: string; last_name: string | null; employee_code: string}> }>(
+        `/api/employees?search=${encodeURIComponent(value.trim())}&limit=10`
+      );
+      setSearchResults(res.data.map(emp => ({
+        id: emp.id,
+        name: `${emp.first_name} ${emp.last_name || ''}`.trim(),
+        code: emp.employee_code
+      })));
+      setShowResults(true);
+    } catch (err) {
+      console.error("Search error:", err);
+      setSearchResults([]);
+    }
+  }
+
+  function selectEmployee(id: string) {
+    setTargetId(id);
+    setShowResults(false);
+    setSearchInput("");
+    navigate(`/employee-stat-card/${id}`, { replace: true });
   }
 
   return (
     <DashboardLayout>
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="p-6 space-y-6 max-w-5xl mx-auto">
 
         {/* ── Page header ────────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -211,17 +225,35 @@ export default function NativeEmployeeStatCard() {
             <p className="text-sm text-slate-500 mt-0.5">Full profile, stats and timeline for any employee</p>
           </div>
           {isAdminOrHR && (
-            <div className="flex gap-2 items-center">
-              <Input
-                placeholder="Employee ID..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                className="w-52"
-              />
-              <Button onClick={handleSearch} size="sm" className="shrink-0">
-                <Search className="h-4 w-4 mr-1.5" /> Load
-              </Button>
+            <div className="relative flex gap-2 items-center">
+              <div ref={searchRef} className="relative w-64">
+                <Input
+                  placeholder="Search by name or employee code..."
+                  value={searchInput}
+                  onChange={(e) => handleSearchInput(e.target.value)}
+                  onFocus={() => searchResults.length > 0 && setShowResults(true)}
+                  className="pr-9"
+                />
+                <Search className="absolute right-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
+
+                {/* Dropdown results */}
+                {showResults && searchResults.length > 0 && (
+                  <Card className="absolute top-full left-0 right-0 mt-1 z-50 max-h-72 overflow-y-auto shadow-lg">
+                    <CardContent className="p-0">
+                      {searchResults.map((emp) => (
+                        <button
+                          key={emp.id}
+                          onClick={() => selectEmployee(emp.id)}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0"
+                        >
+                          <div className="font-medium text-sm text-slate-900">{emp.name}</div>
+                          <div className="text-xs text-slate-500">{emp.code}</div>
+                        </button>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -260,25 +292,19 @@ export default function NativeEmployeeStatCard() {
         {card && (
           <>
             {/* ── Identity header ───────────────────────────────────────────── */}
-            <Card className="overflow-hidden border-0 bg-[#073f78] text-white shadow-lg">
-              <CardContent className="p-7">
-                <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-7">
+            <Card className="overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
                   {/* Avatar */}
-                  <Avatar className="size-36 shrink-0 border-4 border-white shadow-xl ring-2 ring-green-300">
-                    <AvatarImage
-                      src={card.employee.avatar_url || card.employee.photo_url || undefined}
-                      alt={`${card.employee.full_name} profile photo`}
-                    />
-                    <AvatarFallback className="bg-[#1B6AB5] text-3xl font-black text-white">
-                      {card.employee.first_name?.[0]?.toUpperCase() ?? "?"}
-                      {card.employee.last_name?.[0]?.toUpperCase() ?? ""}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="shrink-0 flex h-20 w-20 items-center justify-center rounded-full bg-blue-600 text-white text-2xl font-bold shadow-lg">
+                    {card.employee.first_name?.[0]?.toUpperCase() ?? "?"}
+                    {card.employee.last_name?.[0]?.toUpperCase() ?? ""}
+                  </div>
 
                   {/* Details */}
-                  <div className="min-w-0 flex-1 space-y-3">
+                  <div className="flex-1 min-w-0 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-balance text-3xl font-black text-white">{card.employee.full_name}</h2>
+                      <h2 className="text-xl font-bold text-slate-900 truncate">{card.employee.full_name}</h2>
                       <Badge
                         className={cn(
                           "text-xs font-semibold",
@@ -291,8 +317,8 @@ export default function NativeEmployeeStatCard() {
                       </Badge>
                     </div>
 
-                    <p className="text-base text-blue-100">
-                      <span className="font-bold text-white">{card.employee.employee_code}</span>
+                    <p className="text-sm text-slate-500">
+                      <span className="font-medium text-slate-700">{card.employee.employee_code}</span>
                       {card.employee.designation_name && (
                         <> &bull; {card.employee.designation_name}</>
                       )}
@@ -319,18 +345,13 @@ export default function NativeEmployeeStatCard() {
                           {card.employee.dept_name}
                         </Badge>
                       )}
-                      {card.employee.cost_centre_name && (
-                        <Badge variant="secondary" className="text-xs">
-                          {card.employee.cost_centre_name}
-                        </Badge>
-                      )}
                     </div>
 
-                    <div className="mt-2 flex items-center gap-1.5 text-sm text-blue-100">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
                       <CalendarDays className="h-3.5 w-3.5" />
                       <span>
                         Joined {fmtDate(card.employee.date_of_joining)} &bull;{" "}
-                        <span className="font-bold text-white">
+                        <span className="font-medium text-slate-700">
                           {calcTenure(card.employee.date_of_joining)}
                         </span>{" "}
                         tenure
@@ -338,60 +359,6 @@ export default function NativeEmployeeStatCard() {
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-blue-100 bg-gradient-to-br from-white to-blue-50/60">
-              <CardHeader className="flex flex-row items-center justify-between gap-4">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <IndianRupee className="h-5 w-5 text-[#1B6AB5]" />
-                    Salary Components
-                  </CardTitle>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Confidential compensation data is hidden by default.
-                  </p>
-                </div>
-                {card.salary && (
-                  <Button variant="outline" size="sm" onClick={() => setSalaryVisible((visible) => !visible)}>
-                    {salaryVisible ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
-                    {salaryVisible ? "Hide salary" : "View salary"}
-                  </Button>
-                )}
-              </CardHeader>
-              <CardContent>
-                {!card.salary ? (
-                  <p className="text-sm text-slate-500">No active salary assignment is available.</p>
-                ) : !salaryVisible ? (
-                  <div className="grid gap-3 sm:grid-cols-4">
-                    {["Annual CTC", "Monthly CTC", "Basic", "Allowances"].map((label) => (
-                      <div key={label} className="rounded-xl border bg-white p-4">
-                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
-                        <p className="mt-2 select-none text-xl font-black tracking-[0.2em] text-slate-300 blur-sm">₹00,000</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                    {[
-                      ["Annual CTC", card.salary.ctc_annual],
-                      ["Monthly CTC", card.salary.monthly_ctc],
-                      ["Basic", card.salary.basic],
-                      ["HRA", card.salary.hra],
-                      ["Other Allowances", card.salary.other_allowances],
-                    ].map(([label, value]) => (
-                      <div key={String(label)} className="rounded-xl border bg-white p-4">
-                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
-                        <p className="mt-2 text-lg font-black text-slate-900">
-                          ₹{Number(value).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                        </p>
-                      </div>
-                    ))}
-                    <div className="sm:col-span-2 lg:col-span-5 text-xs text-slate-500">
-                      Structure: <b>{card.salary.structure_name}</b> · Effective {fmtDate(card.salary.effective_from)}
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
@@ -530,10 +497,52 @@ export default function NativeEmployeeStatCard() {
             </div>
 
             {/* ── Journey Timeline ──────────────────────────────────────────── */}
-            <EmployeeJourneyTimeline
-              employeeName={card.employee.full_name}
-              events={card.journey}
-            />
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base font-semibold text-slate-800">Employee Journey</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {card.journey.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-6">No journey events recorded yet.</p>
+                ) : (
+                  <ol className="relative border-l-2 border-slate-100 ml-4 space-y-6">
+                    {card.journey.map((evt, idx) => {
+                      const cfg = journeyConfig(evt.event_type);
+                      return (
+                        <li key={idx} className="ml-6">
+                          {/* Icon bullet */}
+                          <span
+                            className={cn(
+                              "absolute -left-4 flex h-8 w-8 items-center justify-center rounded-full ring-4 ring-white",
+                              cfg.colour
+                            )}
+                          >
+                            {cfg.icon}
+                          </span>
+
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-semibold text-slate-800 capitalize">
+                                {cfg.label !== "Event" ? cfg.label : (evt.event_type ?? "Event")}
+                              </span>
+                              {evt.module && (
+                                <Badge variant="outline" className="text-[10px] py-0">
+                                  {evt.module}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400">{fmtDate(evt.event_date)}</p>
+                            {evt.description && (
+                              <p className="text-sm text-slate-600 mt-0.5">{evt.description}</p>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
+              </CardContent>
+            </Card>
           </>
         )}
       </div>

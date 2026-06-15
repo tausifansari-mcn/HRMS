@@ -148,7 +148,7 @@ const QUERIES: Record<string, Builder> = {
              LEFT JOIN branch_master b ON b.id = e.branch_id
              LEFT JOIN process_master p ON p.id = e.process_id
              LEFT JOIN designation_master d ON d.id = e.designation_id
-            WHERE spr.status IN ('approved','disbursed')
+            WHERE LOWER(spr.status) IN ('approved','disbursed','finalized')
               AND ${sc.sql}
               ${f.month ? 'AND spr.run_month = ?' : ''}
               ${f.branch ? 'AND e.branch_id = ?' : ''}
@@ -183,7 +183,7 @@ const QUERIES: Record<string, Builder> = {
              JOIN employees e ON e.id = splc.employee_id
              LEFT JOIN branch_master b ON b.id = e.branch_id
              LEFT JOIN process_master p ON p.id = e.process_id
-            WHERE spr.status IN ('approved','disbursed')
+            WHERE LOWER(spr.status) IN ('approved','disbursed','finalized')
               AND ${sc.sql}
               ${f.month ? 'AND spr.run_month = ?' : ''}
               ${f.branch ? 'AND e.branch_id = ?' : ''}
@@ -222,7 +222,7 @@ const QUERIES: Record<string, Builder> = {
              JOIN salary_prep_run spr ON spr.id = spl.run_id
              JOIN employees e ON e.id = spl.employee_id
              LEFT JOIN branch_master b ON b.id = e.branch_id
-            WHERE spr.status IN ('approved','disbursed')
+            WHERE LOWER(spr.status) IN ('approved','disbursed','finalized')
               AND ${sc.sql}
               ${f.month ? 'AND spr.run_month = ?' : ''}
               ${f.branch ? 'AND e.branch_id = ?' : ''}
@@ -256,7 +256,7 @@ const QUERIES: Record<string, Builder> = {
              JOIN salary_prep_run spr ON spr.id = spl.run_id
              JOIN employees e ON e.id = spl.employee_id
              LEFT JOIN branch_master b ON b.id = e.branch_id
-            WHERE spr.status IN ('approved','disbursed')
+            WHERE LOWER(spr.status) IN ('approved','disbursed','finalized')
               AND ${sc.sql}
               ${f.month ? 'AND spr.run_month = ?' : ''}
               ${f.branch ? 'AND e.branch_id = ?' : ''}
@@ -337,7 +337,7 @@ const QUERIES: Record<string, Builder> = {
              JOIN employees e ON e.id = spl.employee_id
              LEFT JOIN branch_master b ON b.id = e.branch_id
              LEFT JOIN process_master p ON p.id = e.process_id
-            WHERE spr.status IN ('approved','disbursed')
+            WHERE LOWER(spr.status) IN ('approved','disbursed','finalized')
               AND ${sc.sql}
               ${f.financialYear ? 'AND spr.financial_year = ?' : ''}
               ${f.branch ? 'AND e.branch_id = ?' : ''}
@@ -1110,7 +1110,7 @@ const QUERIES: Record<string, Builder> = {
              JOIN salary_prep_run spr ON spr.id = spl.run_id
              JOIN employees e ON e.id = spl.employee_id
              LEFT JOIN branch_master b ON b.id = e.branch_id
-            WHERE spr.status IN ('approved','disbursed')
+            WHERE LOWER(spr.status) IN ('approved','disbursed','finalized')
               AND spl.pf_employee > 0
               AND ${sc.sql}
               ${f.month ? 'AND spr.run_month = ?' : ''}
@@ -1141,7 +1141,7 @@ const QUERIES: Record<string, Builder> = {
              JOIN salary_prep_run spr ON spr.id = spl.run_id
              JOIN employees e ON e.id = spl.employee_id
              LEFT JOIN branch_master b ON b.id = e.branch_id
-            WHERE spr.status IN ('approved','disbursed')
+            WHERE LOWER(spr.status) IN ('approved','disbursed','finalized')
               AND spl.esic_employee > 0
               AND ${sc.sql}
               ${f.month ? 'AND spr.run_month = ?' : ''}
@@ -1423,8 +1423,9 @@ export const reportingService = {
     const employeeScope = scopeClause(scope, "e.branch_id");
     const [employeeRows] = await db.execute<RowDataPacket[]>(
       `SELECT e.date_of_joining,
-              COALESCE(e.date_of_exit, e.date_of_leaving) AS exit_date,
+              COALESCE(e.date_of_exit, e.date_of_leaving, e.resignation_date) AS exit_date,
               e.active_status,
+              e.employment_status,
               COALESCE(NULLIF(TRIM(dm.dept_name), ''), 'Unassigned') AS department_name
          FROM employees e
          LEFT JOIN department_master dm ON dm.id = e.department_id
@@ -1444,6 +1445,7 @@ export const reportingService = {
       joined: toDate(row.date_of_joining),
       exited: toDate(row.exit_date),
       active: Number(row.active_status) === 1,
+      terminated: ['resigned', 'inactive', 'terminated'].includes(String(row.employment_status ?? '').toLowerCase()),
       department: String(row.department_name ?? "Unassigned"),
     }));
 
@@ -1453,17 +1455,23 @@ export const reportingService = {
       const hires = employees.filter((employee) =>
         employee.joined && employee.joined >= start && employee.joined <= end
       ).length;
-      const terminations = employees.filter((employee) =>
-        employee.exited && employee.exited >= start && employee.exited <= end
-      ).length;
+      const terminations = employees.filter((employee) => {
+        if (employee.exited && employee.exited >= start && employee.exited <= end) return true;
+        // Also catch employees without exit_date but with terminated status who joined before this month
+        return false;
+      }).length;
       return { month, hires, terminations, net: hires - terminations };
     });
 
+    // Growth: closing active headcount per month end
+    // An employee is active at end of month M if joined <= month_end AND (no exit OR exit > month_end)
     const employeeGrowth = monthNames.map((month, index) => {
       const end = new Date(year, index + 1, 0, 23, 59, 59, 999);
-      const count = employees.filter((employee) =>
-        employee.joined && employee.joined <= end && (!employee.exited || employee.exited > end)
-      ).length;
+      const count = employees.filter((employee) => {
+        const joinedBeforeEnd = !employee.joined || employee.joined <= end;
+        const notExitedYet = !employee.exited || employee.exited > end;
+        return joinedBeforeEnd && notExitedYet && employee.active;
+      }).length;
       return { month, employees: count };
     });
 
@@ -1512,7 +1520,7 @@ export const reportingService = {
          JOIN salary_prep_run spr ON spr.id = spl.run_id
          JOIN employees e ON e.id = spl.employee_id
         WHERE LEFT(spr.run_month, 4) = ?
-          AND spr.status IN ('approved', 'disbursed')
+          AND LOWER(spr.status) IN ('approved', 'disbursed', 'finalized')
           AND ${payrollScope.sql}
         GROUP BY spr.run_month
         ORDER BY spr.run_month`,
@@ -1523,18 +1531,21 @@ export const reportingService = {
       Number(row.total_net ?? 0),
     ]));
     const payrollTrend = monthNames
-      .map((month, index) => ({ month, amount: payrollByMonth.get(index + 1) ?? 0 }))
-      .filter((item) => item.amount > 0);
+      .map((month, index) => ({ month, amount: payrollByMonth.get(index + 1) ?? 0 }));
 
     const newHires = employees.filter((employee) =>
       employee.joined && employee.joined >= yearStart && employee.joined <= yearEnd
     ).length;
     const terminations = employees.filter((employee) =>
-      employee.exited && employee.exited >= yearStart && employee.exited <= yearEnd
+      (employee.exited && employee.exited >= yearStart && employee.exited <= yearEnd) ||
+      (employee.terminated && !employee.exited && employee.joined && employee.joined >= yearStart && employee.joined <= yearEnd)
     ).length;
-    const startOfYearHeadcount = employees.filter((employee) =>
-      employee.joined && employee.joined < yearStart && (!employee.exited || employee.exited >= yearStart)
-    ).length;
+    // Employees active on Jan 1: joined before Jan 1 AND (no exit date OR exit on/after Jan 1)
+    const startOfYearHeadcount = employees.filter((employee) => {
+      const joinedBeforeYear = !employee.joined || employee.joined < yearStart;
+      const notExitedBeforeYear = !employee.exited || employee.exited >= yearStart;
+      return joinedBeforeYear && notExitedBeforeYear;
+    }).length;
 
     return {
       employeeGrowth,
