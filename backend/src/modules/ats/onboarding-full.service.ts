@@ -543,3 +543,15 @@ export async function reviewFullOnboarding(candidateId: string, input: { status:
   await logCandidateAction(candidateId, "HR_REVIEW", input, { actorType: "hr", actorId: reviewedBy });
   return getFullOnboardingByCandidate(candidateId);
 }
+
+export async function saveProgress(token: string, stepIdx: number) {
+  const tokenData = await validateOnboardingToken(token);
+  const candidateId = tokenData.candidate_id as string;
+  const idx = Math.max(0, Math.min(10, Math.floor(stepIdx)));
+  await db.execute(
+    `UPDATE candidate_onboarding_profile SET current_step_idx = ?, updated_at = NOW() WHERE candidate_id = ?`,
+    [idx, candidateId]
+  );
+  return { candidateId, currentStepIdx: idx };
+}
+

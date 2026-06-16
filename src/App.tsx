@@ -47,6 +47,7 @@ const ModuleLauncher = lazy(() => import("./pages/ModuleLauncher"));
 
 const CandidateOnboardingPage = lazy(() => import("./pages/CandidateOnboardingPage"));
 const CandidateOnboardingFullPage = lazy(() => import("./pages/CandidateOnboardingFullPage"));
+const CandidateOnboardingV2 = lazy(() => import("./pages/CandidateOnboardingV2"));
 const NativeHROnboardingRequests = lazy(() => import("./pages/NativeHROnboardingRequests"));
 const NativeBranchHeadApproval = lazy(() => import("./pages/NativeBranchHeadApproval"));
 const NativeBGVVerificationCenter = lazy(() => import("./pages/NativeBGVVerificationCenter"));
@@ -243,7 +244,8 @@ const App = () => (
               <Route path="/ats/command-center" element={<ProtectedRoute><Gate pageCode="ATS_DASHBOARD"><NativeATSFullParityCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/ats/onboarding-requests" element={<ProtectedRoute><Gate pageCode="ATS_ONBOARDING_BRIDGE"><NativeHROnboardingRequests /></Gate></ProtectedRoute>} />
               <Route path="/ats/offer-approvals" element={<ProtectedRoute><Gate pageCode="ATS_OFFER"><NativeBranchHeadApproval /></Gate></ProtectedRoute>} />
-              <Route path="/onboard-full" element={<CandidateOnboardingFullPage />} />
+              <Route path="/onboard-full" element={<CandidateOnboardingV2 />} />
+              <Route path="/onboard-full-legacy" element={<CandidateOnboardingFullPage />} />
               <Route path="/ats/bgv" element={<ProtectedRoute><Gate pageCode="ATS_BGV"><NativeBGVVerificationCenter /></Gate></ProtectedRoute>} />
               <Route path="/ats/recruiter-portal" element={<ProtectedRoute><Gate pageCode="ATS_RECRUITER_PORTAL"><NativeRecruiterPortal /></Gate></ProtectedRoute>} />
               <Route path="/ats/payroll-hr-validation" element={<ProtectedRoute><Gate pageCode="ATS_PAYROLL_HR"><NativePayrollHRValidation /></Gate></ProtectedRoute>} />

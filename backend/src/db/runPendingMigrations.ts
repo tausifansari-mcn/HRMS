@@ -126,6 +126,7 @@ const MIGRATION_MANIFEST: string[] = [
   "199_process_branch_dept_cleanup.sql",
   "200_onboarding_empcode_bgv_gaps.sql",
   "201_bgv_portal_initiation.sql",
+  "202_onboarding_v2_court_check.sql",
 ];
 
 export type MigrationHealth = {

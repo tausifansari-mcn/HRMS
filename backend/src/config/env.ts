@@ -93,6 +93,8 @@ const envSchema = z.object({
   DIGIO_CLIENT_SECRET: z.string().optional(),
   DIGIO_WEBHOOK_SECRET: z.string().optional(),
   ATS_FORM_API_KEY: z.string().optional(),
+  COURT_CHECK_API_URL: z.string().url().default("https://api.infinityai.in"),
+  COURT_CHECK_API_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

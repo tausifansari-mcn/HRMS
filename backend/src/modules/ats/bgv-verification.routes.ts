@@ -14,8 +14,11 @@ import {
   saveBgvConsentByToken,
   startDigilockerByToken,
   verifyAadhaarOfflineByToken,
+  verifyAddressDocByToken,
   verifyBankByToken,
   verifyBankForCandidate,
+  verifyCourtByToken,
+  verifyEducationByToken,
   verifyPanByToken,
   verifyPanForCandidate,
   waiveCheck,
@@ -65,6 +68,32 @@ router.post("/verify/aadhaar-offline", h(async (req, res) => {
   const token = String(req.body.token ?? "");
   if (!token) return res.status(400).json({ success: false, message: "token required" });
   return res.json({ success: true, data: await verifyAadhaarOfflineByToken(token, req.body, meta(req)) });
+}));
+
+router.post("/verify/address-doc", h(async (req, res) => {
+  const token = String(req.body.token ?? "");
+  if (!token) return res.status(400).json({ success: false, message: "token required" });
+  if (!req.body.docType || !req.body.documentNumber) return res.status(400).json({ success: false, message: "docType and documentNumber required" });
+  return res.json({ success: true, data: await verifyAddressDocByToken(token, { docType: req.body.docType, documentNumber: req.body.documentNumber }, meta(req)) });
+}));
+
+router.post("/verify/education", h(async (req, res) => {
+  const token = String(req.body.token ?? "");
+  if (!token) return res.status(400).json({ success: false, message: "token required" });
+  if (!req.body.boardType || !req.body.yearOfPassing) return res.status(400).json({ success: false, message: "boardType and yearOfPassing required" });
+  return res.json({ success: true, data: await verifyEducationByToken(token, {
+    boardType: req.body.boardType,
+    rollNumber: req.body.rollNumber,
+    certificateNumber: req.body.certificateNumber,
+    yearOfPassing: Number(req.body.yearOfPassing),
+    institutionName: req.body.institutionName,
+  }, meta(req)) });
+}));
+
+router.post("/verify/court", h(async (req, res) => {
+  const token = String(req.body.token ?? "");
+  if (!token) return res.status(400).json({ success: false, message: "token required" });
+  return res.json({ success: true, data: await verifyCourtByToken(token, meta(req)) });
 }));
 
 router.post("/digilocker/start", h(async (req, res) => {
