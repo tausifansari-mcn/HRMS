@@ -106,6 +106,7 @@ const MIGRATION_MANIFEST: string[] = [
   "179_super_admin_access.sql",
   "180_ats_registration_onboarding_repair.sql",
   "181_careers_super_admin.sql",
+  "181_integration_hub_last_run.sql",
   "182_user_notification_preferences.sql",
   "183_launch_data_repairs.sql",
   "184_master_data_integrity.sql",
