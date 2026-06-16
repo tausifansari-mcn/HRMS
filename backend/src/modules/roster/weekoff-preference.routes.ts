@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { RowDataPacket } from "mysql2";
+import { randomUUID } from "crypto";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 import { db } from "../../db/mysql.js";
 import { getEmployeeForUser, hasProcessScope, hasRole } from "../../shared/accessGuard.js";
@@ -45,16 +46,27 @@ weekoffPreferenceRouter.post("/weekoff-preferences", h(async (req, res) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStartDate)) return res.status(400).json({ success: false, message: "weekStartDate is required in YYYY-MM-DD format" });
   if (!preferred) return res.status(400).json({ success: false, message: "preferredDay1 must be 0-6" });
 
-  await db.execute(
-    `INSERT INTO employee_roster_preference
-       (id, employee_id, preferred_shift_id, preferred_week_off, flexibility, notes, effective_from, status, created_by)
-     VALUES (UUID(), ?, NULL, ?, 'fixed', ?, ?, 'pending', ?)
-     ON DUPLICATE KEY UPDATE
-       preferred_week_off = VALUES(preferred_week_off),
-       notes = VALUES(notes),
-       status = 'pending', approved_by = NULL, approved_at = NULL, rejection_reason = NULL`,
-    [emp.id, preferred, req.body?.reason ?? (alternate ? `Alternate: ${alternate}` : null), weekStartDate, req.authUser!.id],
+  const notes = req.body?.reason ?? (alternate ? `Alternate: ${alternate}` : null);
+  const [existing] = await db.execute<RowDataPacket[]>(
+    `SELECT id FROM employee_roster_preference WHERE employee_id = ? AND effective_from = ? LIMIT 1`,
+    [emp.id, weekStartDate],
   );
+
+  if (existing[0]?.id) {
+    await db.execute(
+      `UPDATE employee_roster_preference
+          SET preferred_week_off = ?, notes = ?, status = 'pending', approved_by = NULL, approved_at = NULL, rejection_reason = NULL
+        WHERE id = ?`,
+      [preferred, notes, existing[0].id],
+    );
+  } else {
+    await db.execute(
+      `INSERT INTO employee_roster_preference
+         (id, employee_id, preferred_shift_id, preferred_week_off, flexibility, notes, effective_from, status, created_by)
+       VALUES (?, ?, NULL, ?, 'fixed', ?, ?, 'pending', ?)`,
+      [randomUUID(), emp.id, preferred, notes, weekStartDate, req.authUser!.id],
+    );
+  }
 
   return res.status(201).json({ success: true, message: "Week-off preference submitted" });
 }));
