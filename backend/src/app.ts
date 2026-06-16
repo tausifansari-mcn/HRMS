@@ -74,6 +74,7 @@ import customizationRouter from "./modules/customization/customization.routes.js
 import { rosterMasterRouter } from "./modules/roster/roster-master.routes.js";
 import rosterCapacityRouter from "./modules/roster/roster-capacity.routes.js";
 import { reportingRouter } from "./modules/reporting/reporting.routes.js";
+import { reportingLeaveBalanceRouter } from "./modules/reporting/reporting.leave-balance.routes.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { authLaunchRouter } from "./modules/auth/auth-launch.routes.js";
 import passwordResetRouter from "./modules/auth/password-reset.routes.js";
@@ -210,6 +211,7 @@ app.use('/api/wfm/biometric-summary', biometricSummaryRouter);
 app.use("/api/customization", customizationRouter);
 app.use("/api/roster-master", rosterMasterRouter);
 app.use("/api/roster-capacity", rosterCapacityRouter);
+app.use('/api/reports', reportingLeaveBalanceRouter);
 app.use('/api/reports', reportingRouter);
 app.use('/api/control-tower', controlTowerRouter);
 app.use("/api/legacy", legacyRouter);
