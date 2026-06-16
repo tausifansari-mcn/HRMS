@@ -88,6 +88,7 @@ const UnifiedPerformanceCommandCenter = lazy(() => import("./pages/UnifiedPerfor
 const UnifiedAccessControl = lazy(() => import("./pages/UnifiedAccessControl"));
 const SuperAdminAccessControl = lazy(() => import("./pages/SuperAdminAccessControl"));
 const NativeManagementDashboard = lazy(() => import("./pages/NativeManagementDashboard"));
+const NativeSecurityCenter = lazy(() => import("./pages/NativeSecurityCenter"));
 
 const NativePerformanceFeedbackMyReports = lazy(() => import("./pages/NativePerformanceFeedbackMyReports"));
 const NativePerformanceFeedbackReportDetail = lazy(() => import("./pages/NativePerformanceFeedbackReportDetail"));
@@ -270,6 +271,7 @@ const App = () => (
               <Route path="/operations/dashboard" element={<ProtectedRoute><Gate pageCode="OPERATIONS_DASHBOARD"><NativePlaceholderPage title="Operations Dashboard" module="Operations" /></Gate></ProtectedRoute>} />
               <Route path="/performance/command-center" element={<ProtectedRoute><Gate pageCode="WORKFORCE_COMMAND_CENTER"><UnifiedPerformanceCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/settings/access-control" element={<ProtectedRoute><Gate pageCode="ACCESS_CONTROL"><UnifiedAccessControl /></Gate></ProtectedRoute>} />
+              <Route path="/security-center" element={<ProtectedRoute roles={['admin', 'ceo', 'hr']}><NativeSecurityCenter /></ProtectedRoute>} />
               <Route path="/super-admin/page-access" element={<ProtectedRoute roles={['admin']}><SuperAdminAccessControl /></ProtectedRoute>} />
               <Route path="/it-provisioning" element={<ProtectedRoute><Gate pageCode="IT_PROVISIONING_TRACKER"><NativeITProvisioningTracker /></Gate></ProtectedRoute>} />
               <Route path="/settings/call-centre-config" element={<ProtectedRoute roles={['admin']}><NativeCallCentreConfig /></ProtectedRoute>} />
