@@ -193,6 +193,10 @@ function normaliseDelimiters(raw: string): string {
  *  - line comments (-- ...)
  *  - block comments (/* ... *\/)
  *  - DELIMITER directives (pre-processed by normaliseDelimiters)
+ *  - BEGIN...END compound statement nesting (stored procedures / functions)
+ *    Semicolons inside a BEGIN...END body are NOT statement terminators.
+ *    END IF / END LOOP / END WHILE / END CASE / END REPEAT do NOT close
+ *    the compound block; only a bare END does.
  *
  * Returns non-empty, trimmed statement strings.
  */
@@ -202,17 +206,21 @@ export function splitSql(raw: string): string[] {
   let current = "";
   let i = 0;
   const len = raw.length;
+  let beginDepth = 0; // tracks BEGIN...END nesting depth
+
+  const isWordChar = (c: string | undefined): boolean =>
+    c !== undefined && /\w/.test(c);
 
   while (i < len) {
     const ch = raw[i];
 
-    // Line comment: consume to end of line
+    // Line comment: consume to end of line (do not add to current)
     if (ch === "-" && raw[i + 1] === "-") {
       while (i < len && raw[i] !== "\n") i++;
       continue;
     }
 
-    // Block comment: consume until */
+    // Block comment: consume until */ (do not add to current)
     if (ch === "/" && raw[i + 1] === "*") {
       i += 2;
       while (i < len) {
@@ -256,11 +264,59 @@ export function splitSql(raw: string): string[] {
       continue;
     }
 
-    // Statement terminator
+    // Keyword detection at a word boundary (not mid-identifier)
+    const prevIsWord = i > 0 && isWordChar(raw[i - 1]);
+    if (!prevIsWord && /[A-Za-z_]/.test(ch)) {
+      // Read the full identifier/keyword
+      let j = i;
+      while (j < len && isWordChar(raw[j])) j++;
+      const word = raw.slice(i, j).toUpperCase();
+
+      if (word === "BEGIN") {
+        beginDepth++;
+        current += raw.slice(i, j);
+        i = j;
+        continue;
+      }
+
+      if (word === "END") {
+        // Peek past whitespace to find the next word
+        let k = j;
+        while (k < len && (raw[k] === " " || raw[k] === "\t" || raw[k] === "\r" || raw[k] === "\n")) k++;
+        let m = k;
+        while (m < len && isWordChar(raw[m])) m++;
+        const followWord = raw.slice(k, m).toUpperCase();
+        // END IF / END LOOP / END WHILE / END CASE / END REPEAT are
+        // control-flow terminators — they do NOT close a BEGIN...END block
+        const isControlEnd =
+          followWord === "IF" ||
+          followWord === "LOOP" ||
+          followWord === "WHILE" ||
+          followWord === "CASE" ||
+          followWord === "REPEAT";
+        if (!isControlEnd && beginDepth > 0) {
+          beginDepth--;
+        }
+        current += raw.slice(i, j);
+        i = j;
+        continue;
+      }
+
+      // Any other identifier: add in full and advance
+      current += raw.slice(i, j);
+      i = j;
+      continue;
+    }
+
+    // Statement terminator: only split when outside a BEGIN...END block
     if (ch === ";") {
-      const stmt = current.trim();
-      if (stmt) statements.push(stmt);
-      current = "";
+      if (beginDepth === 0) {
+        const stmt = current.trim();
+        if (stmt) statements.push(stmt);
+        current = "";
+      } else {
+        current += ch;
+      }
       i++;
       continue;
     }
