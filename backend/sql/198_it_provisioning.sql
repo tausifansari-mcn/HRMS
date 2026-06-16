@@ -45,6 +45,20 @@ CREATE TABLE IF NOT EXISTS it_provisioning_request (
 -- ── 3. Seed OFFICIAL_EMAIL_UPDATE upload template ─────────────────────────────
 -- official_email column already exists in employees (migration 187).
 -- This just registers the upload type so BulkUploadHub can drive it.
+CREATE TABLE IF NOT EXISTS upload_template_master (
+  id                CHAR(36)     NOT NULL DEFAULT (UUID()) PRIMARY KEY,
+  upload_type_code  VARCHAR(100) NOT NULL UNIQUE,
+  upload_type_name  VARCHAR(200) NOT NULL,
+  target_table      VARCHAR(100) NOT NULL,
+  description       TEXT         NULL,
+  required_columns  JSON         NOT NULL,
+  optional_columns  JSON         NULL,
+  sample_row        JSON         NULL,
+  active_status     TINYINT(1)   NOT NULL DEFAULT 1,
+  created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 INSERT IGNORE INTO upload_template_master
   (id, upload_type_code, upload_type_name, target_table, description,
    required_columns, optional_columns, sample_row, active_status)

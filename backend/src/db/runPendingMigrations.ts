@@ -166,16 +166,38 @@ function isIdempotentMigrationError(error: any): boolean {
 }
 
 /**
+ * Pre-process SQL from a MySQL CLI file:
+ * Strips DELIMITER directives and replaces the custom delimiter (// or $$)
+ * with the standard semicolon so that splitSql can handle the file normally.
+ * mysql2/promise does not understand DELIMITER — it is a CLI-only command.
+ */
+function normaliseDelimiters(raw: string): string {
+  // Match: DELIMITER <delim> ... DELIMITER ; blocks
+  // Replaces custom delimiters (e.g. // or $$) with ; and removes DELIMITER lines.
+  return raw.replace(
+    /DELIMITER\s+(\S+)([\s\S]*?)DELIMITER\s*;/gi,
+    (_match, delim: string, body: string) => {
+      // Escape the custom delimiter for use in a regex
+      const escaped = delim.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // Replace all occurrences of the custom delimiter with ;
+      return body.replace(new RegExp(escaped, "g"), ";");
+    }
+  );
+}
+
+/**
  * Safe SQL splitter that respects:
  *  - single-quoted strings (with '' and \' escapes)
  *  - double-quoted identifiers (with "" and \" escapes)
  *  - backtick-quoted identifiers (with `` escapes)
  *  - line comments (-- ...)
  *  - block comments (/* ... *\/)
+ *  - DELIMITER directives (pre-processed by normaliseDelimiters)
  *
  * Returns non-empty, trimmed statement strings.
  */
 export function splitSql(raw: string): string[] {
+  raw = normaliseDelimiters(raw);
   const statements: string[] = [];
   let current = "";
   let i = 0;
