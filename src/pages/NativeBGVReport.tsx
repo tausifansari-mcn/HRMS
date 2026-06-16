@@ -10,6 +10,7 @@ import {
   Shield, CheckCircle2, XCircle, Clock, AlertTriangle,
   FileText, Lock, User, Banknote, GraduationCap,
   Briefcase, MapPin, Fingerprint, Search, Download,
+  Send, ExternalLink, RefreshCw,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -63,6 +64,12 @@ interface BGVReport {
   completed_by?: string;
   completed_at?: string;
   locked: boolean;
+  // InfinitiAI portal initiation fields
+  infinity_ai_case_id?: string;
+  portal_initiated_at?: string;
+  portal_candidate_email?: string;
+  portal_login_url?: string;
+  portal_status?: 'not_initiated' | 'initiated' | 'candidate_submitted' | 'completed' | 'expired';
 }
 
 interface CandidateSummary {
@@ -150,6 +157,7 @@ export default function NativeBGVReport() {
   const [report, setReport] = useState<BGVReport | null>(null);
   const [saving, setSaving] = useState(false);
   const [verifying, setVerifying] = useState('');
+  const [initiatingPortal, setInitiatingPortal] = useState(false);
   const [search, setSearch] = useState('');
 
   const loadList = useCallback(async () => {
@@ -218,6 +226,35 @@ export default function NativeBGVReport() {
     }
   };
 
+  const initiatePortal = async () => {
+    if (!selected) return;
+    const confirmed = window.confirm(
+      `Initiate BGV via InfinitiAI for ${selected.full_name}?\n\n` +
+      `This will create the candidate on the InfinitiAI portal and send them a login email at ${selected.email}.\n` +
+      `They will have 7 days to fill the BGV form and upload documents.`
+    );
+    if (!confirmed) return;
+    setInitiatingPortal(true);
+    try {
+      const r = await hrmsApi.post<any>('/api/ats/bgv/report/initiate-portal', { candidate_id: selected.id });
+      const data = r?.data ?? r;
+      // Reload the report to show portal status
+      const fresh = await hrmsApi.get<any>(`/api/ats/bgv/report?candidateId=${selected.id}`);
+      if (fresh?.data) setReport(fresh.data);
+      alert(
+        `BGV portal initiated!\n\n` +
+        `Case ID: ${data?.caseId ?? '—'}\n` +
+        `Candidate email: ${data?.candidateEmail ?? selected.email}\n` +
+        `Portal link: ${data?.portalLoginUrl ?? '—'}\n\n` +
+        `The candidate will receive a login email shortly.`
+      );
+    } catch (e: any) {
+      alert(`Failed to initiate BGV portal: ${e?.message ?? 'Unknown error'}`);
+    } finally {
+      setInitiatingPortal(false);
+    }
+  };
+
   const exportPDF = () => {
     window.print();
   };
@@ -281,7 +318,16 @@ export default function NativeBGVReport() {
       {/* Header */}
       <div className="flex items-start justify-between print:hidden">
         <Button variant="outline" onClick={() => setSelected(null)}>← Back</Button>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap justify-end">
+          {/* InfinitiAI portal initiation */}
+          {(!report.portal_status || report.portal_status === 'not_initiated' || report.portal_status === 'expired') && !report.locked && (
+            <Button variant="outline" onClick={() => void initiatePortal()} disabled={initiatingPortal}
+              className="border-indigo-300 text-indigo-700 hover:bg-indigo-50">
+              {initiatingPortal
+                ? <><RefreshCw className="w-4 h-4 mr-1 animate-spin" /> Initiating…</>
+                : <><Send className="w-4 h-4 mr-1" /> Initiate BGV (InfinitiAI)</>}
+            </Button>
+          )}
           <Button variant="outline" onClick={exportPDF}><Download className="w-4 h-4 mr-1" /> Export PDF</Button>
           {!report.locked && <Button variant="outline" onClick={() => void saveReport(false)} disabled={saving}>Save Draft</Button>}
           {!report.locked && (
@@ -325,6 +371,56 @@ export default function NativeBGVReport() {
             {report.completed_at && ` Locked on ${new Date(report.completed_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}.`}
           </p>
         </div>
+      )}
+
+      {/* InfinitiAI portal status card */}
+      {report.portal_status && report.portal_status !== 'not_initiated' && (
+        <Card className="border-indigo-200 bg-indigo-50/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-indigo-800">
+              <Send className="w-5 h-5" /> InfinitiAI BGV Portal
+              <Badge className={
+                report.portal_status === 'completed' ? 'bg-emerald-100 text-emerald-700 ml-2' :
+                report.portal_status === 'candidate_submitted' ? 'bg-blue-100 text-blue-700 ml-2' :
+                report.portal_status === 'expired' ? 'bg-red-100 text-red-700 ml-2' :
+                'bg-indigo-100 text-indigo-700 ml-2'
+              }>
+                {report.portal_status.replace(/_/g, ' ').toUpperCase()}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Case ID</p>
+              <p className="text-sm font-mono text-slate-700">{report.infinity_ai_case_id ?? '—'}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Candidate Email</p>
+              <p className="text-sm text-slate-700">{report.portal_candidate_email ?? '—'}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Initiated At</p>
+              <p className="text-sm text-slate-700">
+                {report.portal_initiated_at ? new Date(report.portal_initiated_at).toLocaleString('en-IN') : '—'}
+              </p>
+            </div>
+            {report.portal_login_url && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Portal Login URL</p>
+                <a href={report.portal_login_url} target="_blank" rel="noopener noreferrer"
+                  className="text-sm text-indigo-600 hover:underline flex items-center gap-1 break-all">
+                  {report.portal_login_url}
+                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                </a>
+              </div>
+            )}
+            {report.portal_status === 'initiated' && (
+              <div className="md:col-span-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+                Awaiting candidate to fill the BGV form at the InfinitiAI portal. They received a login email with the link above.
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Document checklist + box file */}

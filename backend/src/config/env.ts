@@ -87,6 +87,7 @@ const envSchema = z.object({
   INFINITY_AI_API_URL: z.string().url().default("https://api.infinityai.in"),
   INFINITY_AI_API_KEY: z.string().optional(),
   INFINITY_AI_CLIENT_ID: z.string().optional(),
+  INFINITY_AI_PORTAL_URL: z.string().url().default("http://candidates.theinfiniti.ai"),
   DIGIO_API_URL: z.string().url().default("https://api.digio.in"),
   DIGIO_CLIENT_ID: z.string().optional(),
   DIGIO_CLIENT_SECRET: z.string().optional(),

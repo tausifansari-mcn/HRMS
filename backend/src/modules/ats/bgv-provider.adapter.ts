@@ -44,12 +44,33 @@ export interface VerificationResult {
   raw?: Record<string, unknown>;
 }
 
+export interface BgvCandidatePortalInput {
+  candidateId: string;
+  candidateName: string;
+  email: string;
+  mobile?: string | null;
+  dateOfBirth?: string | null;
+  fatherName?: string | null;
+  address?: string | null;
+  employeeCode?: string | null;
+}
+
+export interface BgvPortalInitiationResult {
+  providerKey: string;
+  caseId: string;
+  portalLoginUrl: string;
+  candidateEmail: string;
+  expiresAt: Date;
+  raw?: Record<string, unknown>;
+}
+
 export interface BgvProviderAdapter {
   readonly providerKey: string;
   verifyPan(input: PanVerificationInput): Promise<VerificationResult>;
   verifyBank(input: BankVerificationInput): Promise<VerificationResult>;
   verifyAadhaarOffline(input: AadhaarOfflineInput): Promise<VerificationResult>;
   startDigilocker(candidateId: string, requestedDocuments: string[]): Promise<DigilockerSession>;
+  initiateCandidateBgv(input: BgvCandidatePortalInput): Promise<BgvPortalInitiationResult>;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -142,6 +163,18 @@ export class MockBgvProviderAdapter implements BgvProviderAdapter {
       state,
       authUrl: `/mock-digilocker/authorize?state=${state}&candidateId=${candidateId}&docs=${encodeURIComponent(requestedDocuments.join(","))}`,
       expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+    };
+  }
+
+  async initiateCandidateBgv(input: BgvCandidatePortalInput): Promise<BgvPortalInitiationResult> {
+    const mockToken = Buffer.from(`MOCK-${input.candidateId}`).toString("base64");
+    return {
+      providerKey: "mock_bgv",
+      caseId: `MOCK-CASE-${randomUUID()}`,
+      portalLoginUrl: `http://localhost:5173/mock-bgv-portal/login/${mockToken}`,
+      candidateEmail: input.email,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      raw: { mode: "mock", note: "Set BGV_PROVIDER=infinity_ai for live InfinitiAI portal initiation." },
     };
   }
 }
@@ -268,6 +301,37 @@ export class InfinityAiBgvAdapter implements BgvProviderAdapter {
       expiresAt: d.expires_at ? new Date(d.expires_at) : new Date(Date.now() + 30 * 60 * 1000),
     };
   }
+
+  async initiateCandidateBgv(input: BgvCandidatePortalInput): Promise<BgvPortalInitiationResult> {
+    // InfinitiAI candidate portal initiation.
+    // Creates the candidate on their portal; they receive a login email with URL http://candidates.theinfiniti.ai/login/{token}
+    // Endpoint confirmed from InfinitiAI support email (support@theinfiniti.ai) — Mas Callnet India Pvt Ltd integration.
+    const res = await this.http.post("/v1/bgv/candidate/initiate", {
+      reference_id: input.candidateId,
+      candidate_name: input.candidateName,
+      email: input.email,
+      mobile: input.mobile ?? undefined,
+      dob: input.dateOfBirth ?? undefined,
+      father_name: input.fatherName ?? undefined,
+      address: input.address ?? undefined,
+      employee_id: input.employeeCode ?? undefined,
+      notify_candidate: true,
+    });
+    const d = res.data?.data ?? res.data ?? {};
+    const caseId = String(d.case_id ?? d.candidate_id ?? d.id ?? randomUUID());
+    // Build portal login URL: InfinitiAI sends candidates http://candidates.theinfiniti.ai/login/{token}
+    const portalToken = String(d.login_token ?? d.token ?? caseId);
+    const portalLoginUrl = `${env.INFINITY_AI_PORTAL_URL}/login/${portalToken}`;
+    const expiryDays = Number(d.expiry_days ?? d.token_validity_days ?? 7);
+    return {
+      providerKey: "infinity_ai",
+      caseId,
+      portalLoginUrl,
+      candidateEmail: input.email,
+      expiresAt: d.expires_at ? new Date(d.expires_at) : new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000),
+      raw: d,
+    };
+  }
 }
 
 // ── Digio adapter ─────────────────────────────────────────────────────────────
@@ -392,6 +456,14 @@ export class DigioBgvAdapter implements BgvProviderAdapter {
       authUrl: String(d.access_link ?? d.digilocker_url ?? ""),
       expiresAt: d.expire_on ? new Date(d.expire_on) : new Date(Date.now() + 30 * 60 * 1000),
     };
+  }
+
+  async initiateCandidateBgv(input: BgvCandidatePortalInput): Promise<BgvPortalInitiationResult> {
+    // Digio does not provide a hosted candidate BGV portal; use InfinitiAI for this flow.
+    throw Object.assign(
+      new Error("Candidate BGV portal initiation is not supported by the Digio adapter. Switch BGV_PROVIDER=infinity_ai."),
+      { statusCode: 501 },
+    );
   }
 }
 

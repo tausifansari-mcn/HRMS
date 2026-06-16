@@ -20,6 +20,7 @@ import {
   verifyPanForCandidate,
   waiveCheck,
 } from "./bgv-verification.service.js";
+import { getBgvProviderAdapter } from "./bgv-provider.adapter.js";
 import { db } from "../../db/mysql.js";
 import type { RowDataPacket } from "mysql2";
 import { atsService } from "./ats.service.js";
@@ -216,6 +217,91 @@ router.post("/report", requireAuth, requireRole("admin", "hr"), h(async (req: Au
     ],
   );
   return res.status(201).json({ success: true, message: locked ? "BGV report locked" : "BGV report saved" });
+}));
+
+// ── BGV portal initiation (InfinitiAI candidate-portal flow) ──────────────────
+// HR clicks "Initiate BGV via InfinitiAI" → backend calls InfinitiAI to create
+// the candidate on their portal → InfinitiAI emails the candidate a login URL
+// http://candidates.theinfiniti.ai/login/{token} to fill the BGV form themselves.
+router.post("/report/initiate-portal", requireAuth, requireRole("admin", "hr"), h(async (req: AuthenticatedRequest, res) => {
+  const { candidate_id } = req.body;
+  if (!candidate_id) return res.status(400).json({ success: false, message: "candidate_id required" });
+  await requireBgvCandidateScope(req, candidate_id);
+
+  // Guard: already initiated
+  const [existing] = await db.execute<RowDataPacket[]>(
+    `SELECT id, portal_status, locked FROM candidate_bgv_report WHERE candidate_id = ? LIMIT 1`,
+    [candidate_id],
+  );
+  const existingRow = (existing as RowDataPacket[])[0];
+  if (existingRow?.locked) {
+    return res.status(403).json({ success: false, message: "BGV report is locked — cannot re-initiate portal" });
+  }
+  if (existingRow?.portal_status === 'initiated' || existingRow?.portal_status === 'candidate_submitted') {
+    return res.status(409).json({ success: false, message: `Portal already ${existingRow.portal_status}. Use the existing portal link.` });
+  }
+
+  // Fetch candidate info needed by InfinitiAI
+  const [candRows] = await db.execute<RowDataPacket[]>(
+    `SELECT c.id, c.full_name, c.email, c.mobile, p.date_of_birth, p.father_name,
+            CONCAT_WS(', ', pa.address_line1, pa.city, pa.state) AS address
+       FROM ats_candidate c
+       LEFT JOIN candidate_onboarding_profile p ON p.candidate_id = c.id
+       LEFT JOIN candidate_onboarding_address pa ON pa.candidate_id = c.id AND pa.address_type = 'permanent' LIMIT 1
+      WHERE c.id = ?`,
+    [candidate_id],
+  );
+  const cand = (candRows as RowDataPacket[])[0];
+  if (!cand) return res.status(404).json({ success: false, message: "Candidate not found" });
+
+  const adapter = getBgvProviderAdapter();
+  const result = await adapter.initiateCandidateBgv({
+    candidateId: candidate_id,
+    candidateName: String(cand.full_name ?? ""),
+    email: String(cand.email ?? ""),
+    mobile: cand.mobile ?? null,
+    dateOfBirth: cand.date_of_birth ?? null,
+    fatherName: cand.father_name ?? null,
+    address: cand.address ?? null,
+  });
+
+  // Upsert bgv report row with portal fields
+  await db.execute(
+    `INSERT INTO candidate_bgv_report
+       (candidate_id, infinity_ai_case_id, portal_initiated_at, portal_candidate_email,
+        portal_login_url, portal_initiated_by, portal_status,
+        photo_received, aadhaar_received, pan_received, passport_received,
+        driving_license_received, edu_cert_received, prev_exp_received, bank_proof_received,
+        offer_letter_received, box_file_no,
+        aadhaar_status, pan_status, bank_status, education_status, employment_status,
+        address_status, criminal_status, esignature_status,
+        overall_status, bgv_score, locked)
+     VALUES (?, ?, NOW(), ?, ?, ?, 'initiated',
+             0, 0, 0, 0, 0, 0, 0, 0, 0, NULL,
+             'not_run','not_run','not_run','not_run','not_run','not_run','not_run','not_done',
+             'pending', 0, 0)
+     ON DUPLICATE KEY UPDATE
+       infinity_ai_case_id   = VALUES(infinity_ai_case_id),
+       portal_initiated_at   = VALUES(portal_initiated_at),
+       portal_candidate_email= VALUES(portal_candidate_email),
+       portal_login_url      = VALUES(portal_login_url),
+       portal_initiated_by   = VALUES(portal_initiated_by),
+       portal_status         = IF(portal_status IN ('not_initiated','expired'), 'initiated', portal_status),
+       updated_at            = NOW()`,
+    [candidate_id, result.caseId, result.candidateEmail, result.portalLoginUrl, req.authUser!.id],
+  );
+
+  return res.status(201).json({
+    success: true,
+    message: `BGV portal initiated. Candidate will receive a login email at ${result.candidateEmail}.`,
+    data: {
+      caseId: result.caseId,
+      portalLoginUrl: result.portalLoginUrl,
+      candidateEmail: result.candidateEmail,
+      expiresAt: result.expiresAt,
+      providerKey: result.providerKey,
+    },
+  });
 }));
 
 export default router;
