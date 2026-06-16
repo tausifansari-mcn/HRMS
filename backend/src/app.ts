@@ -43,6 +43,7 @@ import { atsExtRouter } from "./modules/ats-extensions/ats-ext.routes.js";
 import { wfmExtRouter } from "./modules/wfm-extensions/wfm-ext.routes.js";
 import { managementRouter } from "./modules/management/management.routes.js";
 import { rosterGovRouter } from "./modules/roster/roster.governance.routes.js";
+import { weekoffPreferenceRouter } from "./modules/roster/weekoff-preference.routes.js";
 import { rtaRouter } from "./modules/rta/rta.routes.js";
 import { accountControlRouter } from "./modules/account-control/account.control.routes.js";
 import { workforceMandateRouter } from "./modules/workforce-mandate/workforce.mandate.routes.js";
@@ -103,41 +104,22 @@ function isAllowedOrigin(origin: string): boolean {
   return false;
 }
 
-app.use(
-  helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" }
-  })
-);
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || isAllowedOrigin(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true
-  })
-);
-
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || isAllowedOrigin(origin)) callback(null, true);
+    else callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true
+}));
 app.use(express.json({
   limit: "5mb",
-  verify: (req: express.Request & { rawBody?: Buffer }, _res, buf) => {
-    req.rawBody = buf;
-  }
+  verify: (req: express.Request & { rawBody?: Buffer }, _res, buf) => { req.rawBody = buf; }
 }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 
-app.get("/", (_req, res) => {
-  return res.json({
-    success: true,
-    service: "MCN HRMS Backend API",
-    version: "1.0.0"
-  });
-});
+app.get("/", (_req, res) => res.json({ success: true, service: "MCN HRMS Backend API", version: "1.0.0" }));
 
 app.use("/api/auth", authRouter);
 app.use("/api/auth", passwordResetRouter);
@@ -185,6 +167,7 @@ app.use("/api/letters", lettersRouter);
 app.use("/api/ats-ext", atsExtRouter);
 app.use("/api/wfm-ext", wfmExtRouter);
 app.use("/api/management", managementRouter);
+app.use("/api/roster-gov", weekoffPreferenceRouter);
 app.use("/api/roster-gov", rosterGovRouter);
 app.use("/api/rta", rtaRouter);
 app.use("/api/account-control", accountControlRouter);
