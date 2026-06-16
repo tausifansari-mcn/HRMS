@@ -155,6 +155,8 @@ const MIGRATION_MANIFEST: string[] = [
   "194_kpi_process_reconciliation.sql",
   "195_reporting_manager_role_alignment.sql",
   "196_seed_call_master_header_mappings.sql",
+  "197_salary_increment_governance.sql",
+  "198_cosec_punch_evidence.sql",
 ];
 
 async function main() {
