@@ -197,6 +197,7 @@ const css = `
   .native-ats-welcome { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100%; padding:36px 24px; text-align:center; }
   .native-ats-welcome-icon { width:88px; height:88px; border-radius:26px; background:var(--ats-grad); display:flex; align-items:center; justify-content:center; font-size:40px; box-shadow:0 14px 40px rgba(109,40,217,.38); margin-bottom:24px; animation:nativeAtsFloat 3s ease-in-out infinite; }
   @keyframes nativeAtsFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+  @keyframes nativeAtsPop { 0%{transform:scale(0);opacity:0} 50%{transform:scale(1.15)} 100%{transform:scale(1);opacity:1} }
   .native-ats-welcome-title { font-family:'Nunito',sans-serif; font-weight:900; font-size:30px; letter-spacing:-.5px; margin-bottom:10px; }
   .native-ats-welcome-desc { font-size:15px; color:var(--ats-muted); line-height:1.65; max-width:300px; margin-bottom:32px; }
   .native-ats-btn-start { background:var(--ats-grad); color:#fff; border:none; border-radius:var(--ats-r); padding:15px 36px; font-family:'Nunito',sans-serif; font-size:16px; font-weight:800; cursor:pointer; box-shadow:0 8px 24px rgba(109,40,217,.42); display:flex; align-items:center; gap:8px; }
@@ -235,13 +236,16 @@ const css = `
   .native-ats-uz-sub { font-size:12px; color:var(--ats-muted); }
   .native-ats-hf { display:none; }
 
-  .native-ats-cam-shell { border-radius:var(--ats-rs); overflow:hidden; position:relative; background:#0f172a; width:100%; aspect-ratio:4/3; max-height:240px; }
+  .native-ats-cam-shell { border-radius:var(--ats-rl); overflow:hidden; position:relative; background:linear-gradient(135deg,#0f172a,#1e293b); width:100%; aspect-ratio:4/3; max-height:280px; box-shadow:0 8px 24px rgba(0,0,0,.2); }
   .native-ats-cam-shell video,.native-ats-cam-shell canvas,.native-ats-cam-shell img { width:100%; height:100%; object-fit:cover; display:block; }
   .native-ats-cam-shell canvas,.native-ats-cam-shell img { display:none; }
-  .native-ats-face-oval { position:absolute; top:50%; left:50%; width:52%; aspect-ratio:1; transform:translate(-50%,-50%); border:3px solid rgba(255,255,255,.9); border-radius:50%; box-shadow:0 0 0 9999px rgba(0,0,0,.28); pointer-events:none; }
-  .native-ats-cam-btns { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:8px; }
-  .native-ats-cam-btn { border:1.5px solid var(--ats-border); background:#f7f9fc; border-radius:var(--ats-rs); padding:10px 6px; font-size:13px; font-weight:700; cursor:pointer; color:var(--ats-text); }
-  .native-ats-cam-btn:active { background:#e2e8f0; }
+  .native-ats-face-oval { position:absolute; top:50%; left:50%; width:52%; aspect-ratio:1; transform:translate(-50%,-50%); border:4px solid rgba(34,197,94,.85); border-radius:50%; box-shadow:0 0 0 9999px rgba(0,0,0,.35), 0 0 20px rgba(34,197,94,.4); pointer-events:none; animation:nativeAtsPulseOval 2s ease-in-out infinite; }
+  @keyframes nativeAtsPulseOval { 0%,100%{border-color:rgba(34,197,94,.85);transform:translate(-50%,-50%) scale(1)} 50%{border-color:rgba(34,197,94,.65);transform:translate(-50%,-50%) scale(1.02)} }
+  .native-ats-cam-hint { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.75); color:#fff; padding:8px 16px; border-radius:99px; font-size:12px; font-weight:600; backdrop-filter:blur(8px); animation:nativeAtsFadeUp .5s ease forwards; }
+  .native-ats-cam-btns { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:12px; }
+  .native-ats-cam-btn { border:none; background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff; border-radius:var(--ats-r); padding:14px 8px; font-size:14px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(99,102,241,.3); transition:all .2s; }
+  .native-ats-cam-btn:active { transform:scale(.96); box-shadow:0 2px 8px rgba(99,102,241,.4); }
+  .native-ats-cam-btn.success { background:linear-gradient(135deg,#10b981,#059669); box-shadow:0 4px 12px rgba(16,185,129,.3); }
   .native-ats-helper { font-size:12px; color:var(--ats-muted); margin-top:6px; line-height:1.5; }
 
   .native-ats-bnav { flex:0 0 auto; padding:10px 12px calc(env(safe-area-inset-bottom,0px) + 10px); background:var(--ats-surface); border-top:1px solid var(--ats-border); display:flex; gap:10px; }
@@ -639,6 +643,14 @@ export default function NativeATSCandidateRegistration() {
     return { path: (json as any).path ?? "", publicUrl: (json as any).url ?? "" };
   };
 
+  const yesNoToInt = (value: string): number | null => {
+    if (!value) return null;
+    const lower = value.toLowerCase();
+    if (lower === 'yes' || lower === 'y' || lower === '1' || lower === 'true') return 1;
+    if (lower === 'no' || lower === 'n' || lower === '0' || lower === 'false') return 0;
+    return null;
+  };
+
   const submitForm = async () => {
     if (!validateForm()) return;
 
@@ -665,17 +677,17 @@ export default function NativeATSCandidateRegistration() {
         appliedForBranch:         canonicalBranch || null,
         sourcingChannel:          'Walk-In', // Canonical format - backend normalizes this
         walkInDate:               new Date().toISOString().slice(0, 10),
-        // New fields from migration 054:
+        // New fields from migration 054 - convert Yes/No to 1/0 for TINYINT columns
         address:                  coreData.address || null,
         education:                coreData.education || null,
         experience:               coreData.experience || null,
-        rotationalShift:          coreData.rotationalShift || null,
+        rotationalShift:          yesNoToInt(coreData.rotationalShift),
         preferredShift:           coreData.preferredShift || null,
-        nightShiftOk:             coreData.nightShiftComfort || null,
-        leavesIn3months:          coreData.leavesRequired || null,
-        ownsTwoWheeler:           coreData.ownTwoWheeler || null,
-        idProofAvailable:         coreData.idProofAvailable || null,
-        educationProofAvailable:  coreData.educationProofAvailable || null,
+        nightShiftOk:             yesNoToInt(coreData.nightShiftComfort),
+        leavesIn3months:          yesNoToInt(coreData.leavesRequired),
+        ownsTwoWheeler:           yesNoToInt(coreData.ownTwoWheeler),
+        idProofAvailable:         yesNoToInt(coreData.idProofAvailable),
+        educationProofAvailable:  yesNoToInt(coreData.educationProofAvailable),
         recruiterName:            coreData.recruiterName || null,
       };
       const apiRes = await hrmsApi.post<{ success: boolean; data: any; message?: string }>(
@@ -840,16 +852,36 @@ export default function NativeATSCandidateRegistration() {
           <video ref={videoRef} autoPlay playsInline muted style={{ display: selfiePreview ? "none" : "block" }} />
           <canvas ref={canvasRef} style={{ display: "none" }} />
           <img ref={imageRef} alt="Selfie preview" src={selfiePreview} style={{ display: selfiePreview ? "block" : "none" }} />
-          <div className="native-ats-face-oval" />
+          {cameraStream && !selfiePreview && (
+            <>
+              <div className="native-ats-face-oval" />
+              <div className="native-ats-cam-hint">😊 Align your face in the circle</div>
+            </>
+          )}
+          {selfiePreview && (
+            <div className="native-ats-cam-hint" style={{ background: "rgba(16,185,129,.85)" }}>✓ Perfect! Looking great!</div>
+          )}
         </div>
         <div className="native-ats-cam-btns">
-          <button type="button" className="native-ats-cam-btn" onClick={openCam}>📷 Open</button>
-          <button type="button" className="native-ats-cam-btn" onClick={capSnap}>🎯 Capture</button>
-          <button type="button" className="native-ats-cam-btn" onClick={() => stopCam()}>⏹ Stop</button>
+          {!cameraStream && !selfiePreview && (
+            <button type="button" className="native-ats-cam-btn" onClick={openCam} style={{ gridColumn: "1 / -1" }}>📷 Open Camera & Smile!</button>
+          )}
+          {cameraStream && !selfiePreview && (
+            <>
+              <button type="button" className="native-ats-cam-btn" onClick={capSnap} style={{ gridColumn: "1 / 3" }}>📸 Capture!</button>
+              <button type="button" className="native-ats-cam-btn" onClick={() => stopCam()} style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)" }}>✕</button>
+            </>
+          )}
+          {selfiePreview && (
+            <>
+              <button type="button" className="native-ats-cam-btn success" style={{ gridColumn: "1 / 3" }}>✓ Photo Saved</button>
+              <button type="button" className="native-ats-cam-btn" onClick={openCam} style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)" }}>🔄 Retake</button>
+            </>
+          )}
         </div>
         <input ref={cameraInputRef} type="file" className="native-ats-hf" accept="image/*" capture="user" onChange={(e) => onSelfieFilePick(e.target.files?.[0] || null)} />
-        <div className="native-ats-helper">
-          {form.selfieFile ? <span style={{ color: "var(--ats-green)", fontWeight: 700 }}>✓ Selfie captured</span> : "Optional: open front camera, align face in circle, then capture."}
+        <div className="native-ats-helper" style={{ textAlign: "center", marginTop: 8 }}>
+          {form.selfieFile ? <span style={{ color: "var(--ats-green)", fontWeight: 700, fontSize: "14px" }}>🎉 Your photo looks amazing!</span> : <span style={{ color: "var(--ats-muted)" }}>📷 Optional but recommended - helps us match you faster!</span>}
         </div>
       </div>
     );
@@ -941,16 +973,16 @@ export default function NativeATSCandidateRegistration() {
       setScanMode('done');
     } catch (err: any) {
       const reason = err?.message === 'Failed to load Tesseract'
-        ? '📡 Could not load scanning engine. Please check your internet connection and try again.'
+        ? '📡 Could not load scanning engine. No worries! The form below is simple and quick to fill.'
         : err?.message?.includes('network')
-          ? '🌐 Network issue detected. Please check your internet and retry.'
-          : '⚠️ Scanning failed. Please fill the form manually - it\'s quick and easy!';
+          ? '🌐 Network issue detected. But don\'t worry - filling the form manually takes just 2 minutes!'
+          : '💡 No problem! Our smart form below is designed for speed - you\'ll be done in no time!';
       setScanStatus(reason);
-      setScanMode('done');
-      // Auto-hide error after 5 seconds
+      setScanMode('idle');
+      // Auto-hide message after 6 seconds
       setTimeout(() => {
         setScanStatus('');
-      }, 5000);
+      }, 6000);
     }
   };
 
@@ -963,12 +995,33 @@ export default function NativeATSCandidateRegistration() {
 
   const renderWelcome = () => (
     <div className="native-ats-welcome native-ats-anim">
-      <div className="native-ats-welcome-icon">
-        <CompanyLogo size="lg" />
+      <div style={{ position: "relative", marginBottom: 20 }}>
+        <div className="native-ats-welcome-icon">
+          <CompanyLogo size="lg" />
+        </div>
+        <div style={{
+          position: "absolute",
+          top: -8,
+          right: -8,
+          width: 24,
+          height: 24,
+          borderRadius: "50%",
+          background: "#22c55e",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 14,
+          animation: "nativeAtsPop .6s cubic-bezier(.68,-.55,.265,1.55)"
+        }}>✓</div>
       </div>
-      <h1 className="native-ats-welcome-title">Welcome! 👋</h1>
-      <p className="native-ats-welcome-desc">Welcome to the registration desk. Fill in your details accurately to help our recruiters process your application.</p>
-      <button className="native-ats-btn-start" onClick={startReg}>✦ Start Registration</button>
+      <h1 className="native-ats-welcome-title">Welcome to MAS! 👋</h1>
+      <p className="native-ats-welcome-desc">You're just 2 minutes away from joining an amazing team! Let's make this quick, easy, and fun.</p>
+      <button className="native-ats-btn-start" onClick={startReg}>🚀 Let's Get Started!</button>
+      <div style={{ marginTop: 24, fontSize: 12, color: "var(--ats-muted)", display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
+        <span>⚡ Takes only 2 mins</span>
+        <span>•</span>
+        <span>📱 Mobile friendly</span>
+      </div>
     </div>
   );
 
@@ -981,21 +1034,28 @@ export default function NativeATSCandidateRegistration() {
       </div>
       <div className="native-ats-form-card">
           {/* Scan Resume — optional, above form sections */}
-          <div style={{ marginBottom: 24, padding: 16, background: '#f0f4ff', borderRadius: 12, border: '1px solid #c7d2fe' }}>
+          {scanStatus && scanMode === 'idle' && (
+            <div style={{ marginBottom: 16, padding: 14, background: 'linear-gradient(135deg,#fef3c7,#fde68a)', borderRadius: 12, border: '1px solid #fbbf24', animation: 'nativeAtsFadeUp .4s ease forwards' }}>
+              <div style={{ fontSize: '0.9rem', color: '#92400e', fontWeight: 600, textAlign: 'center' }}>{scanStatus}</div>
+            </div>
+          )}
+          <div style={{ marginBottom: 24, padding: 16, background: 'linear-gradient(135deg,#f0f4ff,#e0e7ff)', borderRadius: 14, border: '2px solid #c7d2fe', boxShadow: '0 4px 12px rgba(99,102,241,.1)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: scanMode !== 'idle' ? 12 : 0 }}>
               <div>
-                <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#3730a3' }}>📄 Scan Resume (Optional)</div>
-                <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: 2 }}>Capture a photo of your resume to auto-fill this form. You can still fill manually.</div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#4338ca', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  ✨ Quick Scan (Optional)
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: 3 }}>Snap your resume and we'll fill the form for you! Or fill manually - both are easy.</div>
               </div>
               {scanMode === 'idle' && (
                 <button type="button" onClick={() => setScanMode('options')}
-                  style={{ background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>
-                  Scan Resume
+                  style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 18px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, boxShadow: '0 4px 12px rgba(99,102,241,.3)', transition: 'all .2s' }}>
+                  📸 Scan Now
                 </button>
               )}
               {scanMode !== 'idle' && (
                 <button type="button" onClick={() => { setScanMode('idle'); setScanImage(null); setScanStatus(''); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '0.8rem' }}>✕ Close</button>
+                  style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>✕</button>
               )}
             </div>
             {scanMode === 'options' && (
@@ -1003,26 +1063,26 @@ export default function NativeATSCandidateRegistration() {
                 <input type="file" accept="image/*" capture="environment" ref={scanCameraInputRef} style={{ display: 'none' }} onChange={handleScanFileChange} />
                 <input type="file" accept="image/*" ref={scanFileInputRef} style={{ display: 'none' }} onChange={handleScanFileChange} />
                 <button type="button" onClick={() => scanCameraInputRef.current?.click()}
-                  style={{ flex: 1, padding: 10, background: '#fff', border: '1px solid #c7d2fe', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}>📷 Take Photo</button>
+                  style={{ flex: 1, padding: 12, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600, boxShadow: '0 3px 10px rgba(99,102,241,.25)' }}>📷 Take Photo</button>
                 <button type="button" onClick={() => scanFileInputRef.current?.click()}
-                  style={{ flex: 1, padding: 10, background: '#fff', border: '1px solid #c7d2fe', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}>📁 Upload Image</button>
+                  style={{ flex: 1, padding: 12, background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600, boxShadow: '0 3px 10px rgba(16,185,129,.25)' }}>📁 Upload</button>
               </div>
             )}
             {scanMode === 'preview' && scanImage && (
               <div style={{ textAlign: 'center' }}>
-                <img src={scanImage} alt="Resume preview" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, marginBottom: 10, objectFit: 'contain' }} />
+                <img src={scanImage} alt="Resume preview" style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 12, marginBottom: 12, objectFit: 'contain', border: '2px solid #c7d2fe', boxShadow: '0 4px 12px rgba(0,0,0,.1)' }} />
                 <button type="button" onClick={() => extractFromOCR(scanImage)}
-                  style={{ background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', cursor: 'pointer', fontWeight: 600 }}>Extract Details</button>
+                  style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 28px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 4px 12px rgba(99,102,241,.3)' }}>✨ Extract Details</button>
               </div>
             )}
             {scanMode === 'scanning' && (
-              <div style={{ textAlign: 'center', padding: 12, color: '#4f46e5' }}>
-                <div style={{ fontSize: '1.5rem', marginBottom: 6 }}>⏳</div>
-                <div style={{ fontSize: '0.85rem' }}>{scanStatus}</div>
+              <div style={{ textAlign: 'center', padding: 16, color: '#4f46e5' }}>
+                <div style={{ fontSize: '2rem', marginBottom: 8, animation: 'nativeAtsSpin 1.5s linear infinite' }}>🔍</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{scanStatus}</div>
               </div>
             )}
             {scanMode === 'done' && (
-              <div style={{ background: '#f0fdf4', borderRadius: 8, padding: '10px 14px', fontSize: '0.85rem', color: '#166534' }}>✅ {scanStatus}</div>
+              <div style={{ background: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', borderRadius: 10, padding: '12px 16px', fontSize: '0.88rem', color: '#166534', fontWeight: 600, border: '1px solid #a7f3d0', boxShadow: '0 3px 10px rgba(16,185,129,.15)' }}>✅ {scanStatus}</div>
             )}
           </div>
         {dynamicSections.map((section) => (

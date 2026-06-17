@@ -37,9 +37,12 @@ function normalizeSourceChannel(channel: string | null | undefined): string | nu
   return mapping[normalized] || channel; // Return normalized or original if no match
 }
 
-/** Convert Yes/No strings to boolean (1/0) for TINYINT(1) columns */
-function yesNoToBoolean(value: string | null | undefined): number | null {
-  if (!value) return null;
+/** Convert Yes/No strings OR integers to boolean (1/0) for TINYINT(1) columns */
+function yesNoToBoolean(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  // Already a number (from frontend integer conversion)
+  if (typeof value === 'number') return value === 1 ? 1 : 0;
+  // String conversion
   const normalized = value.trim().toLowerCase();
   if (normalized === 'yes' || normalized === '1' || normalized === 'true') return 1;
   if (normalized === 'no' || normalized === '0' || normalized === 'false') return 0;

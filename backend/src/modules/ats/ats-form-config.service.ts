@@ -62,14 +62,22 @@ export const atsFormConfigService = {
     }));
 
     const [recruiterRows] = await db.execute<RowDataPacket[]>(
-      'SELECT name, email, mobile FROM ats_recruiter WHERE active_status = 1 ORDER BY sort_order ASC, name ASC'
+      'SELECT name FROM ats_recruiter WHERE active_status = 1 ORDER BY sort_order ASC, name ASC'
     );
     let recruiterOptions = (recruiterRows as RowDataPacket[]).map((r: any) => r.name as string);
-    const recruiterDetails = (recruiterRows as RowDataPacket[]).map((r: any) => ({
-      name: r.name,
-      email: r.email || null,
-      mobile: r.mobile || null,
-    }));
+
+    // Try to fetch contact details from ats_recruiter_roster (if available)
+    const [rosterRows] = await db.execute<RowDataPacket[]>(
+      'SELECT name, email, mobile FROM ats_recruiter_roster WHERE active_status = 1'
+    ).catch(() => [[]]);
+    const recruiterDetails = recruiterOptions.map(name => {
+      const roster = (rosterRows as RowDataPacket[]).find((r: any) => r.name === name);
+      return {
+        name,
+        email: roster?.email || null,
+        mobile: roster?.mobile || null,
+      };
+    });
     if (recruiterOptions.length === 0) {
       const [employeeRecruiters] = await db.execute<RowDataPacket[]>(
         `SELECT DISTINCT TRIM(CONCAT(e.first_name, ' ', COALESCE(e.last_name, ''))) AS name
