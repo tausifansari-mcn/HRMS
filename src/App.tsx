@@ -185,6 +185,13 @@ const NativeCustomizationManager = lazy(() => import("./pages/customization/Nati
 const NativeCustomizationRuleEditor = lazy(() => import("./pages/customization/NativeCustomizationRuleEditor"));
 const EmployeeJourney = lazy(() => import("./pages/EmployeeJourney"));
 
+// Expenses
+const MyExpenses = lazy(() => import("./pages/expenses/MyExpenses"));
+const NewExpenseClaim = lazy(() => import("./pages/expenses/NewExpenseClaim"));
+const ExpenseApprovals = lazy(() => import("./pages/expenses/ExpenseApprovals"));
+const FinanceQueue = lazy(() => import("./pages/expenses/FinanceQueue"));
+const ExpenseReports = lazy(() => import("./pages/expenses/ExpenseReports"));
+
 const PortalLogin = lazy(() => import("./pages/portal/PortalLogin"));
 const PortalOverview = lazy(() => import("./pages/portal/PortalOverview"));
 const PortalProcessDashboard = lazy(() => import("./pages/portal/PortalProcessDashboard"));
@@ -371,6 +378,16 @@ const App = () => (
               <Route path="/rta-board" element={<ProtectedRoute><Gate pageCode="RTA_BOARD"><NativeRTABoard /></Gate></ProtectedRoute>} />
               <Route path="/attendance-rules-master" element={<ProtectedRoute roles={['admin', 'hr']}><NativeAttendanceRulesMaster /></ProtectedRoute>} />
               <Route path="/changelog" element={<ProtectedRoute><Changelog /></ProtectedRoute>} />
+
+              {/* Expenses */}
+              <Route path="/expenses" element={<ProtectedRoute><MyExpenses /></ProtectedRoute>} />
+              <Route path="/expenses/new" element={<ProtectedRoute><NewExpenseClaim /></ProtectedRoute>} />
+              <Route path="/expenses/new/:claimId" element={<ProtectedRoute><NewExpenseClaim /></ProtectedRoute>} />
+              <Route path="/expenses/approvals" element={<ProtectedRoute><ExpenseApprovals /></ProtectedRoute>} />
+              <Route path="/expenses/finance" element={<ProtectedRoute><FinanceQueue /></ProtectedRoute>} />
+              <Route path="/expenses/reports" element={<ProtectedRoute><ExpenseReports /></ProtectedRoute>} />
+              <Route path="/expenses/:claimId" element={<ProtectedRoute><NewExpenseClaim /></ProtectedRoute>} />
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

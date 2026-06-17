@@ -25,7 +25,7 @@ import {
   Activity, BarChart3, Bell, Briefcase, Building2, Calendar,
   CalendarDays, ClipboardList, Clock, CreditCard, FileCheck,
   FileText, GraduationCap, Heart, Home, Landmark, Menu,
-  Network, Package, Server, Settings, Settings2, ShieldCheck, Sparkles,
+  Network, Package, Receipt, Server, Settings, Settings2, ShieldCheck, Sparkles,
   Target, TrendingUp, User, UserMinus, UserPlus, Users, Wallet,
   X, Zap,
 } from "lucide-react";
@@ -122,6 +122,15 @@ const navGroups: NavGroup[] = [
       { label: "Helpdesk",         href: "/helpdesk",                      icon: <ShieldCheck className="h-[15px] w-[15px]" />,  description: "Helpdesk" },
       { label: "Benefits & Claims",href: "/benefits",                      icon: <ShieldCheck className="h-[15px] w-[15px]" />,  description: "Benefits" },
       { label: "Feedback",         href: "/performance-feedback/my-reports", icon: <FileText className="h-[15px] w-[15px]" />,  description: "Feedback" },
+    ],
+  },
+  {
+    title: "Expenses",
+    items: [
+      { label: "My Expenses",         href: "/expenses",              icon: <Receipt className="h-[15px] w-[15px]" />,      description: "My expense claims" },
+      { label: "Expense Approvals",   href: "/expenses/approvals",    icon: <ClipboardList className="h-[15px] w-[15px]" />, roles: ["admin","hr","manager","branch_head"], description: "Approve expenses" },
+      { label: "Finance Queue",       href: "/expenses/finance",      icon: <Wallet className="h-[15px] w-[15px]" />,        roles: ["admin","finance"], description: "Finance processing" },
+      { label: "Expense Reports",     href: "/expenses/reports",      icon: <BarChart3 className="h-[15px] w-[15px]" />,     roles: ["admin","finance","hr"], description: "Expense analytics" },
     ],
   },
   {
