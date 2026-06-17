@@ -231,3 +231,5 @@
 {"type":"edit","file":"/home/shuvam/hrms-audit/src/components/employees/EmployeeEditDialog.tsx","timestamp":1781632861654,"sessionId":null}
 {"type":"edit","file":"/home/shuvam/hrms-audit/backend/scripts/check-analyst-attendance.ts","timestamp":1781633929277,"sessionId":null}
 {"type":"edit","file":"/home/shuvam/hrms-audit/ATTENDANCE_FLOW_DOCUMENTATION.md","timestamp":1781634014487,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/scripts/setup-friendly-branch-names.sql","timestamp":1781718911810,"sessionId":null}
+{"type":"edit","file":"/home/shuvam/hrms-audit/scripts/setup-friendly-names.ts","timestamp":1781718927891,"sessionId":null}
