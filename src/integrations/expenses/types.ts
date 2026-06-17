@@ -99,3 +99,11 @@ export interface MarkPaidDto {
   payment_date: string;
   payment_method: string;
 }
+
+export interface ExpenseReportQuery {
+  process_id?: number;
+  branch_id?: number;
+  start_date?: string;
+  end_date?: string;
+  group_by?: 'category' | 'employee' | 'branch' | 'process';
+}

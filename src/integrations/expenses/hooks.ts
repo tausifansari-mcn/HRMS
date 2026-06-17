@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { expenseApi } from './api';
-import type { CreateExpenseClaimDto, AddExpenseItemDto, ApproveClaimDto, RejectClaimDto, MarkPaidDto, ExpenseStatus } from './types';
+import type { CreateExpenseClaimDto, AddExpenseItemDto, ApproveClaimDto, RejectClaimDto, MarkPaidDto, ExpenseStatus, ExpenseReportQuery } from './types';
 
 export const EXPENSE_KEYS = {
   categories: ['expense-categories'] as const,
@@ -8,6 +8,9 @@ export const EXPENSE_KEYS = {
   claimDetails: (id: number) => ['expense-claim', id] as const,
   pendingApprovals: ['expense-pending-approvals'] as const,
   financeQueue: (status: ExpenseStatus) => ['expense-finance-queue', status] as const,
+  summary: (query: ExpenseReportQuery) => ['expense-summary', query] as const,
+  monthlyTrends: (months: number) => ['expense-monthly-trends', months] as const,
+  topSpenders: (limit: number) => ['expense-top-spenders', limit] as const,
 };
 
 export function useExpenseCategories() {
@@ -122,5 +125,26 @@ export function useMarkAsPaid() {
       qc.invalidateQueries({ queryKey: EXPENSE_KEYS.financeQueue('FINANCE_APPROVED' as ExpenseStatus) });
       qc.invalidateQueries({ queryKey: EXPENSE_KEYS.financeQueue('PAID' as ExpenseStatus) });
     }
+  });
+}
+
+export function useExpenseSummary(query: ExpenseReportQuery) {
+  return useQuery({
+    queryKey: EXPENSE_KEYS.summary(query),
+    queryFn: () => expenseApi.getExpenseSummary(query)
+  });
+}
+
+export function useMonthlyTrends(months = 6) {
+  return useQuery({
+    queryKey: EXPENSE_KEYS.monthlyTrends(months),
+    queryFn: () => expenseApi.getMonthlyTrends(months)
+  });
+}
+
+export function useTopSpenders(limit = 10) {
+  return useQuery({
+    queryKey: EXPENSE_KEYS.topSpenders(limit),
+    queryFn: () => expenseApi.getTopSpenders(limit)
   });
 }

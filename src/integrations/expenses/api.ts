@@ -8,7 +8,8 @@ import type {
   ApproveClaimDto,
   RejectClaimDto,
   MarkPaidDto,
-  ExpenseStatus
+  ExpenseStatus,
+  ExpenseReportQuery
 } from './types';
 
 function apiBaseUrl(): string {
@@ -137,5 +138,23 @@ export const expenseApi = {
     const res = await fetch(`${API_BASE}/api/expenses/claims/export-for-payment?${params}`, { headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.blob();
+  },
+
+  async getExpenseSummary(query: ExpenseReportQuery) {
+    const params = new URLSearchParams();
+    if (query.process_id) params.append('process_id', String(query.process_id));
+    if (query.branch_id) params.append('branch_id', String(query.branch_id));
+    if (query.start_date) params.append('start_date', query.start_date);
+    if (query.end_date) params.append('end_date', query.end_date);
+    if (query.group_by) params.append('group_by', query.group_by);
+    return request<{ total_amount: number; claim_count: number; avg_claim_amount: number; by_category: Array<{ category: string; amount: number; count: number }>; by_status: Array<{ status: string; count: number }> }>('GET', `/api/expenses/reports/summary?${params}`);
+  },
+
+  async getMonthlyTrends(months = 6) {
+    return request<{ trends: Array<{ month: string; claim_count: number; total_amount: number }> }>('GET', `/api/expenses/reports/monthly-trends?months=${months}`);
+  },
+
+  async getTopSpenders(limit = 10) {
+    return request<{ spenders: Array<{ employee_name: string; employee_code: string; claim_count: number; total_amount: number }> }>('GET', `/api/expenses/reports/top-spenders?limit=${limit}`);
   }
 };
