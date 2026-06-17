@@ -407,21 +407,6 @@ export const leaveService = {
       [year, year, employeeId]
     );
 
-    // Recalculate used_days from actual approved leave requests
-    await db.execute(
-      `UPDATE leave_balance_ledger lbl
-       SET used_days = (
-         SELECT COALESCE(SUM(lr.total_days), 0)
-         FROM leave_request lr
-         WHERE lr.employee_id = lbl.employee_id
-           AND lr.leave_type_id = lbl.leave_type_id
-           AND lr.status = 'approved'
-           AND YEAR(lr.from_date) = lbl.balance_year
-       )
-       WHERE lbl.employee_id = ? AND lbl.balance_year = ?`,
-      [employeeId, year]
-    );
-
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT lbl.*, lt.leave_name, lt.leave_code, lt.paid_leave, lt.carry_forward, lt.max_days_per_year
        FROM leave_balance_ledger lbl
