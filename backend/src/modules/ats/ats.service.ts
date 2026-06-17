@@ -176,6 +176,31 @@ export const atsService = {
       [randomUUID(), id, userId]
     );
 
+    // Auto-create queue token for Walk-In candidates
+    if (normalizedChannel === 'Walk-In') {
+      try {
+        // Generate queue token (format: WI-YYYYMMDD-XXXX)
+        const dateStr = (input.walkInDate || new Date().toISOString().slice(0, 10)).replace(/-/g, '');
+        const [countRows] = await db.execute<RowDataPacket[]>(
+          `SELECT COUNT(*) as count FROM ats_queue_token
+           WHERE DATE(arrival_time) = DATE(?)`,
+          [input.walkInDate || new Date().toISOString().slice(0, 10)]
+        );
+        const dailyCount = ((countRows as RowDataPacket[])[0]?.count || 0) + 1;
+        const tokenNumber = `WI-${dateStr}-${String(dailyCount).padStart(4, '0')}`;
+
+        await db.execute(
+          `INSERT INTO ats_queue_token
+           (id, candidate_id, token, arrival_time, current_stage, status)
+           VALUES (?, ?, ?, NOW(), 'Arrived', 'active')`,
+          [randomUUID(), id, tokenNumber]
+        );
+      } catch (err) {
+        // Log error but don't fail candidate creation
+        console.error('Failed to create queue token:', err);
+      }
+    }
+
     return this.getCandidate(id);
   },
 
