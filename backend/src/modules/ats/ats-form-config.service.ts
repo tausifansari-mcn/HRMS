@@ -62,9 +62,14 @@ export const atsFormConfigService = {
     }));
 
     const [recruiterRows] = await db.execute<RowDataPacket[]>(
-      'SELECT name FROM ats_recruiter WHERE active_status = 1 ORDER BY sort_order ASC, name ASC'
+      'SELECT name, email, mobile FROM ats_recruiter WHERE active_status = 1 ORDER BY sort_order ASC, name ASC'
     );
     let recruiterOptions = (recruiterRows as RowDataPacket[]).map((r: any) => r.name as string);
+    const recruiterDetails = (recruiterRows as RowDataPacket[]).map((r: any) => ({
+      name: r.name,
+      email: r.email || null,
+      mobile: r.mobile || null,
+    }));
     if (recruiterOptions.length === 0) {
       const [employeeRecruiters] = await db.execute<RowDataPacket[]>(
         `SELECT DISTINCT TRIM(CONCAT(e.first_name, ' ', COALESCE(e.last_name, ''))) AS name
@@ -86,6 +91,7 @@ export const atsFormConfigService = {
     return {
       fields:                   configMap['formFields']             ?? DEFAULT_FIELDS,
       recruiterOptions,
+      recruiterDetails,         // NEW: Full recruiter contact details
       branchOptions:            branchOptions.length > 0 ? branchOptions : ['Mumbai','Delhi','Bangalore'],
       branchAliases,            // NEW: Branch display names
       roleOptions:              configMap['roleOptions']             ?? DEFAULT_OPTIONS.roleOptions,
