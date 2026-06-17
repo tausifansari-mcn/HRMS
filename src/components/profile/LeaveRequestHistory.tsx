@@ -12,13 +12,13 @@ interface LeaveRequestHistoryProps {
 
 interface LeaveRequest {
   id: string;
-  start_date: string;
-  end_date: string;
-  days_count: number;
+  from_date: string;
+  to_date: string;
+  total_days: number;
   reason: string | null;
   status: "pending" | "approved" | "rejected" | "cancelled";
   created_at: string;
-  leave_types: { name: string } | null;
+  leave_type_name: string | null;
 }
 
 const statusStyles: Record<string, string> = {
@@ -79,12 +79,12 @@ export function LeaveRequestHistory({ employeeId }: LeaveRequestHistoryProps) {
                   {pendingRequests.map((request) => (
                     <TableRow key={request.id}>
                       <TableCell className="font-medium">
-                        {request.leave_types?.name || "Leave"}
+                        {request.leave_type_name || "Leave"}
                       </TableCell>
                       <TableCell>
-                        {format(new Date(request.start_date), "MMM d")} - {format(new Date(request.end_date), "MMM d, yyyy")}
+                        {format(new Date(request.from_date), "MMM d")} - {format(new Date(request.to_date), "MMM d, yyyy")}
                       </TableCell>
-                      <TableCell>{request.days_count}</TableCell>
+                      <TableCell>{request.total_days}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={statusStyles[request.status]}>
                           {request.status}
@@ -116,12 +116,12 @@ export function LeaveRequestHistory({ employeeId }: LeaveRequestHistoryProps) {
                   {pastRequests.map((request) => (
                     <TableRow key={request.id}>
                       <TableCell className="font-medium">
-                        {request.leave_types?.name || "Leave"}
+                        {request.leave_type_name || "Leave"}
                       </TableCell>
                       <TableCell>
-                        {format(new Date(request.start_date), "MMM d")} - {format(new Date(request.end_date), "MMM d, yyyy")}
+                        {format(new Date(request.from_date), "MMM d")} - {format(new Date(request.to_date), "MMM d, yyyy")}
                       </TableCell>
-                      <TableCell>{request.days_count}</TableCell>
+                      <TableCell>{request.total_days}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={statusStyles[request.status]}>
                           {request.status}
