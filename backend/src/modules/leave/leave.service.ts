@@ -433,51 +433,40 @@ export const leaveService = {
   },
 
   async getBalance(employeeId: string, year: number): Promise<any[]> {
-    await db.execute(
-      `INSERT INTO leave_balance_ledger
-         (id, employee_id, leave_type_id, balance_year, allocated_days, used_days, adjusted_days)
-       SELECT UUID(), e.id, lt.id, ?,
-              lt.max_days_per_year +
-                CASE
-                  WHEN lt.carry_forward = 1
-                  THEN GREATEST(
-                    COALESCE(prev.allocated_days, 0)
-                    + COALESCE(prev.adjusted_days, 0)
-                    - COALESCE(prev.used_days, 0),
-                    0
-                  )
-                  ELSE 0
-                END,
-              0, 0
-       FROM employees e
-       JOIN leave_type_master lt
-         ON lt.active_status = 1
-        AND lt.max_days_per_year > 0
-        AND LOWER(lt.leave_name) NOT LIKE '%legacy%'
-       LEFT JOIN leave_balance_ledger prev
-         ON prev.employee_id = e.id
-        AND prev.leave_type_id = lt.id
-        AND prev.balance_year = ? - 1
-       WHERE e.id = ?
-         AND e.active_status = 1
-         AND (
-           lt.leave_code NOT IN ('ML', 'MTRL', 'PL', 'PTRL')
-           OR (lt.leave_code IN ('ML', 'MTRL') AND LOWER(TRIM(COALESCE(e.gender, ''))) IN ('female', 'f'))
-           OR (lt.leave_code IN ('PL', 'PTRL') AND LOWER(TRIM(COALESCE(e.gender, ''))) IN ('male', 'm'))
-         )
-       ON DUPLICATE KEY UPDATE id = leave_balance_ledger.id`,
-      [year, year, employeeId]
-    );
-
+    // Fetch balance rows — do NOT auto-seed here; balances are seeded by migrations and annual worker
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT lbl.*, lt.leave_name, lt.leave_code, lt.paid_leave, lt.carry_forward, lt.max_days_per_year
+      `SELECT lbl.id, lbl.employee_id, lbl.leave_type_id, lbl.balance_year,
+              lbl.allocated_days, lbl.used_days, lbl.adjusted_days,
+              (lbl.allocated_days + COALESCE(lbl.adjusted_days,0) - lbl.used_days) AS available_days,
+              lt.leave_name, lt.leave_code, lt.paid_leave, lt.carry_forward, lt.max_days_per_year
        FROM leave_balance_ledger lbl
        JOIN leave_type_master lt ON lt.id = lbl.leave_type_id
-       WHERE lbl.employee_id = ? AND lbl.balance_year = ?
+       WHERE lbl.employee_id = ? AND lbl.balance_year = ? AND lt.active_status = 1
        ORDER BY lt.leave_name ASC`,
       [employeeId, year]
     );
-    return rows as RowDataPacket[];
+
+    // Attach EL accrual (current year's accumulation — not yet spendable) as a separate field on the EL row
+    const [accrualRows] = await db.execute<RowDataPacket[]>(
+      `SELECT accrued_days, last_credited_month
+       FROM leave_el_accrual_ledger
+       WHERE employee_id = ? AND accrual_year = ?`,
+      [employeeId, year]
+    );
+    const accrual = accrualRows[0] ?? null;
+
+    const result = (rows as RowDataPacket[]).map((row) => {
+      if (row.leave_code === 'EL' && accrual) {
+        return {
+          ...row,
+          el_accruing_days: Number(accrual.accrued_days),       // accumulating this year (not spendable yet)
+          el_last_credited_month: Number(accrual.last_credited_month),
+        };
+      }
+      return row;
+    });
+
+    return result;
   },
 
   async listHolidays(year?: number): Promise<LeaveHoliday[]> {

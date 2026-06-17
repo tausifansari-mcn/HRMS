@@ -74,11 +74,13 @@ export function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
     return allocated;
   }, [allLeaveTypes, eligibility, unpaidLeaveType]);
 
-  // Fetch approved leave requests to calculate used days
-  const { data: approvedRequests } = useQuery({
-    queryKey: ["leave-used-days", employeeId, currentYear],
+  // Fetch actual leave balances from ledger (includes db_bill synced used_days)
+  const { data: ledgerBalances } = useQuery({
+    queryKey: ["leave-balances", employeeId, currentYear],
     queryFn: async () => {
-      const res = await hrmsApi.get<{success:boolean;data:any}>("/api/leave/requests");
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>(
+        `/api/leave/balance/${employeeId}?year=${currentYear}`
+      );
       return res.data ?? [];
     },
     enabled: !!employeeId,
@@ -87,22 +89,23 @@ export function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
   const isUnpaid = !!unpaidLeaveType && leaveTypeId === unpaidLeaveType.id;
 
   const leaveBalances = useMemo(() => {
-    if (!leaveTypes) return {};
     const balances: Record<string, { total: number; used: number; remaining: number }> = {};
-    leaveTypes.forEach((type) => {
-      // Skip balance tracking for Unpaid Leave (unlimited)
-      if (type.id === unpaidLeaveType?.id) return;
-      const used = approvedRequests
-        ?.filter((r) => r.leave_type_id === type.id)
-        .reduce((sum, r) => sum + r.days_count, 0) || 0;
-      balances[type.id] = {
-        total: type.days_per_year,
+    if (!ledgerBalances) return balances;
+    for (const row of ledgerBalances) {
+      const allocated = Number(row.allocated_days ?? 0);
+      const used = Number(row.used_days ?? 0);
+      const adjusted = Number(row.adjusted_days ?? 0);
+      const available = row.available_days != null
+        ? Number(row.available_days)
+        : allocated + adjusted - used;
+      balances[row.leave_type_id] = {
+        total: allocated + adjusted,
         used,
-        remaining: type.days_per_year - used,
+        remaining: available,
       };
-    });
+    }
     return balances;
-  }, [leaveTypes, approvedRequests, unpaidLeaveType]);
+  }, [ledgerBalances]);
 
 
   const daysCount = useMemo(() => {
