@@ -74,11 +74,11 @@ export function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
     return allocated;
   }, [allLeaveTypes, eligibility, unpaidLeaveType]);
 
-  // Fetch approved leave requests to calculate used days
-  const { data: approvedRequests } = useQuery({
-    queryKey: ["leave-used-days", employeeId, currentYear],
+  // Fetch actual leave balances from backend (accurate calculation)
+  const { data: leaveBalanceData } = useQuery({
+    queryKey: ["leave-balance-for-form", employeeId, currentYear],
     queryFn: async () => {
-      const res = await hrmsApi.get<{success:boolean;data:any}>("/api/leave/requests");
+      const res = await hrmsApi.get<{success:boolean;data:any[]}>(`/api/leave/balance/${employeeId}?year=${currentYear}`);
       return res.data ?? [];
     },
     enabled: !!employeeId,
@@ -87,22 +87,19 @@ export function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
   const isUnpaid = !!unpaidLeaveType && leaveTypeId === unpaidLeaveType.id;
 
   const leaveBalances = useMemo(() => {
-    if (!leaveTypes) return {};
+    if (!leaveBalanceData) return {};
     const balances: Record<string, { total: number; used: number; remaining: number }> = {};
-    leaveTypes.forEach((type) => {
+    leaveBalanceData.forEach((bal: any) => {
       // Skip balance tracking for Unpaid Leave (unlimited)
-      if (type.id === unpaidLeaveType?.id) return;
-      const used = approvedRequests
-        ?.filter((r) => r.leave_type_id === type.id && r.status === 'approved')
-        .reduce((sum, r) => sum + (r.total_days || 0), 0) || 0;
-      balances[type.id] = {
-        total: type.days_per_year,
-        used,
-        remaining: type.days_per_year - used,
+      if (bal.leave_type_id === unpaidLeaveType?.id) return;
+      balances[bal.leave_type_id] = {
+        total: Number(bal.allocated_days || 0),
+        used: Number(bal.used_days || 0),
+        remaining: Number(bal.allocated_days || 0) - Number(bal.used_days || 0),
       };
     });
     return balances;
-  }, [leaveTypes, approvedRequests, unpaidLeaveType]);
+  }, [leaveBalanceData, unpaidLeaveType]);
 
 
   const daysCount = useMemo(() => {
