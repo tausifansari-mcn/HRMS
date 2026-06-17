@@ -37,6 +37,15 @@ function normalizeSourceChannel(channel: string | null | undefined): string | nu
   return mapping[normalized] || channel; // Return normalized or original if no match
 }
 
+/** Convert Yes/No strings to boolean (1/0) for TINYINT(1) columns */
+function yesNoToBoolean(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'yes' || normalized === '1' || normalized === 'true') return 1;
+  if (normalized === 'no' || normalized === '0' || normalized === 'false') return 0;
+  return null;
+}
+
 export const atsService = {
   async listCandidates(filters: CandidateListFilters & { scopeFilter?: { sql: string; params: unknown[] } | string }): Promise<PaginatedResult<AtsCandidate>> {
     const conds: string[] = ["active_status = 1"];
@@ -155,9 +164,9 @@ export const atsService = {
        input.appliedForRole ?? input.appliedForProcess, normalizedChannel, input.referredBy ?? null,
        input.walkInDate ?? null, input.remarks ?? null, userId,
        input.address ?? null, input.education, input.experience,
-       input.rotationalShift ?? null, input.preferredShift ?? null, input.nightShiftOk ?? null,
-       input.leavesIn3months ?? null, input.ownsTwoWheeler ?? null, input.idProofAvailable ?? null,
-       input.educationProofAvailable ?? null, input.recruiterName ?? null, input.profileStatus ?? 'registered']
+       yesNoToBoolean(input.rotationalShift), input.preferredShift ?? null, input.nightShiftOk ?? null,
+       yesNoToBoolean(input.leavesIn3months), yesNoToBoolean(input.ownsTwoWheeler), yesNoToBoolean(input.idProofAvailable),
+       yesNoToBoolean(input.educationProofAvailable), input.recruiterName ?? null, input.profileStatus ?? 'registered']
     );
 
     await db.execute(

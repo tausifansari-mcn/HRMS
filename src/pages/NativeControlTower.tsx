@@ -33,6 +33,7 @@ export default function NativeControlTower() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [health, setHealth] = useState<{ checks: HealthCheck[]; total_issues: number }>({ checks: [], total_issues: 0 });
   const [risks, setRisks] = useState<any>({ open_risks: [], counts: {}, generated_risks: [] });
+  const [teamData, setTeamData] = useState<any>({ manager: null, direct_reports: [], team_summary: { total: 0, by_designation: {}, by_department: {} } });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -61,11 +62,12 @@ export default function NativeControlTower() {
     setLoading(true);
     setError(null);
     try {
-      const [inboxRes, eventRes, healthRes, riskRes] = await Promise.all([
+      const [inboxRes, eventRes, healthRes, riskRes, teamRes] = await Promise.all([
         hrmsApi.get<ApiResponse<InboxItem[]>>("/api/control-tower/inbox"),
         hrmsApi.get<ApiResponse<EventItem[]>>("/api/control-tower/events?limit=100"),
         hrmsApi.get<ApiResponse<{ checks: HealthCheck[]; total_issues: number }>>("/api/control-tower/master-data-health"),
         hrmsApi.get<ApiResponse<any>>("/api/control-tower/risks"),
+        hrmsApi.get<ApiResponse<any>>("/api/control-tower/my-team").catch(() => ({ data: { manager: null, direct_reports: [], team_summary: { total: 0, by_designation: {}, by_department: {} } } })),
       ]);
       setInbox(inboxRes.data ?? []);
       setEvents(eventRes.data ?? []);

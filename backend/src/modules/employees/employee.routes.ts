@@ -37,7 +37,7 @@ const photoStorage = multer.diskStorage({
 
 const photoUpload = multer({
   storage: photoStorage,
-  limits: { fileSize: 3 * 1024 * 1024 }, // 3 MB max
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB max
   fileFilter: (_req, file, cb) => {
     const allowed = new Set([".jpg", ".jpeg", ".png", ".webp"]);
     const ext = path.extname(file.originalname).toLowerCase();
@@ -622,6 +622,20 @@ router.get("/:id/stat-card", requireAuth, h(async (req: any, res: any) => {
     }) as unknown as RowDataPacket[];
   } catch (_e) { /* table may not exist yet */ }
 
+  // Get employee badges
+  let badges: RowDataPacket[] = [];
+  try {
+    const { getEmployeeBadges } = await import('../engagement/badge.service.js');
+    badges = await getEmployeeBadges(targetId) as unknown as RowDataPacket[];
+  } catch (_e) { /* table may not exist yet */ }
+
+  // Get recent kudos
+  let recentKudos: RowDataPacket[] = [];
+  try {
+    const { listKudos } = await import('../engagement/kudos.service.js');
+    recentKudos = await listKudos({ receiver_id: targetId }, 5) as unknown as RowDataPacket[];
+  } catch (_e) { /* table may not exist yet */ }
+
   return res.json({
     data: {
       employee: emp,
@@ -633,7 +647,37 @@ router.get("/:id/stat-card", requireAuth, h(async (req: any, res: any) => {
       gamification_tier: gamificationTier,
       journey,
       salary,
+      badges,
+      recent_kudos: recentKudos,
     }
+  });
+}));
+
+// GET /api/employees/:id/ctc - Fetch employee CTC
+router.get("/:id/ctc", requireAuth, h(async (req: any, res: any) => {
+  const targetId = req.params.id;
+  const isAdminOrHR = await hasRole(req.authUser!.id, "admin", "hr", "ceo", "finance", "payroll");
+  const selfEmp = await getEmployeeForUser(req.authUser!.id);
+
+  // Access check: admin/hr can view all; employees can only view own
+  if (!isAdminOrHR && selfEmp?.id !== targetId) {
+    return res.status(403).json({ success: false, message: "Access denied" });
+  }
+
+  const [[emp]] = await db.execute<RowDataPacket[]>(
+    `SELECT ctc FROM employees WHERE id = ? LIMIT 1`,
+    [targetId]
+  );
+
+  if (!emp) {
+    return res.status(404).json({ success: false, message: "Employee not found" });
+  }
+
+  return res.json({
+    success: true,
+    data: {
+      ctc: emp.ctc ? Number(emp.ctc) : null,
+    },
   });
 }));
 

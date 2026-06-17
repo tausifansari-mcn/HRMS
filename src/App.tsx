@@ -99,52 +99,63 @@ const NativePerformanceFeedbackAssignments = lazy(() => import("./pages/NativePe
 const NativePerformanceFeedbackForm = lazy(() => import("./pages/NativePerformanceFeedbackForm"));
 const NativePerformanceFeedbackTeamReports = lazy(() => import("./pages/NativePerformanceFeedbackTeamReports"));
 
-const NativeEmployeeStatCard = lazy(() => import("./pages/NativeEmployeeStatCard"));
-const NativeEngagement = lazy(() => import("./pages/NativeEngagement"));
-const NativeBadges = lazy(() => import("./pages/NativeBadges"));
-const NativeKudos = lazy(() => import("./pages/NativeKudos"));
-const NativeSurveys = lazy(() => import("./pages/NativeSurveys"));
-const NativeLeaderboard = lazy(() => import("./pages/NativeLeaderboard"));
-const NativeEngagementCommandCenter = lazy(() => import("./pages/NativeEngagementCommandCenter"));
-const NativeExitCommandCenter = lazy(() => import("./pages/NativeExitCommandCenter"));
-const NativeOfferLetterGeneration = lazy(() => import("./pages/NativeOfferLetterGeneration"));
-const NativeMasterReports = lazy(() => import("./pages/NativeMasterReports"));
+// People
+const NativeEmployeeStatCard        = lazy(() => import("./pages/NativeEmployeeStatCard"));
 
-const NativeAssetsManager = lazy(() => import("./pages/NativeAssetsManager"));
-const NativeHelpdesk = lazy(() => import("./pages/NativeHelpdesk"));
-const NativeLetters = lazy(() => import("./pages/NativeLetters"));
-const NativeLifecycle = lazy(() => import("./pages/NativeLifecycle"));
-const NativeEmployeeLifecycle = lazy(() => import("./pages/NativeEmployeeLifecycle"));
-const NativeOrgMasters = lazy(() => import("./pages/NativeOrgMasters"));
-const NativeWorkflowAdmin = lazy(() => import("./pages/NativeWorkflowAdmin"));
-const NativeBenefitsClaims = lazy(() => import("./pages/NativeBenefitsClaims"));
-const NativeCareerPlanning = lazy(() => import("./pages/NativeCareerPlanning"));
-const NativePIPManagement = lazy(() => import("./pages/NativePIPManagement"));
-const NativeERP = lazy(() => import("./pages/NativeERP"));
-const NativeGoalsAppraisal = lazy(() => import("./pages/NativeGoalsAppraisal"));
-const NativeWorkInbox = lazy(() => import("./pages/NativeWorkInbox"));
-const NativeMobilityManagement = lazy(() => import("./pages/NativeMobilityManagement"));
-const NativeJobsPortal = lazy(() => import("./pages/NativeJobsPortal"));
-const NativeAdvancedReports = lazy(() => import("./pages/NativeAdvancedReports"));
-const NativeStatutoryCompliance = lazy(() => import("./pages/NativeStatutoryCompliance"));
-const NativeLabourCompliance = lazy(() => import("./pages/NativeLabourCompliance"));
-const NativeDPDPCompliance = lazy(() => import("./pages/NativeDPDPCompliance"));
-const NativeMaternityLeave = lazy(() => import("./pages/NativeMaternityLeave"));
-const NativeIntegrationHub = lazy(() => import("./pages/NativeIntegrationHub"));
-const EnhancedClientMaster = lazy(() => import("./pages/EnhancedClientMaster"));
-const NativeLocationPolicyMasters = lazy(() => import("./pages/NativeLocationPolicyMasters"));
+// Engagement
+const NativeEngagement                = lazy(() => import("./pages/NativeEngagement"));
+const NativeBadges                    = lazy(() => import("./pages/NativeBadges"));
+const NativeKudos                     = lazy(() => import("./pages/NativeKudos"));
+const NativeSurveys                   = lazy(() => import("./pages/NativeSurveys"));
+const NativeLeaderboard               = lazy(() => import("./pages/NativeLeaderboard"));
+const NativeEngagementCommandCenter   = lazy(() => import("./pages/NativeEngagementCommandCenter"));
 
-const NativePayslipCenter = lazy(() => import("./pages/NativePayslipCenter"));
-const NativeTaxDeclaration = lazy(() => import("./pages/NativeTaxDeclaration"));
-const NativeFullFinal = lazy(() => import("./pages/NativeFullFinal"));
-const NativeStatutoryConfig = lazy(() => import("./pages/NativeStatutoryConfig"));
-const NativePayrollMasters = lazy(() => import("./pages/NativePayrollMasters"));
-const NativeSalaryPackages = lazy(() => import("./pages/NativeSalaryPackages"));
-const NativeIncentives = lazy(() => import("./pages/NativeIncentives"));
+// Exit
+const NativeExitCommandCenter         = lazy(() => import("./pages/NativeExitCommandCenter"));
 
-const NativeTemplateManager = lazy(() => import("./pages/NativeTemplateManager"));
-const NativeDispatchCenter = lazy(() => import("./pages/NativeDispatchCenter"));
-const NativeDispatchHistory = lazy(() => import("./pages/NativeDispatchHistory"));
+// Offer Letters & Master Reports
+const NativeOfferLetterGeneration   = lazy(() => import("./pages/NativeOfferLetterGeneration"));
+const NativeMasterReports           = lazy(() => import("./pages/NativeMasterReports"));
+
+// HR Ops
+const NativeAssetsManager           = lazy(() => import("./pages/NativeAssetsManager"));
+const NativeHelpdesk                = lazy(() => import("./pages/NativeHelpdesk"));
+const NativeLetters                 = lazy(() => import("./pages/NativeLetters"));
+const NativeLifecycle               = lazy(() => import("./pages/NativeLifecycle"));
+const NativeEmployeeLifecycle       = lazy(() => import("./pages/NativeEmployeeLifecycle"));
+const NativeOrgMasters              = lazy(() => import("./pages/NativeOrgMasters"));
+const NativeWorkflowAdmin           = lazy(() => import("./pages/NativeWorkflowAdmin"));
+const NativeBenefitsClaims          = lazy(() => import("./pages/NativeBenefitsClaims"));
+const NativeCareerPlanning          = lazy(() => import("./pages/NativeCareerPlanning"));
+const NativePIPManagement           = lazy(() => import("./pages/NativePIPManagement"));
+const NativeERP                     = lazy(() => import("./pages/NativeERP"));
+const NativeGoalsAppraisal          = lazy(() => import("./pages/NativeGoalsAppraisal"));
+const NativeWorkInbox               = lazy(() => import("./pages/NativeWorkInbox"));
+const NativeMobilityManagement      = lazy(() => import("./pages/NativeMobilityManagement"));
+const NativeJobsPortal              = lazy(() => import("./pages/NativeJobsPortal"));
+const NativeAdvancedReports         = lazy(() => import("./pages/NativeAdvancedReports"));
+const NativeStatutoryCompliance     = lazy(() => import("./pages/NativeStatutoryCompliance"));
+const NativeLabourCompliance        = lazy(() => import("./pages/NativeLabourCompliance"));
+const NativeDPDPCompliance          = lazy(() => import("./pages/NativeDPDPCompliance"));
+const NativeMaternityLeave          = lazy(() => import("./pages/NativeMaternityLeave"));
+const NativeIntegrationHub          = lazy(() => import("./pages/NativeIntegrationHub"));
+const EnhancedClientMaster          = lazy(() => import("./pages/EnhancedClientMaster"));
+const NativeLocationPolicyMasters   = lazy(() => import("./pages/NativeLocationPolicyMasters"));
+
+// Payroll
+const NativePayslipCenter           = lazy(() => import("./pages/NativePayslipCenter"));
+const NativeTaxDeclaration          = lazy(() => import("./pages/NativeTaxDeclaration"));
+const NativeFullFinal               = lazy(() => import("./pages/NativeFullFinal"));
+const NativeStatutoryConfig         = lazy(() => import("./pages/NativeStatutoryConfig"));
+const NativePayrollMasters          = lazy(() => import("./pages/NativePayrollMasters"));
+const NativeSalaryPackages          = lazy(() => import("./pages/NativeSalaryPackages"));
+const NativeIncentives              = lazy(() => import("./pages/NativeIncentives"));
+const PayrollOvertimeManagement     = lazy(() => import("./pages/PayrollOvertimeManagement"));
+
+// Communication
+const NativeTemplateManager         = lazy(() => import("./pages/NativeTemplateManager"));
+const NativeDispatchCenter          = lazy(() => import("./pages/NativeDispatchCenter"));
+const NativeDispatchHistory         = lazy(() => import("./pages/NativeDispatchHistory"));
 const NativeNotificationPreferences = lazy(() => import("./pages/NativeNotificationPreferences"));
 const NativeCommunicationConfig = lazy(() => import("./pages/NativeCommunicationConfig"));
 const NativeCallCentreConfig = lazy(() => import("./pages/NativeCallCentreConfig"));
@@ -333,6 +344,9 @@ const App = () => (
               <Route path="/payroll/masters" element={<ProtectedRoute><Gate pageCode="PAYROLL_MASTERS"><NativePayrollMasters /></Gate></ProtectedRoute>} />
               <Route path="/payroll/salary-packages" element={<ProtectedRoute><Gate pageCode="SALARY_PACKAGES"><NativeSalaryPackages /></Gate></ProtectedRoute>} />
               <Route path="/payroll/incentives" element={<ProtectedRoute><Gate pageCode="PAYROLL_INCENTIVES"><NativeIncentives /></Gate></ProtectedRoute>} />
+              <Route path="/payroll/overtime" element={<ProtectedRoute roles={['admin', 'wfm']}><PayrollOvertimeManagement /></ProtectedRoute>} />
+
+              {/* Communication */}
               <Route path="/communication/templates" element={<ProtectedRoute roles={['admin', 'hr']}><NativeTemplateManager /></ProtectedRoute>} />
               <Route path="/communication/dispatch" element={<ProtectedRoute roles={['admin', 'hr']}><NativeDispatchCenter /></ProtectedRoute>} />
               <Route path="/communication/history" element={<ProtectedRoute roles={['admin', 'hr']}><NativeDispatchHistory /></ProtectedRoute>} />

@@ -45,6 +45,7 @@ async function getEmployeeContext(id: string) {
   const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT e.*,
             COALESCE(NULLIF(TRIM(e.official_email), ''), e.email) AS email,
+            e.personal_email, e.personal_mobile,
             d.designation_name, dept.dept_name, b.branch_name, p.process_name,
             CONCAT(m.first_name, ' ', COALESCE(m.last_name, '')) AS manager_name
        FROM employees e
@@ -71,10 +72,11 @@ export const employeeService = {
     const salaryStartDate = input.salaryStartDate ?? input.dateOfJoining;
     await db.execute(
       `INSERT INTO employees
-         (id, employee_code, first_name, last_name, email, official_email, mobile, gender,
+         (id, employee_code, first_name, last_name, email, official_email, mobile,
+          personal_email, personal_mobile, gender,
           date_of_birth, date_of_joining, salary_start_date, employment_type,
           branch_id, department_id, process_id, designation_id, reporting_manager_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         input.employeeCode,
@@ -83,6 +85,8 @@ export const employeeService = {
         input.email ?? null,
         input.email ?? null,
         input.mobile ?? null,
+        input.personalEmail ?? null,
+        input.personalMobile ?? null,
         input.gender ?? null,
         input.dateOfBirth ?? null,
         input.dateOfJoining,
@@ -146,34 +150,20 @@ export const employeeService = {
 
     if (status)    { conds.push("LOWER(e.employment_status) = LOWER(?)"); params.push(status); }
     if (processId) {
-      conds.push(`(
-        e.process_id = ?
-        OR LOWER(TRIM(p.process_name)) = (
-          SELECT LOWER(TRIM(process_name)) FROM process_master WHERE id = ? LIMIT 1
-        )
-      )`);
-      params.push(processId, processId);
+      conds.push("e.process_id = ?");
+      params.push(processId);
     }
     if (branchId)  {
-      conds.push(`(
-        e.branch_id = ?
-        OR LOWER(TRIM(b.branch_name)) = (
-          SELECT LOWER(TRIM(branch_name)) FROM branch_master WHERE id = ? LIMIT 1
-        )
-      )`);
-      params.push(branchId, branchId);
+      conds.push("e.branch_id = ?");
+      params.push(branchId);
     }
     if (departmentId) {
-      conds.push(`(
-        e.department_id = ?
-        OR LOWER(TRIM(dept.dept_name)) = (
-          SELECT LOWER(TRIM(dept_name)) FROM department_master WHERE id = ? LIMIT 1
-        )
-      )`);
-      params.push(departmentId, departmentId);
+      conds.push("e.department_id = ?");
+      params.push(departmentId);
     }
     if (search)    {
       const term = `%${search}%`;
+      // Comprehensive search: indexed fields + all relevant employee attributes
       conds.push(`(
         COALESCE(e.full_name, '') LIKE ?
         OR CONCAT(COALESCE(e.first_name,''),' ',COALESCE(e.last_name,'')) LIKE ?
@@ -311,14 +301,17 @@ export const employeeService = {
     const sets: string[] = [];
     const params: unknown[] = [];
 
-    if (input.employeeCode      !== undefined) { sets.push("employee_code = ?");        params.push(input.employeeCode); }
-    if (input.firstName         !== undefined) { sets.push("first_name = ?");           params.push(input.firstName); }
-    if (input.lastName          !== undefined) { sets.push("last_name = ?");            params.push(input.lastName ?? null); }
+    // CRITICAL: Employee code and name cannot be modified after creation
+    // if (input.employeeCode      !== undefined) { sets.push("employee_code = ?");        params.push(input.employeeCode); }
+    // if (input.firstName         !== undefined) { sets.push("first_name = ?");           params.push(input.firstName); }
+    // if (input.lastName          !== undefined) { sets.push("last_name = ?");            params.push(input.lastName ?? null); }
     if (input.email             !== undefined) {
       sets.push("email = ?", "official_email = ?");
       params.push(input.email ?? null, input.email ?? null);
     }
     if (input.mobile            !== undefined) { sets.push("mobile = ?");               params.push(input.mobile ?? null); }
+    if (input.personalEmail     !== undefined) { sets.push("personal_email = ?");       params.push(input.personalEmail ?? null); }
+    if (input.personalMobile    !== undefined) { sets.push("personal_mobile = ?");      params.push(input.personalMobile ?? null); }
     if (input.gender            !== undefined) { sets.push("gender = ?");               params.push(input.gender); }
     if (input.dateOfBirth       !== undefined) { sets.push("date_of_birth = ?");        params.push(input.dateOfBirth ?? null); }
     if (input.dateOfJoining     !== undefined) { sets.push("date_of_joining = ?");      params.push(input.dateOfJoining); }

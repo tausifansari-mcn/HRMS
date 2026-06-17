@@ -262,6 +262,86 @@ export const controlTowerService = {
     return summary;
   },
 
+  async getManagerTeamHierarchy(userId: string, targetManagerId?: string) {
+    // Get the employee record for the requesting user
+    const requestingEmp = await getEmployeeForUser(userId);
+    if (!requestingEmp) {
+      return { manager: null, direct_reports: [], team_summary: { total: 0, by_designation: {}, by_department: {} } };
+    }
+
+    // Determine which manager's team to show
+    const managerId = targetManagerId || requestingEmp.id;
+
+    // Get manager details
+    const [managerRows] = await db.execute<RowDataPacket[]>(
+      `SELECT e.id, e.employee_code, e.first_name, e.last_name,
+              CONCAT(e.first_name, ' ', COALESCE(e.last_name, '')) AS full_name,
+              e.email, e.official_email, e.mobile, e.designation_id,
+              d.designation_name, dept.dept_name, b.branch_name, p.process_name,
+              e.avatar_url
+       FROM employees e
+       LEFT JOIN designation_master d ON d.id = e.designation_id
+       LEFT JOIN department_master dept ON dept.id = e.department_id
+       LEFT JOIN branch_master b ON b.id = e.branch_id
+       LEFT JOIN process_master p ON p.id = e.process_id
+       WHERE e.id = ? AND e.active_status = 1
+       LIMIT 1`,
+      [managerId]
+    );
+
+    const manager = (managerRows as any[])[0] || null;
+    if (!manager) {
+      return { manager: null, direct_reports: [], team_summary: { total: 0, by_designation: {}, by_department: {} } };
+    }
+
+    // Get direct reports
+    const [teamRows] = await db.execute<RowDataPacket[]>(
+      `SELECT e.id, e.employee_code, e.first_name, e.last_name,
+              CONCAT(e.first_name, ' ', COALESCE(e.last_name, '')) AS full_name,
+              e.email, e.official_email, e.mobile, e.phone,
+              e.designation_id, d.designation_name,
+              e.department_id, dept.dept_name,
+              e.branch_id, b.branch_name,
+              e.process_id, p.process_name,
+              e.employment_status, e.employment_type,
+              e.date_of_joining, e.avatar_url,
+              e.reporting_manager_id
+       FROM employees e
+       LEFT JOIN designation_master d ON d.id = e.designation_id
+       LEFT JOIN department_master dept ON dept.id = e.department_id
+       LEFT JOIN branch_master b ON b.id = e.branch_id
+       LEFT JOIN process_master p ON p.id = e.process_id
+       WHERE e.reporting_manager_id = ?
+         AND e.active_status = 1
+         AND LOWER(COALESCE(e.employment_status, 'active')) NOT IN ('inactive', 'terminated', 'offboarded', 'absconded')
+       ORDER BY d.designation_name, e.first_name`,
+      [managerId]
+    );
+
+    const directReports = teamRows as any[];
+
+    // Calculate team summary
+    const byDesignation: Record<string, number> = {};
+    const byDepartment: Record<string, number> = {};
+
+    for (const member of directReports) {
+      const desig = member.designation_name || 'Unassigned';
+      const dept = member.dept_name || 'Unassigned';
+      byDesignation[desig] = (byDesignation[desig] || 0) + 1;
+      byDepartment[dept] = (byDepartment[dept] || 0) + 1;
+    }
+
+    return {
+      manager,
+      direct_reports: directReports,
+      team_summary: {
+        total: directReports.length,
+        by_designation: byDesignation,
+        by_department: byDepartment,
+      },
+    };
+  },
+
   async getRiskSummary(query: any, userId: string) {
     const out: any = { open_risks: [], counts: {}, generated_risks: [] };
     if (await tableExists("management_risk_register")) {

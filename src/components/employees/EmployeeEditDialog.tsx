@@ -57,6 +57,8 @@ interface EditFormData {
   email: string;
   official_email: string;
   phone: string;
+  personal_email: string;
+  personal_mobile: string;
   address: string;
   city: string;
   country: string;
@@ -101,6 +103,8 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
     email: "",
     official_email: "",
     phone: "",
+    personal_email: "",
+    personal_mobile: "",
     address: "",
     city: "",
     country: "",
@@ -219,7 +223,11 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
     queryKey: ["departments"],
     queryFn: async () => {
       const res = await hrmsApi.get<{success:boolean;data:any}>("/api/org/departments");
-      return res.data ?? [];
+      // Map dept_name to name for consistent interface
+      return (res.data ?? []).map((dept: any) => ({
+        ...dept,
+        name: dept.dept_name || dept.name
+      }));
     },
   });
 
@@ -245,6 +253,8 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
         email: employeeDetails.email || "",
         official_email: employeeDetails.official_email || "",
         phone: employeeDetails.mobile || employeeDetails.phone || "",
+        personal_email: employeeDetails.personal_email || "",
+        personal_mobile: employeeDetails.personal_mobile || "",
         address: employeeDetails.address1 || employeeDetails.address || "",
         city: employeeDetails.city || "",
         country: employeeDetails.country || "",
@@ -266,12 +276,12 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
   const updateMutation = useMutation({
     mutationFn: async ({ data, isDeptManager }: { data: EditFormData; isDeptManager: boolean }) => {
       await hrmsApi.patch(`/api/employees/${employee.id}`, {
-        employeeCode: data.employee_code,
-        firstName: data.first_name,
-        lastName: data.last_name,
+        // Note: employeeCode, firstName, and lastName are protected and cannot be updated
         email: data.email,
         officialEmail: data.official_email || null,
         mobile: data.phone || null,
+        personalEmail: data.personal_email || null,
+        personalMobile: data.personal_mobile || null,
         address1: data.address || null,
         city: data.city || null,
         country: data.country || null,
@@ -346,12 +356,14 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
       toast.error("Employee code is required");
       return;
     }
+    // Validate official email format if provided
     if (formData.official_email && !/^[a-zA-Z0-9._%+\-]+@(teammas\.in|teammas\.co\.in)$/.test(formData.official_email)) {
       toast.error("Official email must be @teammas.in or @teammas.co.in");
       return;
     }
-    if (!formData.first_name || !formData.last_name || !formData.email || !formData.designation) {
-      toast.error("Please fill in all required fields");
+    // Note: first_name, last_name, and employee_code are protected fields and cannot be updated
+    if (!formData.email || !formData.designation) {
+      toast.error("Please fill in all required fields (email, designation)");
       return;
     }
     try {
@@ -426,10 +438,13 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
                       id="employee_code"
                       value={formData.employee_code}
                       onChange={(e) => setFormData({ ...formData, employee_code: e.target.value.toUpperCase() })}
-                      className="pl-9 font-mono"
+                      className="pl-9 font-mono bg-slate-50"
                       required
+                      disabled
+                      title="Employee code cannot be changed"
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground">Employee code cannot be modified</p>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
@@ -439,7 +454,10 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
                       id="first_name"
                       value={formData.first_name}
                       onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                      className="bg-slate-50"
                       required
+                      disabled
+                      title="Name cannot be changed"
                     />
                   </div>
                   <div className="space-y-2">
@@ -448,10 +466,14 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
                       id="last_name"
                       value={formData.last_name}
                       onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                      className="bg-slate-50"
                       required
+                      disabled
+                      title="Name cannot be changed"
                     />
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground -mt-2">Employee name cannot be modified</p>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -484,6 +506,32 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
                     onChange={(e) => setFormData({ ...formData, official_email: e.target.value })}
                   />
                   <p className="text-xs text-muted-foreground">Must be @teammas.in or @teammas.co.in</p>
+                </div>
+
+                {/* Personal Contact Section */}
+                <div className="pt-2 border-t">
+                  <h4 className="text-sm font-medium mb-3">Personal Contact Information</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="personal_email">Personal Email</Label>
+                      <Input
+                        id="personal_email"
+                        type="email"
+                        placeholder="personal@gmail.com"
+                        value={formData.personal_email}
+                        onChange={(e) => setFormData({ ...formData, personal_email: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="personal_mobile">Personal Mobile</Label>
+                      <Input
+                        id="personal_mobile"
+                        placeholder="+91 98765 43210"
+                        value={formData.personal_mobile}
+                        onChange={(e) => setFormData({ ...formData, personal_mobile: e.target.value })}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

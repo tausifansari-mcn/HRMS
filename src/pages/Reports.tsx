@@ -306,8 +306,13 @@ const Reports = () => {
                 <LineChart data={payrollTrendData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`} />
+                  <YAxis tickFormatter={(value) => `${(Number(value) / 100000).toFixed(1)}L`} />
+                  <Tooltip
+                    formatter={(value) => {
+                      const lakhs = (Number(value) / 100000).toFixed(2);
+                      return [`₹${lakhs}L (${Number(value).toLocaleString('en-IN')})`, 'Payroll Amount'];
+                    }}
+                  />
                   <Line type="monotone" dataKey="amount" stroke="hsl(var(--primary))" strokeWidth={2} name="Payroll Amount" />
                 </LineChart>
               </ResponsiveContainer>

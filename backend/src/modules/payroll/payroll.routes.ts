@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../../middleware/authMiddleware.js";
 import { requireRole } from "../../middleware/requireRole.js";
 import { requireScopedRole } from "../../middleware/scopeMiddleware.js";
+import { requireWFMAccess } from "../../middleware/requireWFMAccess.js";
 import { buildScopeWhereClause } from "../../shared/scopeAccess.js";
 import { getEmployeeForUser, hasRole } from "../../shared/accessGuard.js";
 import { payrollController as c } from "./payroll.controller.js";
@@ -150,6 +151,14 @@ router.post("/runs/:id/calculate", requireRole("admin", "finance", "payroll"), a
 // ─── Run Lines ────────────────────────────────────────────────────────────────
 
 router.patch("/lines/:id", requireRole("admin", "finance", "payroll"), h(c.updateLine));
+
+// ─── Overtime (WFM-only) ──────────────────────────────────────────────────────
+
+router.patch("/lines/:lineId/overtime",
+  requireAuth,
+  requireWFMAccess,
+  h(c.updateOvertime)
+);
 
 // ─── Advances ─────────────────────────────────────────────────────────────────
 

@@ -563,6 +563,78 @@ export const payrollService = {
     return rows as SalaryAdvance[];
   },
 
+  // ─── Overtime Management ───────────────────────────────────────────────────
+
+  async updateOvertime(
+    lineId: string,
+    input: { overtimeHours: number; overtimeAmount: number },
+    userId: string
+  ): Promise<SalaryPrepLine> {
+    // Get the prep line with run status
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT spl.*, spr.status AS run_status, e.branch_id, e.employee_code
+       FROM salary_prep_line spl
+       JOIN salary_prep_run spr ON spl.run_id = spr.id
+       JOIN employees e ON spl.employee_id = e.id
+       WHERE spl.id = ? LIMIT 1`,
+      [lineId]
+    );
+
+    const line = rows[0] as any;
+    if (!line) throw new Error("Salary prep line not found");
+
+    // Check if run is editable
+    if (line.run_status === "locked" || line.run_status === "disbursed") {
+      throw new Error(`Cannot update overtime: run is ${line.run_status}`);
+    }
+
+    // Update overtime fields
+    await db.execute(
+      `UPDATE salary_prep_line
+       SET overtime_hours = ?,
+           overtime_amount = ?,
+           net_salary = net_salary - COALESCE(overtime_amount, 0) + ?,
+           gross_salary = gross_salary - COALESCE(overtime_amount, 0) + ?
+       WHERE id = ?`,
+      [input.overtimeHours, input.overtimeAmount, input.overtimeAmount, input.overtimeAmount, lineId]
+    );
+
+    // Log the action
+    await logSensitiveAction({
+      userId,
+      action: "payroll.overtime.update",
+      resourceType: "salary_prep_line",
+      resourceId: lineId,
+      metadata: {
+        employeeCode: line.employee_code,
+        branchId: line.branch_id,
+        overtimeHours: input.overtimeHours,
+        overtimeAmount: input.overtimeAmount,
+      },
+    });
+
+    // Append to journey log
+    await appendJourneyEvent({
+      employeeId: line.employee_id,
+      eventType: "overtime_updated",
+      eventCategory: "payroll",
+      description: `Overtime updated: ${input.overtimeHours}h = ₹${input.overtimeAmount}`,
+      metadata: {
+        lineId,
+        overtimeHours: input.overtimeHours,
+        overtimeAmount: input.overtimeAmount,
+        updatedBy: userId,
+      },
+    });
+
+    // Return updated line
+    const [updated] = await db.execute<RowDataPacket[]>(
+      "SELECT * FROM salary_prep_line WHERE id = ? LIMIT 1",
+      [lineId]
+    );
+    return (updated as SalaryPrepLine[])[0];
+  },
+
   // ─── Statutory Config ──────────────────────────────────────────────────────
 
   async getStatutoryConfig(): Promise<Record<string, number>> {
