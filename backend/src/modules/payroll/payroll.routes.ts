@@ -27,6 +27,37 @@ router.use(requireAuth);
 router.get("/structures", requireRole("admin", "hr", "finance", "payroll"), h(c.listStructures));
 router.post("/structures", requireRole("admin", "hr", "finance", "payroll"), h(c.createStructure));
 
+// ─── Employee Salaries (per-employee assignment with computed monthly amounts) ─
+router.get("/employee-salaries", requireRole("admin", "hr", "finance", "payroll"), h(async (req: AuthenticatedRequest, res: Response) => {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT
+       esa.id,
+       esa.employee_id,
+       esa.ctc_annual,
+       esa.effective_from,
+       ss.id             AS structure_id,
+       ss.structure_code,
+       ss.structure_name,
+       ss.basic_pct,
+       ss.hra_pct,
+       ROUND((esa.ctc_annual / 12) * ss.basic_pct  / 100, 2)                                          AS basic_salary,
+       ROUND((esa.ctc_annual / 12) * ss.hra_pct    / 100, 2)                                          AS hra,
+       ROUND((esa.ctc_annual / 12) - ((esa.ctc_annual / 12) * ss.basic_pct / 100)
+                                   - ((esa.ctc_annual / 12) * ss.hra_pct   / 100), 2)                 AS special_allowance,
+       CONCAT_WS(' ', e.first_name, e.last_name)  AS employee_name,
+       e.employee_code,
+       e.email                                     AS employee_email,
+       e.avatar_url                                AS employee_avatar
+     FROM employee_salary_assignment esa
+     JOIN salary_structure_master ss ON ss.id = esa.structure_id
+     JOIN employees e               ON e.id  = esa.employee_id
+     WHERE esa.active_status = 1
+       AND e.employment_status = 'active'
+     ORDER BY e.employee_code`
+  );
+  return res.json({ success: true, data: rows });
+}));
+
 // ─── Components ───────────────────────────────────────────────────────────────
 
 router.get("/components", requireRole("admin", "hr", "finance", "payroll"), h(c.listComponents));

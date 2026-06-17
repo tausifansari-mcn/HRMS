@@ -245,6 +245,7 @@ export function useBulkUpdatePayrollStatus() {
 export interface SalaryStructure {
   id: string;
   employeeId: string;
+  employeeCode: string;
   employeeName: string;
   employeeEmail: string;
   employeeAvatar?: string;
@@ -265,25 +266,28 @@ export function useSalaryStructures() {
   return useQuery({
     queryKey: ["salary-structures"],
     queryFn: async () => {
-      const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/payroll/structures");
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>("/api/payroll/employee-salaries");
       return (res.data || []).map((s: any): SalaryStructure => {
-        const hra = Number(s.hra ?? 0);
-        const transportAllowance = Number(s.transport_allowance ?? 0);
-        const medicalAllowance = Number(s.medical_allowance ?? 0);
-        const otherAllowances = Number(s.other_allowances ?? 0);
-        const taxDeduction = Number(s.tax_deduction ?? 0);
-        const otherDeductions = Number(s.other_deductions ?? 0);
         const basicSalary = Number(s.basic_salary ?? 0);
-        const totalAllowances = hra + transportAllowance + medicalAllowance + otherAllowances;
-        const totalDeductions = taxDeduction + otherDeductions;
+        const hra = Number(s.hra ?? 0);
+        const specialAllowance = Number(s.special_allowance ?? 0);
+        // transport/medical are not separate fields in our CTC model — special_allowance is the residual
+        const transportAllowance = 0;
+        const medicalAllowance = 0;
+        const otherAllowances = specialAllowance;
+        const taxDeduction = 0;
+        const otherDeductions = 0;
+        const totalAllowances = hra + specialAllowance;
+        const totalDeductions = 0;
         const netSalary = basicSalary + totalAllowances - totalDeductions;
 
         return {
           id: s.id,
           employeeId: s.employee_id ?? "",
-          employeeName: s.structure_name ?? `${s.employee?.first_name ?? ""} ${s.employee?.last_name ?? ""}`.trim(),
-          employeeEmail: s.employee?.email ?? "",
-          employeeAvatar: s.employee?.avatar_url ?? undefined,
+          employeeCode: s.employee_code ?? "",
+          employeeName: s.employee_name ?? s.employee_code ?? "Unknown",
+          employeeEmail: s.employee_email ?? "",
+          employeeAvatar: s.employee_avatar ?? undefined,
           basicSalary,
           hra,
           transportAllowance,
@@ -291,7 +295,7 @@ export function useSalaryStructures() {
           otherAllowances,
           taxDeduction,
           otherDeductions,
-          effectiveFrom: s.effective_from ?? s.created_at ?? "",
+          effectiveFrom: s.effective_from ?? "",
           totalAllowances,
           totalDeductions,
           netSalary,
