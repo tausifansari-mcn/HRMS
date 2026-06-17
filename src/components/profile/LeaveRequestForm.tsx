@@ -93,8 +93,8 @@ export function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
       // Skip balance tracking for Unpaid Leave (unlimited)
       if (type.id === unpaidLeaveType?.id) return;
       const used = approvedRequests
-        ?.filter((r) => r.leave_type_id === type.id)
-        .reduce((sum, r) => sum + r.days_count, 0) || 0;
+        ?.filter((r) => r.leave_type_id === type.id && r.status === 'approved')
+        .reduce((sum, r) => sum + (r.total_days || 0), 0) || 0;
       balances[type.id] = {
         total: type.days_per_year,
         used,
