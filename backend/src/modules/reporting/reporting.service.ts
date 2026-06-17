@@ -1410,7 +1410,7 @@ export const reportingService = {
   ): Promise<{
     employeeGrowth: Array<{ month: string; employees: number }>;
     departmentDistribution: Array<{ name: string; value: number }>;
-    leaveStatistics: { monthlyData: Array<Record<string, string | number>>; leaveTypeKeys: string[] };
+    leaveStatistics: { monthlyData: Array<Record<string, string | number>>; leaveTypeKeys: string[]; leaveTypeLabels: Record<string, string>; leaveSummary: Array<{ leave_name: string; total_days: number; employee_count: number; request_count: number }> };
     payrollTrend: Array<{ month: string; amount: number }>;
     headcount: {
       newHires: number;
@@ -1493,7 +1493,8 @@ export const reportingService = {
     const [leaveRows] = await db.execute<RowDataPacket[]>(
       `SELECT MONTH(lr.from_date) AS month_no,
               lt.leave_name,
-              SUM(lr.total_days) AS total_days
+              SUM(lr.total_days) AS total_days,
+              COUNT(DISTINCT lr.employee_id) AS employee_count
          FROM leave_request lr
          JOIN employees e ON e.id = lr.employee_id
          JOIN leave_type_master lt ON lt.id = lr.leave_type_id
@@ -1507,17 +1508,47 @@ export const reportingService = {
     );
     const leaveNames = Array.from(new Set(leaveRows.map((row) => String(row.leave_name))));
     const leaveKey = (name: string) => name.trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, "_");
+    const leaveCountKey = (name: string) => leaveKey(name) + "_count";
     const leaveTypeKeys = leaveNames.map(leaveKey);
+    const leaveTypeLabels: Record<string, string> = {};
+    for (const name of leaveNames) leaveTypeLabels[leaveKey(name)] = name;
     const monthlyData = monthNames.map((month, index) => {
       const item: Record<string, string | number> = { month };
-      for (const name of leaveNames) item[leaveKey(name)] = 0;
+      for (const name of leaveNames) {
+        item[leaveKey(name)] = 0;
+        item[leaveCountKey(name)] = 0;
+      }
       for (const row of leaveRows) {
         if (Number(row.month_no) === index + 1) {
           item[leaveKey(String(row.leave_name))] = Number(row.total_days ?? 0);
+          item[leaveCountKey(String(row.leave_name))] = Number(row.employee_count ?? 0);
         }
       }
       return item;
     });
+    // Per-type summary: total days + unique employees across all months
+    const [leaveSummaryRows] = await db.execute<RowDataPacket[]>(
+      `SELECT lt.leave_name,
+              SUM(lr.total_days) AS total_days,
+              COUNT(DISTINCT lr.employee_id) AS employee_count,
+              COUNT(lr.id) AS request_count
+         FROM leave_request lr
+         JOIN employees e ON e.id = lr.employee_id
+         JOIN leave_type_master lt ON lt.id = lr.leave_type_id
+        WHERE YEAR(lr.from_date) = ?
+          AND LOWER(lr.status) = 'approved'
+          AND lt.active_status = 1
+          AND ${leaveScope.sql}
+        GROUP BY lt.leave_name
+        ORDER BY total_days DESC`,
+      [year, ...leaveScope.params]
+    );
+    const leaveSummary = (leaveSummaryRows as any[]).map(row => ({
+      leave_name: String(row.leave_name),
+      total_days: Number(row.total_days ?? 0),
+      employee_count: Number(row.employee_count ?? 0),
+      request_count: Number(row.request_count ?? 0),
+    }));
 
     const payrollScope = scopeClause(scope, "e.branch_id");
     const [payrollRows] = await db.execute<RowDataPacket[]>(
@@ -1556,7 +1587,7 @@ export const reportingService = {
     return {
       employeeGrowth,
       departmentDistribution,
-      leaveStatistics: { monthlyData, leaveTypeKeys },
+      leaveStatistics: { monthlyData, leaveTypeKeys, leaveTypeLabels, leaveSummary },
       payrollTrend,
       headcount: {
         newHires,

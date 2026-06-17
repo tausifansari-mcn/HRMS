@@ -10,12 +10,21 @@ const CHART_COLORS = [
   "hsl(var(--primary))",
 ];
 
+interface LeaveSummaryRow {
+  leave_name: string;
+  total_days: number;
+  employee_count: number;
+  request_count: number;
+}
+
 interface AnalyticsOverview {
   employeeGrowth: Array<{ month: string; employees?: number; headcount?: number; joiners?: number; exits?: number }>;
   departmentDistribution: Array<{ name: string; value: number }>;
   leaveStatistics: {
     monthlyData: Array<Record<string, string | number>>;
     leaveTypeKeys: string[];
+    leaveTypeLabels?: Record<string, string>;
+    leaveSummary?: LeaveSummaryRow[];
   };
   payrollTrend: Array<{ month: string; amount: number }>;
   headcount: {
@@ -80,12 +89,27 @@ export function useDepartmentDistribution(year = new Date().getFullYear()) {
 
 export function useLeaveStatistics(year: number) {
   const query = useAnalyticsOverview(year);
+  const ls = query.data?.leaveStatistics;
   return {
     ...query,
-    data: query.data?.leaveStatistics.leaveTypeKeys.map((key) => ({
-      name: titleFromKey(key),
-      days: query.data?.leaveStatistics.monthlyData.reduce((sum, month) => sum + Number(month[key] ?? 0), 0) ?? 0,
+    // Per-type totals with employee count (for the bar chart)
+    data: ls?.leaveSummary?.map((row, i) => ({
+      name: row.leave_name,
+      days: row.total_days,
+      employees: row.employee_count,
+      requests: row.request_count,
+      color: CHART_COLORS[i % CHART_COLORS.length],
+    })) ?? ls?.leaveTypeKeys.map((key, i) => ({
+      name: ls.leaveTypeLabels?.[key] ?? titleFromKey(key),
+      days: ls.monthlyData.reduce((sum, month) => sum + Number(month[key] ?? 0), 0),
+      employees: 0,
+      requests: 0,
+      color: CHART_COLORS[i % CHART_COLORS.length],
     })),
+    // Month-by-month stacked data (for trend chart)
+    monthlyData: ls?.monthlyData,
+    leaveTypeKeys: ls?.leaveTypeKeys ?? [],
+    leaveTypeLabels: ls?.leaveTypeLabels ?? {},
   };
 }
 

@@ -350,13 +350,22 @@ export const payrollService = {
   },
 
   async listPayrollRecords(filters: RunFilters & { scopeFilter?: { sql: string; params: unknown[] } | string }): Promise<PaginatedResult<RowDataPacket>> {
-    const { page, limit, runMonth, status, scopeFilter } = filters;
+    const { page, limit, runMonth, status, search, departmentId, scopeFilter } = filters;
     const offset = (page - 1) * limit;
     const conds: string[] = [];
     const params: unknown[] = [];
 
     if (runMonth) { conds.push("spr.run_month = ?"); params.push(runMonth); }
     if (status)   { conds.push("spr.status = ?");    params.push(status); }
+    if (search) {
+      const s = `%${search.trim()}%`;
+      conds.push("(COALESCE(spl.employee_code, e.employee_code) LIKE ? OR CONCAT_WS(' ', e.first_name, e.last_name) LIKE ?)");
+      params.push(s, s);
+    }
+    if (departmentId) {
+      conds.push("e.department_id = ?");
+      params.push(departmentId);
+    }
 
     if (scopeFilter) {
       if (typeof scopeFilter === "object" && scopeFilter.sql) {
@@ -395,6 +404,10 @@ export const payrollService = {
                COALESCE(spl.working_days, 0) AS working_days,
                COALESCE(spl.present_days, 0) AS present_days,
                COALESCE(spl.lwp_days, 0) AS lwp_days,
+               COALESCE(bm.branch_name, '-') AS branch_name,
+               COALESCE(pm.process_name, '-') AS process_name,
+               COALESCE(dm.dept_name, '-') AS department_name,
+               COALESCE(cc.cost_centre_name, '-') AS cost_centre_name,
                ROW_NUMBER() OVER (
                  PARTITION BY spr.run_month, spl.employee_id
                  ORDER BY spr.created_at DESC, spl.id DESC
@@ -402,6 +415,10 @@ export const payrollService = {
           FROM salary_prep_line spl
           JOIN salary_prep_run spr ON spr.id = spl.run_id
           LEFT JOIN employees e ON e.id = spl.employee_id
+          LEFT JOIN branch_master bm ON bm.id = e.branch_id
+          LEFT JOIN process_master pm ON pm.id = e.process_id
+          LEFT JOIN department_master dm ON dm.id = e.department_id
+          LEFT JOIN cost_centre_master cc ON cc.id = e.cost_centre_id
           ${where}
       ) ranked
       WHERE ranked.rn = 1`;

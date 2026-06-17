@@ -2,6 +2,18 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { hrmsApi } from "@/lib/hrmsApi";
 import { format } from "date-fns";
 
+export interface PayrollRecordFilters {
+  month?:        number;
+  year?:         number;
+  search?:       string;
+  branchId?:     string;
+  departmentId?: string;
+  processId?:    string;
+  status?:       string;
+  page?:         number;
+  limit?:        number;
+}
+
 export interface PayrollRecord {
   id: string;
   runId: string;
@@ -72,39 +84,43 @@ const mapPayrollRecord = (row: any): PayrollRecord => {
   };
 };
 
-async function fetchPayrollRecordPages(runMonth?: string): Promise<PayrollRecord[]> {
-  const limit = 1000;
-  let page = 1;
-  let total = 0;
-  const records: PayrollRecord[] = [];
+async function fetchPayrollRecordPage(
+  f: PayrollRecordFilters
+): Promise<{ records: PayrollRecord[]; total: number; page: number; limit: number }> {
+  const p = new URLSearchParams();
+  if (f.month !== undefined && f.year !== undefined)
+    p.set("runMonth", toRunMonth(f.month, f.year)!);
+  if (f.search)       p.set("search",       f.search);
+  if (f.branchId)     p.set("branchId",     f.branchId);
+  if (f.departmentId) p.set("departmentId", f.departmentId);
+  if (f.processId)    p.set("processId",    f.processId);
+  if (f.status)       p.set("status",       f.status);
+  p.set("page",  String(f.page  ?? 1));
+  p.set("limit", String(f.limit ?? 50));
 
-  do {
-    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-    if (runMonth) params.set("runMonth", runMonth);
-
-    const res = await hrmsApi.get<{ success: boolean; data: any[]; total?: number }>(
-      `/api/payroll/records?${params}`
-    );
-    const pageRows = res.data || [];
-    records.push(...pageRows.map(mapPayrollRecord));
-    total = Number(res.total ?? records.length);
-    page += 1;
-  } while (records.length < total);
-
-  return records;
+  const res = await hrmsApi.get<{ success: boolean; data: any[]; total: number; page: number; limit: number }>(
+    `/api/payroll/records?${p}`
+  );
+  return {
+    records: (res.data ?? []).map(mapPayrollRecord),
+    total:   Number(res.total  ?? 0),
+    page:    Number(res.page   ?? 1),
+    limit:   Number(res.limit  ?? 50),
+  };
 }
 
-export function usePayrollRecords(month?: number, year?: number) {
+export function usePayrollRecords(filters: PayrollRecordFilters = {}) {
   return useQuery({
-    queryKey: ["payroll-records", month, year],
+    queryKey: ["payroll-records", filters],
     queryFn: async () => {
       try {
-        return fetchPayrollRecordPages(toRunMonth(month, year));
+        return fetchPayrollRecordPage(filters);
       } catch {
-        console.warn("Payroll run management requires backend payroll module");
-        return [] as PayrollRecord[];
+        console.warn("Payroll records fetch failed");
+        return { records: [] as PayrollRecord[], total: 0, page: 1, limit: 50 };
       }
     },
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -353,5 +369,109 @@ export function useDeleteSalaryStructure() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salary-structures"] });
     },
+  });
+}
+
+// ─── Analytics types ──────────────────────────────────────────────────────────
+
+export interface PayrollAnalyticsDimRow {
+  dimension_name:      string;
+  headcount:           number;
+  total_basic:         number;
+  total_allowances:    number;
+  total_gross:         number;
+  total_deductions:    number;
+  total_net:           number;
+  total_pf_employer:   number;
+  total_esic_employer: number;
+  avg_net?:            number;
+  pct_of_total?:       number;
+}
+
+export interface PayrollAnalyticsKPI {
+  headcount:           number;
+  total_net:           number;
+  avg_net:             number;
+  total_gross:         number;
+  total_pf_employer:   number;
+  total_esic_employer: number;
+}
+
+export interface PayrollAnalyticsResponse {
+  runMonth: string | null;
+  kpi:      PayrollAnalyticsKPI;
+  data:     PayrollAnalyticsDimRow[];
+}
+
+export interface PayrollTrendRow {
+  run_month:        string;
+  headcount:        number;
+  total_gross:      number;
+  total_deductions: number;
+  total_net:        number;
+  month_label?:     string;
+}
+
+export function usePayrollAnalytics(
+  runMonth: string | undefined,
+  dimension: "department" | "branch" | "process" = "department"
+) {
+  return useQuery<PayrollAnalyticsResponse>({
+    queryKey: ["payroll-analytics", runMonth, dimension],
+    queryFn: async () => {
+      const p = new URLSearchParams({ dimension });
+      if (runMonth) p.set("runMonth", runMonth);
+      const res = await hrmsApi.get<{ success: boolean; runMonth: string | null; kpi: any; data: any[] }>(
+        `/api/payroll/analytics?${p}`
+      );
+      const totalNet = Number(res.kpi?.total_net ?? 0);
+      return {
+        runMonth: res.runMonth ?? null,
+        kpi: {
+          headcount:           Number(res.kpi?.headcount           ?? 0),
+          total_net:           Number(res.kpi?.total_net           ?? 0),
+          avg_net:             Number(res.kpi?.avg_net             ?? 0),
+          total_gross:         Number(res.kpi?.total_gross         ?? 0),
+          total_pf_employer:   Number(res.kpi?.total_pf_employer   ?? 0),
+          total_esic_employer: Number(res.kpi?.total_esic_employer ?? 0),
+        },
+        data: (res.data ?? []).map((row) => ({
+          ...row,
+          headcount:           Number(row.headcount),
+          total_net:           Number(row.total_net),
+          total_gross:         Number(row.total_gross),
+          total_pf_employer:   Number(row.total_pf_employer),
+          total_esic_employer: Number(row.total_esic_employer),
+          avg_net:      row.headcount > 0 ? Number(row.total_net) / Number(row.headcount) : 0,
+          pct_of_total: totalNet > 0 ? (Number(row.total_net) / totalNet) * 100 : 0,
+        })),
+      };
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function usePayrollTrends(months = 6) {
+  return useQuery<PayrollTrendRow[]>({
+    queryKey: ["payroll-trends", months],
+    queryFn: async () => {
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>(
+        `/api/payroll/analytics/trends?months=${months}`
+      );
+      return (res.data ?? []).map((row) => {
+        const [yr, mo] = String(row.run_month ?? "").split("-");
+        const label = new Intl.DateTimeFormat("en-IN", { month: "short", year: "2-digit" })
+          .format(new Date(Number(yr), Number(mo) - 1, 1));
+        return {
+          run_month:        String(row.run_month),
+          headcount:        Number(row.headcount),
+          total_gross:      Number(row.total_gross),
+          total_deductions: Number(row.total_deductions),
+          total_net:        Number(row.total_net),
+          month_label:      label,
+        };
+      });
+    },
+    staleTime: 2 * 60 * 1000,
   });
 }
