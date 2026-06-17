@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { hrmsApi } from "@/lib/hrmsApi";
 
+type BranchAlias = {
+  canonical: string;
+  display: string;
+  alias: string;
+};
+
 type Bootstrap = {
   fields?: FieldDef[];
   companyName: string;
@@ -10,6 +16,7 @@ type Bootstrap = {
   roleOptions: string[];
   recruiterOptions: string[];
   branchOptions: string[];
+  branchAliases?: BranchAlias[];
   yesNoOptions: string[];
   preferredShiftOptions: string[];
   nightShiftComfortOptions: string[];
@@ -99,6 +106,7 @@ const DEFAULT_BOOTSTRAP: Bootstrap = {
   roleOptions: [],
   recruiterOptions: [],
   branchOptions: [],
+  branchAliases: [],
   yesNoOptions: ["Yes", "No"],
   preferredShiftOptions: [],
   nightShiftComfortOptions: [],
@@ -375,6 +383,11 @@ export default function NativeATSCandidateRegistration() {
     const res = await hrmsApi.get('/api/ats/form-config/bootstrap').catch(() => null);
     const data = res?.data;
     if (data) {
+      // Use branch aliases (display names) if available, otherwise fall back to canonical names
+      const branchOptions = data.branchAliases && data.branchAliases.length > 0
+        ? data.branchAliases.map((a: BranchAlias) => a.display)
+        : data.branchOptions ?? ["Mumbai","Delhi","Bangalore"];
+
       setBootstrap({
         companyName:             "Mas Callnet India Pvt Ltd",
         fields:                  data.fields              ?? undefined,
@@ -383,7 +396,8 @@ export default function NativeATSCandidateRegistration() {
         genderOptions:           data.genderOptions       ?? ["Male","Female","Other"],
         roleOptions:             data.roleOptions         ?? ["Inbound Agent","Outbound Agent","Back Office","Team Leader","Quality Analyst"],
         recruiterOptions:        data.recruiterOptions    ?? ["Admin","HR Team","Sourcer"],
-        branchOptions:           data.branchOptions       ?? ["Mumbai","Delhi","Bangalore"],
+        branchOptions,
+        branchAliases:           data.branchAliases       ?? [],
         yesNoOptions:            ["Yes","No"],
         preferredShiftOptions:   data.preferredShiftOptions   ?? ["Morning (6AM-2PM)","Afternoon (2PM-10PM)","Night (10PM-6AM)","Rotational"],
         nightShiftComfortOptions:data.nightShiftComfortOptions ?? ["Comfortable","Not Comfortable","On Request"],
@@ -397,6 +411,7 @@ export default function NativeATSCandidateRegistration() {
         roleOptions:              ["Inbound Agent","Outbound Agent","Back Office","Team Leader","Quality Analyst"],
         recruiterOptions:         ["Admin","HR Team","Sourcer"],
         branchOptions:            ["Mumbai","Delhi","Bangalore","Hyderabad","Chennai","Pune"],
+        branchAliases:            [],
         yesNoOptions:             ["Yes","No"],
         preferredShiftOptions:    ["Morning (6AM-2PM)","Afternoon (2PM-10PM)","Night (10PM-6AM)","Rotational"],
         nightShiftComfortOptions: ["Comfortable","Not Comfortable","On Request"],
@@ -569,6 +584,10 @@ export default function NativeATSCandidateRegistration() {
     const step3 = window.setTimeout(() => setLoadingStep(3), 1400);
 
     try {
+      // Convert display name back to canonical branch name
+      const selectedBranchAlias = bootstrap.branchAliases?.find(a => a.display === coreData.branch);
+      const canonicalBranch = selectedBranchAlias?.canonical || coreData.branch;
+
       const payload = {
         fullName:                 coreData.name,
         mobile:                   coreData.mobile,
@@ -576,7 +595,7 @@ export default function NativeATSCandidateRegistration() {
         gender:                   coreData.gender || null,
         appliedForProcess:        coreData.roleApplied || null,
         appliedForRole:           coreData.roleApplied || null,
-        appliedForBranch:         coreData.branch || null,
+        appliedForBranch:         canonicalBranch || null,
         sourcingChannel:          'Walk-In', // Canonical format - backend normalizes this
         walkInDate:               new Date().toISOString().slice(0, 10),
         // New fields from migration 054:

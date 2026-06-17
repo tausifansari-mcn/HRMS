@@ -162,4 +162,40 @@ export const atsFormConfigService = {
   async deleteRecruiter(id: string) {
     await db.execute('UPDATE ats_recruiter SET active_status = 0, updated_at = NOW() WHERE id = ?', [id]);
   },
+
+  async listBranchAliases() {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT id, canonical_key, display_name, alias_text, active_status, created_at, updated_at
+       FROM ats_branch_alias_master
+       ORDER BY display_name ASC`
+    );
+    return rows as RowDataPacket[];
+  },
+
+  async createBranchAlias(canonical: string, display: string, alias: string | null) {
+    await db.execute<ResultSetHeader>(
+      'INSERT INTO ats_branch_alias_master (id, canonical_key, display_name, alias_text) VALUES (UUID(), ?, ?, ?)',
+      [canonical.trim(), display.trim(), alias?.trim() || null]
+    );
+    const [rows] = await db.execute<RowDataPacket[]>(
+      'SELECT id, canonical_key, display_name, alias_text, active_status FROM ats_branch_alias_master ORDER BY created_at DESC LIMIT 1'
+    );
+    return (rows as RowDataPacket[])[0];
+  },
+
+  async updateBranchAlias(id: string, data: { canonical_key?: string; display_name?: string; alias_text?: string; active_status?: number }) {
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    if (data.canonical_key !== undefined) { sets.push('canonical_key = ?'); params.push(data.canonical_key.trim()); }
+    if (data.display_name  !== undefined) { sets.push('display_name = ?');  params.push(data.display_name.trim()); }
+    if (data.alias_text    !== undefined) { sets.push('alias_text = ?');    params.push(data.alias_text?.trim() || null); }
+    if (data.active_status !== undefined) { sets.push('active_status = ?'); params.push(data.active_status); }
+    if (sets.length === 0) return;
+    params.push(id);
+    await db.execute(`UPDATE ats_branch_alias_master SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, params);
+  },
+
+  async deleteBranchAlias(id: string) {
+    await db.execute('DELETE FROM ats_branch_alias_master WHERE id = ?', [id]);
+  },
 };
