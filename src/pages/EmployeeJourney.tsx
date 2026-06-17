@@ -22,6 +22,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { normalizeDate } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -154,7 +155,7 @@ function TimelineItem({ event, type, isLast }: TimelineItemProps) {
           </div>
           <Badge variant="outline" className="flex-shrink-0 text-xs font-medium">
             <Calendar className="mr-1 h-3 w-3" />
-            {format(parseISO(date), "MMM d, yyyy")}
+            {format(parseISO(normalizeDate(date)), "MMM d, yyyy")}
           </Badge>
         </div>
       </div>
@@ -220,7 +221,7 @@ export default function EmployeeJourney() {
     ...journeyEvents.map((e) => ({ ...e, type: "journey" as const, sortDate: e.event_date })),
     ...promotions.map((p) => ({ ...p, type: "promotion" as const, sortDate: p.promotion_date })),
     ...transfers.map((t) => ({ ...t, type: "transfer" as const, sortDate: t.transfer_date })),
-  ].sort((a, b) => new Date(b.sortDate).getTime() - new Date(a.sortDate).getTime());
+  ].sort((a, b) => new Date(normalizeDate(b.sortDate)).getTime() - new Date(normalizeDate(a.sortDate)).getTime());
 
   const isLoading = profileLoading || journeyLoading || promotionsLoading || transfersLoading;
 
@@ -245,7 +246,7 @@ export default function EmployeeJourney() {
   }
 
   const yearsOfService = profile.date_of_joining
-    ? Math.floor((Date.now() - new Date(profile.date_of_joining).getTime()) / (1000 * 60 * 60 * 24 * 365))
+    ? Math.floor((Date.now() - new Date(/^\d{4}-\d{2}-\d{2}$/.test(profile.date_of_joining) ? `${profile.date_of_joining}T00:00:00` : profile.date_of_joining).getTime()) / (1000 * 60 * 60 * 24 * 365))
     : 0;
 
   return (

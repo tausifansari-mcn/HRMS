@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CalendarIcon, Send, Loader2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, differenceInDays, subDays, startOfDay, eachDayOfInterval, isWeekend, parseISO, isSameDay } from "date-fns";
+import { normalizeDate } from "@/lib/utils";
 import { useLeaveTypes, useSubmitLeaveRequest } from "@/hooks/useLeaveRequests";
 import { useLeaveEligibility } from "@/hooks/useLeaveEligibility";
 import { useQuery } from "@tanstack/react-query";
@@ -110,7 +111,7 @@ export function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
 
   const daysCount = useMemo(() => {
     if (!startDate || !endDate) return 0;
-    const holidayDates = holidays.map((h) => parseISO(h.event_date));
+    const holidayDates = holidays.map((h) => parseISO(normalizeDate(h.event_date)));
     return eachDayOfInterval({ start: startDate, end: endDate })
       .filter((d) => !isWeekend(d) && !holidayDates.some((hd) => isSameDay(d, hd))).length;
   }, [startDate, endDate, holidays]);

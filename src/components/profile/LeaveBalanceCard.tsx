@@ -69,9 +69,15 @@ export function LeaveBalanceCard({ employeeId }: LeaveBalanceCardProps) {
 
                     <p className="text-xs text-muted-foreground">
                       Allocated: {balance.allocated_days.toFixed(1)} days
+                      {balance.annual_entitlement != null &&
+                        balance.annual_entitlement !== balance.allocated_days && (
+                          <span className="text-slate-400">
+                            {" "}(annual: {balance.annual_entitlement} days)
+                          </span>
+                        )}
                       {balance.adjusted_days !== 0 && (
                         <span className={balance.adjusted_days > 0 ? " text-green-600" : " text-red-500"}>
-                          {" "}({balance.adjusted_days > 0 ? "+" : ""}{balance.adjusted_days.toFixed(1)} adjustment)
+                          {" "}({balance.adjusted_days > 0 ? "+" : ""}{balance.adjusted_days.toFixed(1)} adj)
                         </span>
                       )}
                     </p>

@@ -9,6 +9,7 @@ export interface LeaveBalance {
   used_days: number;
   adjusted_days: number;
   available_days: number;
+  annual_entitlement: number | null;
   year: number;
   // EL-specific: current year's accumulation (not yet spendable)
   el_accruing_days?: number;
@@ -48,6 +49,7 @@ export function useLeaveBalances(employeeId: string | undefined) {
           used_days: used,
           adjusted_days: adjusted,
           available_days: available,
+          annual_entitlement: row.annual_entitlement != null ? Number(row.annual_entitlement) : null,
           year: Number(row.balance_year ?? currentYear),
           el_accruing_days: row.el_accruing_days != null ? Number(row.el_accruing_days) : undefined,
           el_last_credited_month: row.el_last_credited_month != null ? Number(row.el_last_credited_month) : undefined,

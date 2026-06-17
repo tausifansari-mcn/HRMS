@@ -104,7 +104,7 @@ export const leaveService = {
       );
       if (capResult.exceeded) {
         throw new Error(
-          `Monthly leave cap of 2 days reached for ${capResult.monthBreached}. Please apply excess days as Earned Leave.`
+          `Monthly leave cap of ${capResult.cap} day reached for ${capResult.monthBreached}. Please apply excess days as Earned Leave.`
         );
       }
     } else if (leaveCode === "EL") {
@@ -438,7 +438,7 @@ export const leaveService = {
       `SELECT lbl.id, lbl.employee_id, lbl.leave_type_id, lbl.balance_year,
               lbl.allocated_days, lbl.used_days, lbl.adjusted_days,
               (lbl.allocated_days + COALESCE(lbl.adjusted_days,0) - lbl.used_days) AS available_days,
-              lt.leave_name, lt.leave_code, lt.paid_leave, lt.carry_forward, lt.max_days_per_year
+              lt.leave_name, lt.leave_code, lt.paid_leave, lt.carry_forward, lt.max_days_per_year AS annual_entitlement
        FROM leave_balance_ledger lbl
        JOIN leave_type_master lt ON lt.id = lbl.leave_type_id
        WHERE lbl.employee_id = ? AND lbl.balance_year = ? AND lt.active_status = 1

@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { hrmsApi } from "@/lib/hrmsApi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, parseISO } from "date-fns";
+import { normalizeDate } from "@/lib/utils";
 
 interface LeaveInfo {
   id: string;
@@ -82,7 +83,7 @@ export function WhosOut() {
                   <p className="text-xs text-muted-foreground">
                     {leave.start_date === leave.end_date
                       ? "Today only"
-                      : `Until ${format(parseISO(leave.end_date), "MMM d")}`}
+                      : `Until ${format(parseISO(normalizeDate(leave.end_date)), "MMM d")}`}
                   </p>
                 </div>
                 <Badge variant="outline" className="text-xs shrink-0">

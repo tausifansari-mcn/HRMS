@@ -106,6 +106,14 @@ router.post("/batches/:id/import", requireRole("admin", "hr"), h(async (req: Aut
     return res.json({ success: true, data });
   }
 
+  if (rpc_name === "import_reporting_manager_update_batch") {
+    const { importReportingManagerBatch } = await import(
+      "../bulk-upload/reporting-manager-bulk.service.js"
+    );
+    const data = await importReportingManagerBatch(id, req.authUser!.id);
+    return res.json({ success: true, data });
+  }
+
   return res.status(501).json({
     success: false,
     error: `Import function '${rpc_name || "unknown"}' for batch ${id} is not yet implemented in the MySQL backend.`,

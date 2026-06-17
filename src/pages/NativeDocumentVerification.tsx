@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { normalizeDate } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { hrmsApi } from "@/lib/hrmsApi";
@@ -63,7 +64,7 @@ interface AccessLogEntry {
 function daysUntil(dateStr: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const expiry = new Date(dateStr);
+  const expiry = new Date(normalizeDate(dateStr));
   expiry.setHours(0, 0, 0, 0);
   return Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
@@ -79,7 +80,7 @@ function DaysRemainingBadge({ expiryDate }: { expiryDate?: string }) {
 
 function formatDate(str?: string): string {
   if (!str) return "—";
-  try { return new Date(str).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); }
+  try { return new Date(normalizeDate(str)).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); }
   catch { return str; }
 }
 
