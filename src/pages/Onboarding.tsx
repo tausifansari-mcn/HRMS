@@ -1268,8 +1268,8 @@ const Onboarding = () => {
                   {onboardingEmployees.map((employee) => {
                     const name = `${employee.first_name} ${employee.last_name}`;
                     const departmentName = employee.departments?.name || 'Unassigned';
-                    const hireDate = employee.hire_date 
-                      ? new Date(employee.hire_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    const hireDate = employee.hire_date
+                      ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(employee.hire_date) ? `${employee.hire_date}T00:00:00` : employee.hire_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                       : 'TBD';
                     
                     return (
@@ -1541,8 +1541,8 @@ const Onboarding = () => {
                     <div>
                       <p className="text-xs text-muted-foreground">Start Date</p>
                       <p className="text-sm font-medium">
-                        {selectedEmployee.hire_date 
-                          ? new Date(selectedEmployee.hire_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                        {selectedEmployee.hire_date
+                          ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(selectedEmployee.hire_date) ? `${selectedEmployee.hire_date}T00:00:00` : selectedEmployee.hire_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
                           : 'TBD'}
                       </p>
                     </div>

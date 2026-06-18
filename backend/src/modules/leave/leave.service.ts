@@ -120,7 +120,7 @@ export const leaveService = {
       );
       if (capResult.exceeded) {
         throw new Error(
-          `Monthly leave cap of 2 days reached for ${capResult.monthBreached}. Please apply excess days as Earned Leave.`
+          `Monthly leave cap of ${capResult.cap} day reached for ${capResult.monthBreached}. Please apply excess days as Earned Leave.`
         );
       }
     } else if (leaveCode === "EL") {
@@ -180,41 +180,103 @@ export const leaveService = {
 
     // Helper: deduct leave balance within a connection (for transaction safety)
     const deductLeaveBalance = async (conn: any) => {
-      if (!request.leave_type_id) {
-        throw new Error("Leave type is required for approval");
-      }
+      if (!request.leave_type_id) throw new Error("Leave type is required for approval");
+
       const duration = request.total_days;
       const employeeId = request.employee_id;
-      const leaveTypeId = request.leave_type_id;
       const year = new Date(request.from_date).getFullYear();
 
-      const [balanceRows] = await conn.execute(
-        `SELECT * FROM leave_balance_ledger
-         WHERE employee_id = ? AND leave_type_id = ? AND balance_year = ?`,
-        [employeeId, leaveTypeId, year]
+      // Get leave code for the request
+      const [ltRows] = await conn.execute(
+        "SELECT leave_code FROM leave_type_master WHERE id = ? LIMIT 1",
+        [request.leave_type_id]
       );
+      const leaveCode: string = (ltRows as any[])[0]?.leave_code;
+      if (!leaveCode) throw new Error("Leave type not found");
 
-      if (balanceRows.length === 0) {
-        await conn.execute(
-          `INSERT INTO leave_balance_ledger (id, employee_id, leave_type_id, balance_year, allocated_days, used_days, adjusted_days)
-           VALUES (UUID(), ?, ?, ?, 0, ?, 0)`,
-          [employeeId, leaveTypeId, year, duration]
+      if (leaveCode === 'CL' || leaveCode === 'ML') {
+        // CL+ML combined pool: check total available across both types
+        const [poolRows] = await conn.execute(
+          `SELECT lt.leave_code,
+                  COALESCE(lbl.allocated_days, 0) + COALESCE(lbl.adjusted_days, 0) - COALESCE(lbl.used_days, 0) AS available
+           FROM leave_type_master lt
+           LEFT JOIN leave_balance_ledger lbl
+             ON lbl.leave_type_id = lt.id AND lbl.employee_id = ? AND lbl.balance_year = ?
+           WHERE lt.leave_code IN ('CL', 'ML') AND lt.active_status = 1`,
+          [employeeId, year]
         );
-      } else {
-        const balance = balanceRows[0];
-        const availableBalance =
-          (balance.allocated_days || 0) + (balance.adjusted_days || 0) - (balance.used_days || 0);
-        if (duration > availableBalance) {
-          throw new Error(
-            `Insufficient leave balance. Available: ${availableBalance}, Requested: ${duration}`
+
+        const pool: Record<string, number> = {};
+        for (const r of poolRows as any[]) pool[r.leave_code] = Number(r.available ?? 0);
+        const totalAvailable = (pool['CL'] ?? 0) + (pool['ML'] ?? 0);
+
+        if (duration > totalAvailable) {
+          throw new Error(`Insufficient leave balance. Available (CL+ML): ${totalAvailable.toFixed(3)}, Requested: ${duration}`);
+        }
+
+        // Deduct: CL first, remainder from ML
+        let remaining = duration;
+        const clAvailable = pool['CL'] ?? 0;
+
+        if (clAvailable >= remaining) {
+          // All from CL
+          await conn.execute(
+            `INSERT INTO leave_balance_ledger (id, employee_id, leave_type_id, balance_year, allocated_days, used_days, adjusted_days)
+             VALUES (UUID(), ?, (SELECT id FROM leave_type_master WHERE leave_code='CL' LIMIT 1), ?, 0, ?, 0)
+             ON DUPLICATE KEY UPDATE used_days = used_days + ?`,
+            [employeeId, year, remaining, remaining]
+          );
+        } else {
+          // Some from CL, rest from ML
+          const fromML = remaining - clAvailable;
+          if (clAvailable > 0) {
+            await conn.execute(
+              `INSERT INTO leave_balance_ledger (id, employee_id, leave_type_id, balance_year, allocated_days, used_days, adjusted_days)
+               VALUES (UUID(), ?, (SELECT id FROM leave_type_master WHERE leave_code='CL' LIMIT 1), ?, 0, ?, 0)
+               ON DUPLICATE KEY UPDATE used_days = used_days + ?`,
+              [employeeId, year, clAvailable, clAvailable]
+            );
+          }
+          await conn.execute(
+            `INSERT INTO leave_balance_ledger (id, employee_id, leave_type_id, balance_year, allocated_days, used_days, adjusted_days)
+             VALUES (UUID(), ?, (SELECT id FROM leave_type_master WHERE leave_code='ML' LIMIT 1), ?, 0, ?, 0)
+             ON DUPLICATE KEY UPDATE used_days = used_days + ?`,
+            [employeeId, year, fromML, fromML]
           );
         }
-        await conn.execute(
-          `UPDATE leave_balance_ledger
-           SET used_days = used_days + ?
+
+      } else {
+        // All other types (EL, LWP, PTRL, MTRL): single-type balance check from leave_balance_ledger only
+        const [balanceRows] = await conn.execute(
+          `SELECT allocated_days, used_days, adjusted_days
+           FROM leave_balance_ledger
            WHERE employee_id = ? AND leave_type_id = ? AND balance_year = ?`,
-          [duration, employeeId, leaveTypeId, year]
+          [employeeId, request.leave_type_id, year]
         );
+
+        if ((balanceRows as any[]).length === 0) {
+          if (leaveCode === 'LWP') {
+            // LWP has no balance row — always allowed, just track usage
+            await conn.execute(
+              `INSERT INTO leave_balance_ledger (id, employee_id, leave_type_id, balance_year, allocated_days, used_days, adjusted_days)
+               VALUES (UUID(), ?, ?, ?, 0, ?, 0)`,
+              [employeeId, request.leave_type_id, year, duration]
+            );
+          } else {
+            throw new Error(`No leave balance found for ${leaveCode} in ${year}. Please contact HR.`);
+          }
+        } else {
+          const balance = (balanceRows as any[])[0];
+          const available = Number(balance.allocated_days) + Number(balance.adjusted_days) - Number(balance.used_days);
+          if (duration > available) {
+            throw new Error(`Insufficient ${leaveCode} balance. Available: ${available.toFixed(2)}, Requested: ${duration}`);
+          }
+          await conn.execute(
+            `UPDATE leave_balance_ledger SET used_days = used_days + ?
+             WHERE employee_id = ? AND leave_type_id = ? AND balance_year = ?`,
+            [duration, employeeId, request.leave_type_id, year]
+          );
+        }
       }
     };
 
@@ -423,51 +485,40 @@ export const leaveService = {
   },
 
   async getBalance(employeeId: string, year: number): Promise<any[]> {
-    await db.execute(
-      `INSERT INTO leave_balance_ledger
-         (id, employee_id, leave_type_id, balance_year, allocated_days, used_days, adjusted_days)
-       SELECT UUID(), e.id, lt.id, ?,
-              lt.max_days_per_year +
-                CASE
-                  WHEN lt.carry_forward = 1
-                  THEN GREATEST(
-                    COALESCE(prev.allocated_days, 0)
-                    + COALESCE(prev.adjusted_days, 0)
-                    - COALESCE(prev.used_days, 0),
-                    0
-                  )
-                  ELSE 0
-                END,
-              0, 0
-       FROM employees e
-       JOIN leave_type_master lt
-         ON lt.active_status = 1
-        AND lt.max_days_per_year > 0
-        AND LOWER(lt.leave_name) NOT LIKE '%legacy%'
-       LEFT JOIN leave_balance_ledger prev
-         ON prev.employee_id = e.id
-        AND prev.leave_type_id = lt.id
-        AND prev.balance_year = ? - 1
-       WHERE e.id = ?
-         AND e.active_status = 1
-         AND (
-           lt.leave_code NOT IN ('ML', 'MTRL', 'PL', 'PTRL')
-           OR (lt.leave_code IN ('ML', 'MTRL') AND LOWER(TRIM(COALESCE(e.gender, ''))) IN ('female', 'f'))
-           OR (lt.leave_code IN ('PL', 'PTRL') AND LOWER(TRIM(COALESCE(e.gender, ''))) IN ('male', 'm'))
-         )
-       ON DUPLICATE KEY UPDATE id = leave_balance_ledger.id`,
-      [year, year, employeeId]
-    );
-
+    // Fetch balance rows — do NOT auto-seed here; balances are seeded by migrations and annual worker
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT lbl.*, lt.leave_name, lt.leave_code, lt.paid_leave, lt.carry_forward, lt.max_days_per_year
+      `SELECT lbl.id, lbl.employee_id, lbl.leave_type_id, lbl.balance_year,
+              lbl.allocated_days, lbl.used_days, lbl.adjusted_days,
+              (lbl.allocated_days + COALESCE(lbl.adjusted_days,0) - lbl.used_days) AS available_days,
+              lt.leave_name, lt.leave_code, lt.paid_leave, lt.carry_forward, lt.max_days_per_year AS annual_entitlement
        FROM leave_balance_ledger lbl
        JOIN leave_type_master lt ON lt.id = lbl.leave_type_id
-       WHERE lbl.employee_id = ? AND lbl.balance_year = ?
+       WHERE lbl.employee_id = ? AND lbl.balance_year = ? AND lt.active_status = 1
        ORDER BY lt.leave_name ASC`,
       [employeeId, year]
     );
-    return rows as RowDataPacket[];
+
+    // Attach EL accrual (current year's accumulation — not yet spendable) as a separate field on the EL row
+    const [accrualRows] = await db.execute<RowDataPacket[]>(
+      `SELECT accrued_days, last_credited_month
+       FROM leave_el_accrual_ledger
+       WHERE employee_id = ? AND accrual_year = ?`,
+      [employeeId, year]
+    );
+    const accrual = accrualRows[0] ?? null;
+
+    const result = (rows as RowDataPacket[]).map((row) => {
+      if (row.leave_code === 'EL' && accrual) {
+        return {
+          ...row,
+          el_accruing_days: Number(accrual.accrued_days),       // accumulating this year (not spendable yet)
+          el_last_credited_month: Number(accrual.last_credited_month),
+        };
+      }
+      return row;
+    });
+
+    return result;
   },
 
   async listHolidays(year?: number): Promise<LeaveHoliday[]> {

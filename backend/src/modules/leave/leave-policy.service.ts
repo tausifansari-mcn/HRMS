@@ -48,7 +48,7 @@ async function checkMonthlyCapExceeded(
   requestedDays: number,
   excludeRequestId?: string
 ): Promise<{ exceeded: boolean; monthBreached: string | null; usedDays: number; cap: number }> {
-  const CAP = 2;
+  const CAP = 1;
   const months = getMonthsInRange(fromDate, toDate);
 
   for (const { year, month } of months) {
@@ -286,6 +286,42 @@ function prorateAnnualCredit(
 }
 
 // ---------------------------------------------------------------------------
+// getCombinedCLMLBalance
+// ---------------------------------------------------------------------------
+async function getCombinedCLMLBalance(
+  employeeId: string,
+  year: number
+): Promise<{ available: number; clAllocated: number; clUsed: number; mlAllocated: number; mlUsed: number }> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT lt.leave_code,
+            COALESCE(lbl.allocated_days, 0) AS allocated_days,
+            COALESCE(lbl.used_days, 0) AS used_days,
+            COALESCE(lbl.adjusted_days, 0) AS adjusted_days
+     FROM leave_type_master lt
+     LEFT JOIN leave_balance_ledger lbl
+       ON lbl.leave_type_id = lt.id
+       AND lbl.employee_id = ?
+       AND lbl.balance_year = ?
+     WHERE lt.leave_code IN ('CL', 'ML') AND lt.active_status = 1`,
+    [employeeId, year]
+  );
+
+  let clAllocated = 0, clUsed = 0, mlAllocated = 0, mlUsed = 0;
+  for (const row of rows as RowDataPacket[]) {
+    if (row.leave_code === 'CL') {
+      clAllocated = Number(row.allocated_days) + Number(row.adjusted_days);
+      clUsed = Number(row.used_days);
+    } else if (row.leave_code === 'ML') {
+      mlAllocated = Number(row.allocated_days) + Number(row.adjusted_days);
+      mlUsed = Number(row.used_days);
+    }
+  }
+
+  const available = (clAllocated - clUsed) + (mlAllocated - mlUsed);
+  return { available, clAllocated, clUsed, mlAllocated, mlUsed };
+}
+
+// ---------------------------------------------------------------------------
 // Named export
 // ---------------------------------------------------------------------------
 export const leavePolicyService = {
@@ -297,4 +333,5 @@ export const leavePolicyService = {
   requiresBranchHeadApproval,
   prorateMonthlyCredit,
   prorateAnnualCredit,
+  getCombinedCLMLBalance,
 };

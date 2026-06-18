@@ -472,7 +472,7 @@ export function EmployeeReport() {
                     {selectedEmployee.hire_date && (
                       <span className="flex items-center gap-1.5">
                         <Calendar className="h-3.5 w-3.5" />
-                        Joined {format(new Date(selectedEmployee.hire_date), "MMM yyyy")}
+                        Joined {format(new Date(/^\d{4}-\d{2}-\d{2}$/.test(selectedEmployee.hire_date) ? `${selectedEmployee.hire_date}T00:00:00` : selectedEmployee.hire_date), "MMM yyyy")}
                       </span>
                     )}
                   </div>

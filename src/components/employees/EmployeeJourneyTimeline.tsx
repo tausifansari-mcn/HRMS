@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { cn, normalizeDate } from "@/lib/utils";
 
 export interface EmployeeJourneyEvent {
   id?: string;
@@ -86,7 +86,7 @@ function getEventMeta(type: string) {
 
 function formatDate(value: string) {
   if (!value) return "Date not recorded";
-  return new Date(value).toLocaleDateString("en-IN", {
+  return new Date(normalizeDate(value)).toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "numeric",

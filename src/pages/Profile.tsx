@@ -29,6 +29,7 @@ import { PhotoUpload } from "@/components/employee/PhotoUpload";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useIsAdminOrHR } from "@/hooks/useUserRole";
 import { EmployeeDocuments } from "@/components/documents/EmployeeDocuments";
 import { LeaveBalanceCard } from "@/components/profile/LeaveBalanceCard";
 import { LeaveRequestForm } from "@/components/profile/LeaveRequestForm";
@@ -48,6 +49,8 @@ import {
 interface ProfileForm {
   email: string;
   phone: string;
+  personal_email: string;
+  personal_phone: string;
   alternate_mobile: string;
   personal_email: string;
   personal_mobile: string;
@@ -122,6 +125,7 @@ const Profile = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isAdminOrHR } = useIsAdminOrHR();
 
   const tabParam = (searchParams.get("tab") || "").toLowerCase();
   const allowedTabs = ["profile", "statutory", "emergency", "journey", "leaves", "attendance", "assets", "reviews", "payslips", "documents"] as const;
@@ -133,8 +137,7 @@ const Profile = () => {
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState<ProfileForm>({
-    email: "", phone: "", alternate_mobile: "", personal_email: "", personal_mobile: "",
-    address: "", city: "", country: "",
+    email: "", phone: "", personal_email: "", personal_mobile: "", personal_phone: "", alternate_mobile: "", address: "", city: "", country: "",
     date_of_birth: "", gender: "", marital_status: "", blood_group: "",
     working_hours_start: "09:00", working_hours_end: "18:00",
     working_days: [1, 2, 3, 4, 5, 6], // Default: Mon-Sat (Sunday off)
@@ -171,6 +174,8 @@ const Profile = () => {
       setFormData({
         email: employee.email || "",
         phone: employee.phone || "",
+        personal_email: employee.personal_email || "",
+        personal_phone: employee.personal_phone || "",
         alternate_mobile: employee.alternate_mobile || "",
         personal_email: employee.personal_email || "",
         personal_mobile: employee.personal_mobile || "",
@@ -215,6 +220,8 @@ const Profile = () => {
     if (employee) setFormData({
       email: employee.email || "",
       phone: employee.phone || "",
+      personal_email: employee.personal_email || "",
+      personal_phone: employee.personal_phone || "",
       alternate_mobile: employee.alternate_mobile || "",
       personal_email: employee.personal_email || "",
       personal_mobile: employee.personal_mobile || "",
@@ -273,7 +280,11 @@ const Profile = () => {
                   <PhotoUpload
                     currentUrl={avatarUrl}
                     displayName={`${employee.first_name} ${employee.last_name}`}
-                    onSuccess={(url) => setAvatarUrl(url || null)}
+                    onSuccess={(url) => {
+                      setAvatarUrl(url || null);
+                      queryClient.invalidateQueries({ queryKey: ["my-profile"] });
+                      queryClient.invalidateQueries({ queryKey: ["employee-profile"] });
+                    }}
                     size="2xl"
                   />
                 </div>
@@ -500,6 +511,28 @@ const Profile = () => {
                               onChange={(e) => setFormData(p => ({ ...p, phone: e.target.value }))}
                               disabled={!isEditing}
                               placeholder="e.g. +91 98765 43210"
+                              className="rounded-xl"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Personal Email</Label>
+                            <Input
+                              type="email"
+                              value={formData.personal_email}
+                              onChange={(e) => setFormData(p => ({ ...p, personal_email: e.target.value.toLowerCase() }))}
+                              disabled={!isEditing}
+                              placeholder="personal@gmail.com"
+                              className="rounded-xl"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Personal Phone</Label>
+                            <Input
+                              type="tel"
+                              value={formData.personal_phone}
+                              onChange={(e) => setFormData(p => ({ ...p, personal_phone: e.target.value }))}
+                              disabled={!isEditing}
+                              placeholder="Personal mobile number"
                               className="rounded-xl"
                             />
                           </div>
@@ -770,7 +803,11 @@ const Profile = () => {
 
               <TabsContent value="documents" className="space-y-6">
                 <TaxDocumentsViewer employeeId={employee.id} />
-                <EmployeeDocuments employeeId={employee.id} />
+                <EmployeeDocuments
+                  employeeId={employee.id}
+                  canUpload={isAdminOrHR}
+                  canDelete={isAdminOrHR}
+                />
               </TabsContent>
             </Tabs>
           </>

@@ -67,7 +67,7 @@ const Reports = () => {
 
   const { data: employeeGrowthData, isLoading: isLoadingGrowth } = useEmployeeGrowthData(year);
   const { data: departmentData, isLoading: isLoadingDept } = useDepartmentDistribution(year);
-  const { data: leaveStats, isLoading: isLoadingLeave } = useLeaveStatistics(year);
+  const { data: leaveStats, monthlyData: leaveMonthlyData, leaveTypeKeys, leaveTypeLabels, isLoading: isLoadingLeave } = useLeaveStatistics(year);
   const { data: payrollTrendData, isLoading: isLoadingPayroll } = usePayrollTrend(year);
   const { data: headcountData, isLoading: isLoadingHeadcount } = useHeadcountSummary(year);
 
@@ -266,28 +266,96 @@ const Reports = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="flex flex-col">
             <CardHeader>
               <CardTitle>Leave Statistics</CardTitle>
-              <CardDescription>Leave usage by type</CardDescription>
+              <CardDescription>
+                Approved leave days by type — {selectedYear} · Company-wide
+              </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 space-y-4">
               {isLoadingLeave ? (
                 <div className="h-[300px] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
+              ) : !leaveStats?.length ? (
+                <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
+                  No approved leave records for {selectedYear}
+                </div>
               ) : (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={leaveStats}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="days" fill="hsl(var(--primary))">
-                      {leaveStats?.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={LEAVE_COLORS[index % LEAVE_COLORS.length]} />
+                <>
+                  {/* Stacked monthly trend */}
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={leaveMonthlyData} margin={{ left: 0, right: 8, top: 4, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip
+                        formatter={(value: number, key: string) => [
+                          `${value} day${value !== 1 ? "s" : ""}`,
+                          leaveTypeLabels[key] ?? key,
+                        ]}
+                        contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                      />
+                      <Legend
+                        formatter={(key) => leaveTypeLabels[key] ?? key}
+                        wrapperStyle={{ fontSize: 11 }}
+                      />
+                      {leaveTypeKeys.map((key, i) => (
+                        <Bar
+                          key={key}
+                          dataKey={key}
+                          stackId="a"
+                          fill={LEAVE_COLORS[i % LEAVE_COLORS.length]}
+                          radius={i === leaveTypeKeys.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+                        />
                       ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                    </BarChart>
+                  </ResponsiveContainer>
+
+                  {/* Summary table */}
+                  <div className="rounded-md border text-sm">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b bg-muted/50 text-xs font-semibold text-muted-foreground">
+                          <th className="px-3 py-2 text-left">Leave Type</th>
+                          <th className="px-3 py-2 text-right">Days Taken</th>
+                          <th className="px-3 py-2 text-right">Employees</th>
+                          <th className="px-3 py-2 text-right">Requests</th>
+                          <th className="px-3 py-2 text-right">Avg Days/Emp</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {leaveStats.map((row, i) => (
+                          <tr key={row.name} className="border-b last:border-0">
+                            <td className="px-3 py-2 flex items-center gap-2">
+                              <span
+                                className="inline-block h-2.5 w-2.5 rounded-sm flex-shrink-0"
+                                style={{ background: LEAVE_COLORS[i % LEAVE_COLORS.length] }}
+                              />
+                              {row.name}
+                            </td>
+                            <td className="px-3 py-2 text-right font-medium tabular-nums">{row.days}</td>
+                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{row.employees}</td>
+                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{row.requests}</td>
+                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                              {row.employees > 0 ? (row.days / row.employees).toFixed(1) : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="bg-muted/30 font-semibold text-xs">
+                          <td className="px-3 py-2">Total</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{leaveStats.reduce((s, r) => s + r.days, 0)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                            {leaveStats.reduce((s, r) => s + r.employees, 0)}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                            {leaveStats.reduce((s, r) => s + r.requests, 0)}
+                          </td>
+                          <td className="px-3 py-2" />
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

@@ -132,6 +132,16 @@ const MIGRATION_MANIFEST: string[] = [
   "201_bgv_portal_initiation.sql",
   "202_onboarding_v2_court_check.sql",
   "203_bgv_missing_tables.sql",
+  "204_leave_type_master_fix.sql",
+  "205_leave_policy_config_fix.sql",
+  "206_leave_el_accrual_ledger.sql",
+  "207_leave_2026_balance_correction.sql",
+  "208_leave_2026_ml_el_accrual_seed.sql",
+  "209_sync_2026_used_days_from_db_bill.sql",
+  "210_fix_el_accrual_ledger_collation.sql",
+  "211_employee_personal_contact_fields.sql",
+  "212_reporting_manager_bulk_template.sql",
+  "213_salary_prep_line_component_columns.sql",
 ];
 
 export type MigrationHealth = {

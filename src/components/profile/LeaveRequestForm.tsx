@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CalendarIcon, Send, Loader2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, differenceInDays, subDays, startOfDay, eachDayOfInterval, isWeekend, parseISO, isSameDay } from "date-fns";
+import { normalizeDate } from "@/lib/utils";
 import { useLeaveTypes, useSubmitLeaveRequest } from "@/hooks/useLeaveRequests";
 import { useLeaveEligibility } from "@/hooks/useLeaveEligibility";
 import { useQuery } from "@tanstack/react-query";
@@ -74,11 +75,13 @@ export function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
     return allocated;
   }, [allLeaveTypes, eligibility, unpaidLeaveType]);
 
-  // Fetch actual leave balances from backend (accurate calculation)
-  const { data: leaveBalanceData } = useQuery({
-    queryKey: ["leave-balance-for-form", employeeId, currentYear],
+  // Fetch actual leave balances from ledger (includes db_bill synced used_days)
+  const { data: ledgerBalances } = useQuery({
+    queryKey: ["leave-balances", employeeId, currentYear],
     queryFn: async () => {
-      const res = await hrmsApi.get<{success:boolean;data:any[]}>(`/api/leave/balance/${employeeId}?year=${currentYear}`);
+      const res = await hrmsApi.get<{ success: boolean; data: any[] }>(
+        `/api/leave/balance/${employeeId}?year=${currentYear}`
+      );
       return res.data ?? [];
     },
     enabled: !!employeeId,
@@ -87,24 +90,28 @@ export function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
   const isUnpaid = !!unpaidLeaveType && leaveTypeId === unpaidLeaveType.id;
 
   const leaveBalances = useMemo(() => {
-    if (!leaveBalanceData) return {};
     const balances: Record<string, { total: number; used: number; remaining: number }> = {};
-    leaveBalanceData.forEach((bal: any) => {
-      // Skip balance tracking for Unpaid Leave (unlimited)
-      if (bal.leave_type_id === unpaidLeaveType?.id) return;
-      balances[bal.leave_type_id] = {
-        total: Number(bal.allocated_days || 0),
-        used: Number(bal.used_days || 0),
-        remaining: Number(bal.allocated_days || 0) - Number(bal.used_days || 0),
+    if (!ledgerBalances) return balances;
+    for (const row of ledgerBalances) {
+      const allocated = Number(row.allocated_days ?? 0);
+      const used = Number(row.used_days ?? 0);
+      const adjusted = Number(row.adjusted_days ?? 0);
+      const available = row.available_days != null
+        ? Number(row.available_days)
+        : allocated + adjusted - used;
+      balances[row.leave_type_id] = {
+        total: allocated + adjusted,
+        used,
+        remaining: available,
       };
-    });
+    }
     return balances;
-  }, [leaveBalanceData, unpaidLeaveType]);
+  }, [ledgerBalances]);
 
 
   const daysCount = useMemo(() => {
     if (!startDate || !endDate) return 0;
-    const holidayDates = holidays.map((h) => parseISO(h.event_date));
+    const holidayDates = holidays.map((h) => parseISO(normalizeDate(h.event_date)));
     return eachDayOfInterval({ start: startDate, end: endDate })
       .filter((d) => !isWeekend(d) && !holidayDates.some((hd) => isSameDay(d, hd))).length;
   }, [startDate, endDate, holidays]);
