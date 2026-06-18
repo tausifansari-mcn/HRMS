@@ -7,6 +7,7 @@ import { db } from "../../db/mysql.js";
 import { hasRole, getEmployeeForUser } from "../../shared/accessGuard.js";
 import type { RowDataPacket } from "mysql2";
 import type { AuthenticatedRequest } from "../../middleware/authMiddleware.js";
+import { getQualityHeatmap, predictAgentRisk, generateInsights, calculateQualityROI } from "./quality-insights.service.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -417,7 +418,8 @@ router.get("/sales-funnel", requireRole(...ALLOWED_ROLES), h(async (req, res) =>
   const pool = getCiPool();
 
   const whereClauses = ["CallDate BETWEEN ? AND ?"];
-  const params: unknown[] = [from, to];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params: any[] = [from, to];
   if (clientId) { whereClauses.push("client_id = ?"); params.push(clientId); }
   const where = whereClauses.join(" AND ");
 
@@ -456,6 +458,39 @@ router.get("/sales-funnel", requireRole(...ALLOWED_ROLES), h(async (req, res) =>
     rejection_funnel: rejection[0],
     top_rejection_reasons: reasons,
   });
+}));
+
+// GET /api/quality-dashboard/heatmap
+router.get("/heatmap", requireRole(...ALLOWED_ROLES), h(async (req, res) => {
+  const { from, to } = dateDefaults(req.query);
+  const data = await getQualityHeatmap(from, to);
+  return res.json({ success: true, heatmap: data });
+}));
+
+// GET /api/quality-dashboard/agent-risk
+router.get("/agent-risk", requireRole(...ALLOWED_ROLES), h(async (req: AuthenticatedRequest, res) => {
+  const { from, to } = dateDefaults(req.query);
+  const scope = await resolveScope(req);
+  let agents = await predictAgentRisk(from, to);
+  if (!scope.global && scope.agentCodes !== null) {
+    const codesSet = new Set(scope.agentCodes);
+    agents = agents.filter((a: any) => codesSet.has(a.agent_name));
+  }
+  return res.json({ success: true, agents });
+}));
+
+// GET /api/quality-dashboard/insights
+router.get("/insights", requireRole(...ALLOWED_ROLES), h(async (req, res) => {
+  const { from, to } = dateDefaults(req.query);
+  const insights = await generateInsights(from, to);
+  return res.json({ success: true, insights });
+}));
+
+// GET /api/quality-dashboard/roi
+router.get("/roi", requireRole(...ALLOWED_ROLES), h(async (req, res) => {
+  const { from, to } = dateDefaults(req.query);
+  const roi = await calculateQualityROI(from, to);
+  return res.json({ success: true, roi });
 }));
 
 export const qualityDashboardRouter = router;
