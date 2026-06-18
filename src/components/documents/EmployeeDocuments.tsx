@@ -10,6 +10,7 @@ import { Upload, FileText, Trash2, Download, Loader2, Eye } from "lucide-react";
 import { useEmployeeDocuments, useUploadDocument, useDeleteDocument } from "@/hooks/useEmployeeDocuments";
 import { format } from "date-fns";
 import { DocumentViewerDialog } from "./DocumentViewerDialog";
+import { useIsReadOnly } from "@/contexts/AuthContext";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,6 +52,7 @@ export function EmployeeDocuments({ employeeId, canUpload = false, canDelete = f
   const { data: documents, isLoading } = useEmployeeDocuments(employeeId);
   const uploadMutation = useUploadDocument();
   const deleteMutation = useDeleteDocument();
+  const isReadOnly = useIsReadOnly();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -124,7 +126,7 @@ export function EmployeeDocuments({ employeeId, canUpload = false, canDelete = f
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {canUpload && (
+        {canUpload && !isReadOnly && (
           <div className="flex flex-col sm:flex-row gap-3">
             <Select value={selectedType} onValueChange={setSelectedType}>
               <SelectTrigger className="w-full sm:w-[180px]">

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { requireAuth } from "../../middleware/authMiddleware.js";
+import { requireAuth, requireWriteAccess } from "../../middleware/authMiddleware.js";
 import { requireRole } from "../../middleware/requireRole.js";
 import { db } from "../../db/mysql.js";
 import { getLegacyPool } from "../../db/legacyDb.js";
@@ -89,7 +89,7 @@ leaveRouter.delete(
 );
 
 // Employee self-scope: employees can submit only their own leave request.
-leaveRouter.post("/requests", h(async (req: AuthenticatedRequest, res: Response) => {
+leaveRouter.post("/requests", requireWriteAccess, h(async (req: AuthenticatedRequest, res: Response) => {
   const privileged = await isLeavePrivileged(req.authUser!.id);
   if (!privileged) {
     const callerEmp = await getEmployeeForUser(req.authUser!.id);

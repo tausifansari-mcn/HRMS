@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { PhotoUpload } from "@/components/employee/PhotoUpload";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, useIsReadOnly } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
 import { EmployeeDocuments } from "@/components/documents/EmployeeDocuments";
@@ -125,6 +125,7 @@ const Profile = () => {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const { isAdminOrHR } = useIsAdminOrHR();
+  const isReadOnly = useIsReadOnly();
 
   const tabParam = (searchParams.get("tab") || "").toLowerCase();
   const allowedTabs = ["profile", "statutory", "emergency", "journey", "leaves", "attendance", "assets", "reviews", "payslips", "documents"] as const;
@@ -435,9 +436,11 @@ const Profile = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => setIsEditing(true)}
+                          disabled={isReadOnly}
                           className="gap-1.5 rounded-xl text-xs font-bold"
+                          title={isReadOnly ? "Cannot edit in read-only mode" : ""}
                         >
-                          <Edit3 className="h-3.5 w-3.5" /> Edit
+                          <Edit3 className="h-3.5 w-3.5" /> {isReadOnly ? "Read-Only" : "Edit"}
                         </Button>
                       ) : (
                         <div className="flex gap-2">

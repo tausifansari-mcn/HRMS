@@ -5,6 +5,7 @@ import { getDemoCred, buildDemoSession } from "@/lib/demoCreds";
 export interface HrmsUser {
   id: string;
   email: string;
+  isReadOnly?: boolean;
 }
 
 interface AuthContextType {
@@ -42,7 +43,11 @@ function decodeJwtUser(token: string): HrmsUser | null {
     const [, b64] = token.split('.');
     const payload = JSON.parse(atob(b64.replace(/-/g, '+').replace(/_/g, '/')));
     if (payload?.sub && payload?.exp && payload.exp * 1000 > Date.now()) {
-      return { id: payload.sub, email: payload.email ?? '' };
+      return {
+        id: payload.sub,
+        email: payload.email ?? '',
+        isReadOnly: payload.isReadOnly || false
+      };
     }
     return null;
   } catch {
@@ -177,7 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMustChangePassword(forceChange);
       await queryClient.cancelQueries();
       queryClient.clear();
-      setUser({ id: authUser.id, email: authUser.email });
+      setUser({ id: authUser.id, email: authUser.email, isReadOnly: authUser.isReadOnly || false });
       scheduleRefresh();
       return { error: null };
     } catch (err) {
@@ -265,4 +270,9 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+}
+
+export function useIsReadOnly() {
+  const { user } = useAuth();
+  return user?.isReadOnly || false;
 }

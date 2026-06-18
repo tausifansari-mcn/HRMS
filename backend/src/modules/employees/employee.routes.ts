@@ -4,7 +4,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { requireAuth } from "../../middleware/authMiddleware.js";
+import { requireAuth, requireWriteAccess } from "../../middleware/authMiddleware.js";
 import { requireRole } from "../../middleware/requireRole.js";
 import { requireScopedRole } from "../../middleware/scopeMiddleware.js";
 import { buildScopeWhereClause } from "../../shared/scopeAccess.js";
@@ -68,7 +68,7 @@ router.get("/me", h(async (req: any, res: any) => {
 }));
 
 // PATCH /api/employees/me — update own profile (employee self-service)
-router.patch("/me", h(async (req: any, res: any) => {
+router.patch("/me", requireWriteAccess, h(async (req: any, res: any) => {
   const parsed = selfProfileUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -85,7 +85,7 @@ router.patch("/me", h(async (req: any, res: any) => {
   return res.json({ success: true, data, message: "Profile updated" });
 }));
 
-router.put("/me/emergency-contact", h(async (req: any, res: any) => {
+router.put("/me/emergency-contact", requireWriteAccess, h(async (req: any, res: any) => {
   const parsed = emergencyContactSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -102,7 +102,7 @@ router.put("/me/emergency-contact", h(async (req: any, res: any) => {
   return res.json({ success: true, data, message: "Emergency contact saved" });
 }));
 
-router.put("/me/nominee", h(async (req: any, res: any) => {
+router.put("/me/nominee", requireWriteAccess, h(async (req: any, res: any) => {
   const parsed = nomineeSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -119,7 +119,7 @@ router.put("/me/nominee", h(async (req: any, res: any) => {
   return res.json({ success: true, data, message: "Nominee details saved" });
 }));
 
-router.put("/me/bank-details", h(async (req: any, res: any) => {
+router.put("/me/bank-details", requireWriteAccess, h(async (req: any, res: any) => {
   const parsed = bankDetailsSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -140,7 +140,7 @@ router.put("/me/bank-details", h(async (req: any, res: any) => {
   });
 }));
 
-router.put("/me/statutory-details", h(async (req: any, res: any) => {
+router.put("/me/statutory-details", requireWriteAccess, h(async (req: any, res: any) => {
   const parsed = statutoryDetailsSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -210,7 +210,7 @@ router.get("/me/transfers", h(async (req: any, res: any) => {
 }));
 
 // POST /api/employees/me/photo — employee uploads their own photo
-router.post("/me/photo", (req: any, res: any, next: any) => {
+router.post("/me/photo", requireWriteAccess, (req: any, res: any, next: any) => {
   photoUpload.single("photo")(req, res, (err: any) => {
     if (err instanceof multer.MulterError) return res.status(400).json({ success: false, error: err.message });
     if (err) return res.status(400).json({ success: false, error: err.message });

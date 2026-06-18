@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { db } from '../../db/mysql.js';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { env } from '../../config/env.js';
+import { sendOtpSms } from './sms.helper.js';
 
 // Always use the validated env value so production safety checks are respected
 const JWT_SECRET = env.JWT_SECRET;
@@ -168,13 +169,59 @@ export const authService = {
     if (!user) throw new Error('Invalid credentials');
     if (user.is_blocked) throw new Error('Account is blocked');
 
-    // CRITICAL: Block inactive employees from logging in
-    if (user.active_status === 0 || user.active_status === false) {
-      throw new Error('Account is inactive. Please contact HR for assistance.');
-    }
-
     const valid = await bcrypt.compare(password, user.password_hash as string);
     if (!valid) throw new Error('Invalid credentials');
+
+    // Handle inactive employees with grace period
+    let isReadOnly = false;
+    if (user.active_status === 0 || user.active_status === false) {
+      // Check if within 90-day grace period
+      const [empRows] = await db.execute<RowDataPacket[]>(
+        `SELECT id, access_end_date FROM employees WHERE user_id = ? LIMIT 1`,
+        [user.id]
+      );
+      const emp = empRows[0] as any;
+      let accessEndDate = emp?.access_end_date;
+
+      // If grace period not set, set it now (since trigger may not exist due to permission constraints)
+      if (!accessEndDate && emp?.id) {
+        const gracePeriodEnd = new Date();
+        gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 90);
+        const gracePeriodEndStr = gracePeriodEnd.toISOString().split('T')[0];
+
+        await db.execute(
+          `UPDATE employees SET access_end_date = ? WHERE id = ?`,
+          [gracePeriodEndStr, emp.id]
+        );
+        accessEndDate = gracePeriodEndStr;
+        console.log(`[Auth] Set 90-day grace period for employee ${emp.id}: ${gracePeriodEndStr}`);
+      }
+
+      if (!accessEndDate || new Date(accessEndDate) < new Date()) {
+        // Grace period expired
+        // Log denied access
+        if (emp?.id) {
+          await db.execute(
+            `INSERT INTO auth_inactive_access_log (employee_id, ip_address, user_agent, access_granted, denial_reason)
+             VALUES (?, NULL, NULL, 0, 'Grace period expired')`,
+            [emp.id]
+          );
+        }
+        throw new Error('Account is inactive. Access period has ended. Contact HR for assistance.');
+      }
+
+      // Within grace period - allow read-only access
+      isReadOnly = true;
+
+      // Log the inactive access
+      if (emp?.id) {
+        await db.execute(
+          `INSERT INTO auth_inactive_access_log (employee_id, ip_address, user_agent, access_granted)
+           VALUES (?, NULL, NULL, 1)`,
+          [emp.id]
+        );
+      }
+    }
 
     // Check if password is older than 90 days and force password change
     const passwordChangedAt = user.password_changed_at as Date | null;
@@ -191,7 +238,7 @@ export const authService = {
     await db.execute('UPDATE auth_user SET last_login_at = NOW() WHERE id = ?', [user.id]);
 
     const accessToken = jwt.sign(
-      { sub: user.id, email: user.email },
+      { sub: user.id, email: user.email, isReadOnly },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );
@@ -208,7 +255,13 @@ export const authService = {
     return {
       accessToken,
       refreshToken: rawRefresh,
-      user: { id: user.id, email: user.email, isBlocked: user.is_blocked === 1, mustChangePassword: Number(user.must_change_password ?? 0) === 1 },
+      user: {
+        id: user.id,
+        email: user.email,
+        isBlocked: user.is_blocked === 1,
+        mustChangePassword: Number(user.must_change_password ?? 0) === 1,
+        isReadOnly
+      },
     };
   },
 
@@ -235,10 +288,10 @@ export const authService = {
     await db.execute('UPDATE auth_refresh_token SET revoked = 1 WHERE token_hash = ?', [tokenHash]);
   },
 
-  verifyAccessToken(token: string): { id: string; email: string } | null {
+  verifyAccessToken(token: string): { id: string; email: string; isReadOnly?: boolean } | null {
     try {
-      const payload = jwt.verify(token, JWT_SECRET) as { sub: string; email: string };
-      return { id: payload.sub, email: payload.email };
+      const payload = jwt.verify(token, JWT_SECRET) as { sub: string; email: string; isReadOnly?: boolean };
+      return { id: payload.sub, email: payload.email, isReadOnly: payload.isReadOnly };
     } catch {
       return null;
     }
@@ -372,5 +425,94 @@ export const authService = {
       'UPDATE auth_user SET password_hash = ?, must_change_password = 0, password_changed_at = NOW(), updated_at = NOW() WHERE id = ?',
       [hash, userId]
     );
+  },
+
+  async forgotPasswordOtp(phone: string): Promise<{ success: boolean; message: string }> {
+    const normalizedPhone = phone.replace(/[^\d]/g, ''); // Strip non-digits
+
+    // Find active OR inactive-with-grace-period employee by phone
+    const [empRows] = await db.execute<RowDataPacket[]>(
+      `SELECT e.id, e.employee_code, e.mobile, e.active_status, e.access_end_date, e.user_id
+       FROM employees e
+       WHERE e.mobile LIKE ?
+         AND (e.active_status = 1 OR (e.active_status = 0 AND e.access_end_date >= CURDATE()))
+       LIMIT 1`,
+      [`%${normalizedPhone}%`]
+    );
+
+    const employee = empRows[0] as any;
+    if (!employee || !employee.user_id) {
+      return { success: true, message: 'If this phone number is registered, you will receive an OTP.' }; // Silent fail for security
+    }
+
+    // Generate 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Store OTP
+    await db.execute(
+      `INSERT INTO auth_password_reset_otp (phone, otp_code, expires_at)
+       VALUES (?, ?, ?)`,
+      [employee.mobile, otpCode, expiresAt]
+    );
+
+    // Send OTP via SMS
+    const smsSent = await sendOtpSms(employee.mobile, otpCode);
+
+    if (!smsSent) {
+      console.warn(`[OTP] SMS delivery failed for ${employee.mobile}, but OTP stored in DB`);
+    }
+
+    return { success: true, message: 'OTP sent to your registered mobile number.' };
+  },
+
+  async verifyOtpAndResetPassword(phone: string, otp: string, newPassword: string): Promise<boolean> {
+    const normalizedPhone = phone.replace(/[^\d]/g, '');
+
+    // Find and verify OTP first
+    const [otpRows] = await db.execute<RowDataPacket[]>(
+      `SELECT id as otp_id, phone
+       FROM auth_password_reset_otp
+       WHERE phone LIKE ?
+         AND otp_code = ?
+         AND expires_at > NOW()
+         AND verified = 0
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [`%${normalizedPhone}%`, otp]
+    );
+
+    if (otpRows.length === 0) {
+      throw new Error('Invalid or expired OTP');
+    }
+
+    const { otp_id, phone: otpPhone } = otpRows[0] as any;
+
+    // Find employee with this phone
+    const [empRows] = await db.execute<RowDataPacket[]>(
+      `SELECT user_id FROM employees WHERE mobile LIKE ? LIMIT 1`,
+      [`%${normalizedPhone}%`]
+    );
+
+    if (empRows.length === 0 || !(empRows[0] as any).user_id) {
+      throw new Error('Employee record not found');
+    }
+
+    const { user_id } = empRows[0] as any;
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    // Update password
+    await db.execute(
+      `UPDATE auth_user SET password_hash = ?, must_change_password = 0, password_changed_at = NOW(), updated_at = NOW()
+       WHERE id = ?`,
+      [hashedPassword, user_id]
+    );
+
+    // Mark OTP as verified
+    await db.execute(`UPDATE auth_password_reset_otp SET verified = 1 WHERE id = ?`, [otp_id]);
+
+    return true;
   },
 };

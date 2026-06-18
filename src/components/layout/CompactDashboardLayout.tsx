@@ -34,6 +34,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { SidebarNav, type NavGroup } from "@/components/layout/SidebarNav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { ReadOnlyBanner } from "@/components/ReadOnlyBanner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdminOrHR, useWorkforceAccess } from "@/hooks/useUserRole";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
@@ -409,6 +410,9 @@ export function DashboardLayout({ children }: Props) {
             setSearchQuery("");
           }}
         />
+
+        {/* Read-only banner for inactive employees */}
+        <ReadOnlyBanner />
 
         {/* Page content */}
         <main className="flex-1 px-4 py-5 sm:px-5 lg:px-6 lg:py-6">

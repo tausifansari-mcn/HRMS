@@ -17,6 +17,7 @@ import { useLeaveEligibility } from "@/hooks/useLeaveEligibility";
 import { useQuery } from "@tanstack/react-query";
 import { useCompanyHolidays } from "@/hooks/useCompanyHolidays";
 import { Badge } from "@/components/ui/badge";
+import { useIsReadOnly } from "@/contexts/AuthContext";
 
 const UNPAID_LEAVE_NAME = "Unpaid Leave";
 
@@ -34,6 +35,7 @@ export function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
   const { data: eligibility } = useLeaveEligibility(employeeId);
   const submitMutation = useSubmitLeaveRequest();
   const { data: holidays = [] } = useCompanyHolidays();
+  const isReadOnly = useIsReadOnly();
 
   const currentYear = new Date().getFullYear();
 
@@ -159,6 +161,14 @@ export function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
         <CardDescription>Submit a new leave request for approval</CardDescription>
       </CardHeader>
       <CardContent>
+        {isReadOnly && (
+          <Alert className="mb-4 border-amber-200 bg-amber-50">
+            <AlertTriangle className="h-4 w-4 text-amber-700" />
+            <AlertDescription className="text-amber-900">
+              Your account is in read-only mode. You cannot submit leave requests.
+            </AlertDescription>
+          </Alert>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Leave balance summary */}
           {leaveTypes && leaveTypes.length > 0 && (
@@ -354,13 +364,13 @@ export function LeaveRequestForm({ employeeId }: LeaveRequestFormProps) {
             )}
           </div>
 
-          <Button type="submit" disabled={!isValid || submitMutation.isPending} className="w-full">
+          <Button type="submit" disabled={!isValid || submitMutation.isPending || isReadOnly} className="w-full">
             {submitMutation.isPending ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Send className="mr-2 h-4 w-4" />
             )}
-            Submit Request
+            {isReadOnly ? "Cannot Submit (Read-Only)" : "Submit Request"}
           </Button>
         </form>
       </CardContent>
