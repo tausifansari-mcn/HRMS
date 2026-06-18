@@ -106,4 +106,8 @@ router.post("/coaching/:coachingId/create-tni", requireRole("admin", "hr"), h(as
   res.status(201).json({ data });
 }));
 
+router.get("/ceo-metrics", requireRole("admin", "hr", "ceo", "finance"), h(async (_req: AuthenticatedRequest, res: Response) => {
+  res.json({ data: await managementService.getCeoMetrics() });
+}));
+
 export { router as managementRouter };

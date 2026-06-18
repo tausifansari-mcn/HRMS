@@ -640,4 +640,199 @@ export const managementService = {
       },
     };
   },
+
+  async getCeoMetrics() {
+    const [
+      payrollResult,
+      mandateGapResult,
+      shrinkageResult,
+      billingResult,
+      attritionCostResult,
+      hiringGapResult,
+      ffLiabilityResult,
+    ] = await Promise.all([
+      // 1. Payroll liability — latest run (any status)
+      db.execute<RowDataPacket[]>(
+        `SELECT
+           COALESCE(SUM(spl.gross_salary), 0)  AS total_gross,
+           COALESCE(SUM(spl.net_salary), 0)    AS total_net,
+           COALESCE(SUM(spl.pf_employer), 0)   AS total_pf_employer,
+           COALESCE(SUM(spl.esic_employer), 0) AS total_esic_employer,
+           COUNT(DISTINCT spl.employee_id)     AS employee_count,
+           spr.run_month
+         FROM salary_prep_run spr
+         JOIN salary_prep_line spl ON spl.run_id = spr.id
+         WHERE spr.run_month = (
+           SELECT MAX(run_month) FROM salary_prep_run
+           WHERE status IN ('draft','processing','completed')
+         )
+         GROUP BY spr.run_month
+         LIMIT 1`
+      ),
+      // 2. HC gap by process: mandated vs active
+      db.execute<RowDataPacket[]>(
+        `SELECT
+           p.process_name,
+           wm.mandated_hc,
+           CEIL(wm.mandated_hc * (1 + (wm.buffer_pct + wm.shrinkage_pct + wm.attrition_buffer_pct + wm.training_buffer_pct) / 100)) AS required_hc,
+           COALESCE(ec.active_hc, 0) AS active_hc,
+           CEIL(wm.mandated_hc * (1 + (wm.buffer_pct + wm.shrinkage_pct + wm.attrition_buffer_pct + wm.training_buffer_pct) / 100))
+             - COALESCE(ec.active_hc, 0) AS hc_gap
+         FROM workforce_mandate wm
+         JOIN process_master p ON p.id = wm.process_id
+         LEFT JOIN (
+           SELECT process_id, COUNT(*) AS active_hc
+           FROM employees WHERE active_status = 1
+           GROUP BY process_id
+         ) ec ON ec.process_id = wm.process_id
+         WHERE wm.active_status = 1
+           AND wm.effective_from <= CURDATE()
+           AND (wm.effective_to IS NULL OR wm.effective_to >= CURDATE())
+         ORDER BY hc_gap DESC
+         LIMIT 10`
+      ),
+      // 3. Shrinkage cost from latest snapshot
+      db.execute<RowDataPacket[]>(
+        `SELECT
+           sds.process_id,
+           COALESCE(p.process_name, 'Unknown') AS process_name,
+           sds.rostered_hc,
+           sds.absent_hc,
+           sds.total_shrinkage_pct,
+           sds.snapshot_date,
+           ROUND(
+             COALESCE(sds.absent_hc, 0) * COALESCE(
+               (SELECT AVG(esa.ctc_annual / 365 / 8)
+                FROM employee_salary_assignment esa
+                JOIN employees e ON e.id = esa.employee_id
+                WHERE e.process_id = sds.process_id
+                  AND esa.effective_from <= CURDATE()
+                  AND (esa.effective_to IS NULL OR esa.effective_to >= CURDATE())
+               ), 0
+             ), 2
+           ) AS estimated_daily_revenue_at_risk
+         FROM shrinkage_daily_snapshot sds
+         LEFT JOIN process_master p ON p.id = sds.process_id
+         WHERE sds.snapshot_date = (
+           SELECT MAX(snapshot_date) FROM shrinkage_daily_snapshot WHERE snapshot_date <= CURDATE()
+         )
+         ORDER BY sds.total_shrinkage_pct DESC
+         LIMIT 8`
+      ),
+      // 4. Last billing cycle
+      db.execute<RowDataPacket[]>(
+        `SELECT
+           COALESCE(SUM(bi.net_amount), 0)   AS total_billed,
+           COALESCE(SUM(bi.gross_amount), 0) AS total_gross_billed,
+           COUNT(DISTINCT bi.process_id)     AS process_count,
+           DATE_FORMAT(bi.period_from, '%Y-%m') AS billing_month
+         FROM billing_invoice bi
+         WHERE bi.status IN ('approved', 'paid')
+           AND bi.period_from >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
+         GROUP BY DATE_FORMAT(bi.period_from, '%Y-%m')
+         ORDER BY billing_month DESC
+         LIMIT 1`
+      ),
+      // 5. Attrition replacement cost (exits last 30d × avg CTC/12)
+      db.execute<RowDataPacket[]>(
+        `SELECT
+           COUNT(*) AS exits_30d,
+           ROUND(
+             COUNT(*) * COALESCE(
+               (SELECT AVG(esa.ctc_annual)
+                FROM employee_salary_assignment esa
+                WHERE esa.effective_from <= CURDATE()
+                  AND (esa.effective_to IS NULL OR esa.effective_to >= CURDATE())
+               ), 0
+             ) / 12, 0
+           ) AS replacement_cost_estimate
+         FROM employees
+         WHERE COALESCE(date_of_leaving, resignation_date, date_of_exit)
+           BETWEEN DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND CURDATE()`
+      ),
+      // 6. Open hiring pipeline
+      db.execute<RowDataPacket[]>(
+        `SELECT
+           COUNT(*) AS open_candidates,
+           SUM(CASE WHEN current_stage IN ('offer_sent','offer_accepted') THEN 1 ELSE 0 END) AS offers_pending_joining,
+           SUM(CASE WHEN current_stage IN ('screened','interview_scheduled','interview_done') THEN 1 ELSE 0 END) AS in_pipeline
+         FROM ats_candidate
+         WHERE active_status = 1
+           AND current_stage NOT IN ('joined','rejected','declined','withdrawn','absconded')`
+      ),
+      // 7. F&F pending liability
+      db.execute<RowDataPacket[]>(
+        `SELECT
+           COUNT(*) AS pending_ff_count,
+           COALESCE(SUM(ffc.net_payable), 0) AS pending_ff_liability
+         FROM full_final_calculation ffc
+         JOIN exit_request er ON er.id = ffc.exit_request_id
+         WHERE er.status NOT IN ('completed','cancelled')
+           AND ffc.is_ff_provisional = 1`
+      ),
+    ]);
+
+    const payroll = payrollResult[0][0] ?? {};
+    const mandateGaps = mandateGapResult[0] as RowDataPacket[];
+    const shrinkageByProcess = shrinkageResult[0] as RowDataPacket[];
+    const billing = billingResult[0][0] ?? {};
+    const attrition = attritionCostResult[0][0] ?? {};
+    const hiring = hiringGapResult[0][0] ?? {};
+    const ff = ffLiabilityResult[0][0] ?? {};
+
+    const totalHcGap = mandateGaps.reduce((s, r) => s + Math.max(0, numberValue(r.hc_gap)), 0);
+    const totalRevenueAtRisk = shrinkageByProcess.reduce(
+      (s, r) => s + numberValue(r.estimated_daily_revenue_at_risk), 0
+    );
+    const processesUnderstaffed = mandateGaps.filter(r => numberValue(r.hc_gap) > 0).length;
+
+    return {
+      payroll_liability: {
+        run_month: payroll.run_month ?? null,
+        total_gross: numberValue(payroll.total_gross),
+        total_net: numberValue(payroll.total_net),
+        employer_statutory: numberValue(payroll.total_pf_employer) + numberValue(payroll.total_esic_employer),
+        employee_count: numberValue(payroll.employee_count),
+      },
+      hc_gap: {
+        total_gap: totalHcGap,
+        processes_understaffed: processesUnderstaffed,
+        by_process: mandateGaps.map(r => ({
+          process_name: String(r.process_name),
+          mandated_hc: numberValue(r.mandated_hc),
+          required_hc: numberValue(r.required_hc),
+          active_hc: numberValue(r.active_hc),
+          gap: Math.max(0, numberValue(r.hc_gap)),
+        })),
+      },
+      revenue_at_risk: {
+        total_daily_estimate: totalRevenueAtRisk,
+        by_process: shrinkageByProcess.map(r => ({
+          process_name: String(r.process_name),
+          shrinkage_pct: numberValue(r.total_shrinkage_pct),
+          absent_hc: numberValue(r.absent_hc),
+          daily_revenue_at_risk: numberValue(r.estimated_daily_revenue_at_risk),
+          snapshot_date: r.snapshot_date ?? null,
+        })),
+      },
+      billing: {
+        last_month_billed: numberValue(billing.total_billed),
+        billing_month: billing.billing_month ?? null,
+        process_count: numberValue(billing.process_count),
+      },
+      attrition_cost: {
+        exits_30d: numberValue(attrition.exits_30d),
+        replacement_cost_estimate: numberValue(attrition.replacement_cost_estimate),
+      },
+      hiring_pipeline: {
+        open_candidates: numberValue(hiring.open_candidates),
+        offers_pending_joining: numberValue(hiring.offers_pending_joining),
+        in_pipeline: numberValue(hiring.in_pipeline),
+      },
+      ff_liability: {
+        pending_count: numberValue(ff.pending_ff_count),
+        pending_amount: numberValue(ff.pending_ff_liability),
+      },
+    };
+  },
 };

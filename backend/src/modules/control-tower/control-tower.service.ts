@@ -184,7 +184,23 @@ export const controlTowerService = {
     if (query.priority) { conds.push("priority = ?"); params.push(query.priority); }
     const limit = Math.min(Number(query.limit ?? 100), 250);
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT * FROM work_inbox_item WHERE ${conds.join(" AND ")} ORDER BY FIELD(priority,'critical','high','medium','low'), COALESCE(due_at, '2999-12-31'), created_at DESC LIMIT ?`,
+      `SELECT
+         wii.*,
+         CONCAT(COALESCE(e.first_name, ''), ' ', COALESCE(e.last_name, '')) AS owner_name,
+         TIMESTAMPDIFF(HOUR, wii.created_at, NOW()) AS aging_hours,
+         CASE wii.priority
+           WHEN 'urgent' THEN 3
+           WHEN 'high' THEN 2
+           WHEN 'normal' THEN 1
+           ELSE 0
+         END AS escalation_level,
+         NULL AS decision_required_from
+       FROM work_inbox_item wii
+       LEFT JOIN users u ON u.id = wii.user_id
+       LEFT JOIN employees e ON e.user_id = u.id
+       WHERE ${conds.join(" AND ")}
+       ORDER BY FIELD(wii.priority,'urgent','high','normal','low'), COALESCE(wii.created_at, '2999-12-31'), wii.created_at DESC
+       LIMIT ?`,
       [...params, limit]
     );
     const visible = [] as any[];

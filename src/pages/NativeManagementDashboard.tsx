@@ -12,6 +12,9 @@ type PerformanceAlert = { id: string; employee_id: string; employee_name: string
 type CoachingForm = { employee_id: string; session_date: string; session_type: string; notes: string; action_items: string };
 type ActiveTab = "overview" | "kpi" | "coaching" | "alerts";
 type Lens = "CEO" | "HR" | "Finance" | "Operations";
+type CeoMetrics = { payroll_liability: { run_month: string | null; total_gross: number; total_net: number; employer_statutory: number; employee_count: number }; hc_gap: { total_gap: number; processes_understaffed: number }; revenue_at_risk: { total_daily_estimate: number }; billing: { last_month_billed: number; billing_month: string | null }; attrition_cost: { exits_30d: number; replacement_cost_estimate: number }; hiring_pipeline: { open_candidates: number; offers_pending_joining: number }; ff_liability: { pending_count: number; pending_amount: number } };
+
+function inrFmt(v: number) { if (v >= 10_000_000) return `₹${(v / 10_000_000).toFixed(2)} Cr`; if (v >= 100_000) return `₹${(v / 100_000).toFixed(2)} L`; return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v); }
 
 const SEVERITY_TABS = ["All", "Critical", "High", "Medium", "Low"] as const;
 const SESSION_TYPES = ["one_on_one", "performance_review", "goal_setting", "feedback", "disciplinary", "career_development"];
@@ -32,6 +35,7 @@ export default function NativeManagementDashboard() {
   const [message, setMessage] = useState("");
   const [query, setQuery] = useState("");
   const [dashStats, setDashStats] = useState<DashboardStats | null>(null);
+  const [ceoMetrics, setCeoMetrics] = useState<CeoMetrics | null>(null);
   const [teamKpi, setTeamKpi] = useState<TeamKpi[]>([]);
   const [coachingSessions, setCoachingSessions] = useState<CoachingSession[]>([]);
   const [alerts, setAlerts] = useState<PerformanceAlert[]>([]);
@@ -43,10 +47,11 @@ export default function NativeManagementDashboard() {
   const [coachingForm, setCoachingForm] = useState<CoachingForm>({ employee_id: "", session_date: "", session_type: "one_on_one", notes: "", action_items: "" });
 
   const loadDashboard = async () => { try { const res = await hrmsApi.get<{ success: boolean; data: DashboardStats }>("/api/management/dashboard"); setDashStats(res.data ?? null); } catch { /* handled by summary UI */ } };
+  const loadCeoMetrics = async () => { try { const res = await hrmsApi.get<{ success: boolean; data: CeoMetrics }>("/api/management/ceo-metrics"); setCeoMetrics(res.data ?? null); } catch { /* silent */ } };
   const loadKpi = async () => { try { const res = await hrmsApi.get<{ success: boolean; data: TeamKpi[] }>(`/api/management/team-kpi?period=${kpiPeriod}`); setTeamKpi(res.data ?? []); } catch { /* silent */ } };
   const loadCoaching = async () => { try { const res = await hrmsApi.get<{ success: boolean; data: CoachingSession[] }>("/api/management/coaching"); setCoachingSessions(res.data ?? []); } catch { /* silent */ } };
   const loadAlerts = async () => { try { const res = await hrmsApi.get<{ success: boolean; data: PerformanceAlert[] }>("/api/management/alerts"); setAlerts(res.data ?? []); } catch { /* silent */ } };
-  const loadAll = async () => { setLoading(true); setMessage(""); try { await Promise.all([loadDashboard(), loadKpi(), loadCoaching(), loadAlerts()]); } catch (err: unknown) { setMessage(err instanceof Error ? err.message : "Unable to load data"); } finally { setLoading(false); } };
+  const loadAll = async () => { setLoading(true); setMessage(""); try { await Promise.all([loadDashboard(), loadCeoMetrics(), loadKpi(), loadCoaching(), loadAlerts()]); } catch (err: unknown) { setMessage(err instanceof Error ? err.message : "Unable to load data"); } finally { setLoading(false); } };
   useEffect(() => { void loadAll(); }, []);
   useEffect(() => { void loadKpi(); }, [kpiPeriod]);
 
@@ -74,23 +79,35 @@ export default function NativeManagementDashboard() {
   const lensCards: Record<Lens, { title: string; value: string | number; sub: string }[]> = {
     CEO: [
       { title: "Workforce Health", value: `${healthScore}%`, sub: "blended attendance/KPI/risk" },
-      { title: "Attrition", value: `${dashStats?.attrition_rate ?? 0}%`, sub: "watch hotspots" },
+      { title: "Payroll Liability", value: ceoMetrics ? inrFmt(ceoMetrics.payroll_liability.total_gross) : "—", sub: ceoMetrics?.payroll_liability.run_month ?? "latest run" },
+      { title: "Revenue at Risk", value: ceoMetrics ? inrFmt(ceoMetrics.revenue_at_risk.total_daily_estimate) : "—", sub: "daily est. from absenteeism" },
+      { title: "HC Gap", value: ceoMetrics?.hc_gap.total_gap ?? 0, sub: `${ceoMetrics?.hc_gap.processes_understaffed ?? 0} process(es)` },
+      { title: "Attrition Cost", value: ceoMetrics ? inrFmt(ceoMetrics.attrition_cost.replacement_cost_estimate) : "—", sub: `${ceoMetrics?.attrition_cost.exits_30d ?? 0} exits (30d)` },
       { title: "Critical Risks", value: criticalAlerts, sub: "unacknowledged high/critical" },
     ],
     HR: [
       { title: "Pending Leaves", value: dashStats?.pending_leaves ?? 0, sub: "approval backlog" },
       { title: "Coaching Open", value: pendingCoaching, sub: "sessions not closed" },
       { title: "People Alerts", value: unacknowledgedCount, sub: "pending acknowledgement" },
+      { title: "Open Pipeline", value: ceoMetrics?.hiring_pipeline.open_candidates ?? 0, sub: "ATS candidates active" },
+      { title: "Offers Pending Join", value: ceoMetrics?.hiring_pipeline.offers_pending_joining ?? 0, sub: "offer accepted stage" },
+      { title: "F&F Pending", value: ceoMetrics?.ff_liability.pending_count ?? 0, sub: `${ceoMetrics ? inrFmt(ceoMetrics.ff_liability.pending_amount) : "—"} liability` },
     ],
     Finance: [
       { title: "Headcount", value: dashStats?.headcount ?? 0, sub: "payroll exposure base" },
-      { title: "Attendance %", value: `${dashStats?.attendance_rate ?? 0}%`, sub: "salary input risk" },
+      { title: "Gross Payroll", value: ceoMetrics ? inrFmt(ceoMetrics.payroll_liability.total_gross) : "—", sub: `${ceoMetrics?.payroll_liability.employee_count ?? 0} employees` },
+      { title: "Net Payable", value: ceoMetrics ? inrFmt(ceoMetrics.payroll_liability.total_net) : "—", sub: ceoMetrics?.payroll_liability.run_month ?? "draft run" },
+      { title: "Employer PF+ESIC", value: ceoMetrics ? inrFmt(ceoMetrics.payroll_liability.employer_statutory) : "—", sub: "statutory liability" },
+      { title: "Last Billing", value: ceoMetrics ? inrFmt(ceoMetrics.billing.last_month_billed) : "—", sub: ceoMetrics?.billing.billing_month ?? "no billing data" },
       { title: "Open Tickets", value: dashStats?.open_tickets ?? 0, sub: "ops/payroll blockers" },
     ],
     Operations: [
       { title: "Attendance %", value: `${dashStats?.attendance_rate ?? 0}%`, sub: "floor availability" },
       { title: "Avg KPI", value: dashStats?.avg_kpi_score ?? 0, sub: "team productivity" },
       { title: "Low KPI", value: lowKpiCount, sub: "below 60 score" },
+      { title: "Attrition Rate", value: `${dashStats?.attrition_rate ?? 0}%`, sub: "trailing 30d" },
+      { title: "HC Shortfall", value: ceoMetrics?.hc_gap.total_gap ?? 0, sub: "vs required capacity" },
+      { title: "Revenue at Risk", value: ceoMetrics ? inrFmt(ceoMetrics.revenue_at_risk.total_daily_estimate) : "—", sub: "shrinkage cost today" },
     ],
   };
 
@@ -100,7 +117,7 @@ export default function NativeManagementDashboard() {
 
   return <DashboardLayout><div className="space-y-6"><div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">Management</p><h1 className="mt-2 text-3xl font-black text-slate-950">Command Centre</h1><p className="mt-2 max-w-4xl text-slate-600">Executive overview of workforce health, team KPI, performance alerts and coaching pipeline.</p></div><button onClick={() => void loadAll()} disabled={loading} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"><RefreshCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh</button></div><RoleInsightsPanel roles={roleKeys} title="Management command insights" />{message && <div className="flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-800"><AlertTriangle className="h-4 w-4 flex-shrink-0" />{message}</div>}
     <div className="rounded-3xl border bg-white p-4 shadow-sm"><div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between"><div className="flex flex-wrap gap-2">{(["CEO", "HR", "Finance", "Operations"] as Lens[]).map((l) => <button key={l} onClick={() => setLens(l)} className={`rounded-xl px-4 py-2 text-sm font-black ${lens === l ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>{l} Lens</button>)}</div><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search employee, alert, coaching..." className="h-10 w-full rounded-xl border bg-white pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-blue-400 xl:w-80" /></div></div></div>
-    <div className="grid gap-4 md:grid-cols-4"><StatCard title="Management Health" value={`${healthScore}%`} icon={<ShieldAlert className="h-5 w-5" />} tone={healthScore >= 85 ? "bg-emerald-50 text-emerald-700" : healthScore >= 65 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"} sub={healthScore >= 85 ? "green" : healthScore >= 65 ? "amber" : "red"} />{lensCards[lens].map((card) => <StatCard key={card.title} title={card.title} value={card.value} icon={<BarChart3 className="h-5 w-5" />} tone="bg-blue-50 text-blue-700" sub={card.sub} />)}</div>
+    <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7"><StatCard title="Management Health" value={`${healthScore}%`} icon={<ShieldAlert className="h-5 w-5" />} tone={healthScore >= 85 ? "bg-emerald-50 text-emerald-700" : healthScore >= 65 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"} sub={healthScore >= 85 ? "green" : healthScore >= 65 ? "amber" : "red"} />{lensCards[lens].map((card) => <StatCard key={card.title} title={card.title} value={card.value} icon={<BarChart3 className="h-5 w-5" />} tone="bg-blue-50 text-blue-700" sub={card.sub} />)}</div>
     <div className="grid gap-3 md:grid-cols-3">{criticalAlerts > 0 && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">{criticalAlerts} critical/high alerts need acknowledgement.</div>}{lowKpiCount > 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">{lowKpiCount} employees are below KPI threshold.</div>}{pendingCoaching > 0 && <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-800">{pendingCoaching} coaching sessions are open.</div>}</div>
     <div className="flex w-fit items-center gap-1 rounded-2xl border bg-slate-50 p-1">{TABS.map((tab) => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`relative inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${activeTab === tab.id ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{tab.label}{tab.badge != null && tab.badge > 0 && <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">{tab.badge}</span>}</button>)}</div>
     {loading ? <div className="flex items-center justify-center py-16"><Loader className="h-8 w-8 animate-spin text-slate-400" /></div> : <>
