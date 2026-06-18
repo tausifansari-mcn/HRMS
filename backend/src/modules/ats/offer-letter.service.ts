@@ -2,6 +2,9 @@ import { db } from '../../db/mysql.js';
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import PDFDocument from 'pdfkit';
 import { Readable } from 'stream';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { emailService } from '../communication/email.service.js';
 
 /**
  * Offer Letter Generation Service
@@ -144,8 +147,11 @@ export async function generateOfferLetter(data: OfferLetterData, templateId?: st
       offer_letter_id: offerId,
     });
 
-    // TODO: Save PDF to storage (S3/local)
-    const pdfPath = `/offers/${offerId}.pdf`;
+    // Save PDF to local filesystem under uploads/offers/
+    const uploadsDir = path.resolve('uploads', 'offers');
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    const pdfPath = path.join(uploadsDir, `${offerId}.pdf`);
+    fs.writeFileSync(pdfPath, pdfBuffer);
 
     // Update with PDF path
     await conn.execute(
@@ -328,13 +334,30 @@ export async function sendOfferLetter(offerId: string): Promise<{
     ['offer_pending', offer.candidate_id]
   );
 
-  // TODO: Send actual email with PDF attachment
-  // await sendEmail({
-  //   to: offer.email,
-  //   subject: 'Offer Letter - Mas Callnet India',
-  //   body: ...,
-  //   attachments: [{ filename: 'offer_letter.pdf', path: offer.pdf_path }]
-  // });
+  // Send offer notification email via emailService
+  if (emailService.isConfigured()) {
+    const html = `
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+  <h2 style="color: #1a3c5e;">Offer of Employment — Mas Callnet India Pvt. Ltd.</h2>
+  <p>Dear ${offer.full_name},</p>
+  <p>We are pleased to offer you the position of <strong>${offer.position}</strong> at Mas Callnet India Pvt. Ltd.</p>
+  <table style="width:100%; border-collapse: collapse; margin: 16px 0;">
+    <tr style="background:#f5f5f5;"><td style="padding:8px; border:1px solid #ddd;"><strong>Position</strong></td><td style="padding:8px; border:1px solid #ddd;">${offer.position}</td></tr>
+    <tr><td style="padding:8px; border:1px solid #ddd;"><strong>Department</strong></td><td style="padding:8px; border:1px solid #ddd;">${offer.department}</td></tr>
+    <tr style="background:#f5f5f5;"><td style="padding:8px; border:1px solid #ddd;"><strong>Date of Joining</strong></td><td style="padding:8px; border:1px solid #ddd;">${new Date(offer.joining_date).toLocaleDateString('en-IN')}</td></tr>
+    <tr><td style="padding:8px; border:1px solid #ddd;"><strong>Gross Salary</strong></td><td style="padding:8px; border:1px solid #ddd;">₹${Number(offer.salary_gross).toLocaleString('en-IN')} per month</td></tr>
+  </table>
+  <p>Please report to HR to collect your official offer letter document and complete joining formalities.</p>
+  <p style="color: #666; font-size: 12px;">This is an automated notification. Please do not reply to this email.</p>
+</div>`;
+
+    await emailService.send({
+      to: offer.email,
+      subject: 'Offer of Employment — Mas Callnet India Pvt. Ltd.',
+      html,
+      text: `Dear ${offer.full_name}, we are pleased to offer you the position of ${offer.position}. Please report to HR to collect your official offer letter and complete joining formalities.`,
+    });
+  }
 
   return {
     success: true,

@@ -215,22 +215,64 @@ registrationEnhancedRouter.post("/parse-resume", async (req, res) => {
       return res.status(400).json({ success: false, message: "fileUrl required" });
     }
 
-    // TODO: Integrate actual resume parsing library
-    // For now, return mock parsed data
+    // Extract metadata from the URL itself — no parsing library required
+    const urlParts = fileUrl.split('/');
+    const filename = decodeURIComponent(urlParts[urlParts.length - 1] ?? '');
+    const lower = filename.toLowerCase();
+    const isPdf = lower.endsWith('.pdf');
+    const isDoc = lower.endsWith('.docx') || lower.endsWith('.doc');
+
+    // For plain-text files hosted on Supabase Storage, attempt a fetch and read
+    let extractedText = '';
+    if (lower.endsWith('.txt')) {
+      try {
+        const response = await fetch(fileUrl);
+        if (response.ok) {
+          extractedText = await response.text();
+        }
+      } catch {
+        // Silently ignore fetch failures — fallback data is returned below
+      }
+    }
+
     const parsed = {
-      name: "",
-      mobile: "",
-      email: "",
-      education: "",
-      experience: "",
-      skills: [],
-      company: "",
-      designation: "",
-      address: "",
+      name: '',
+      mobile: '',
+      email: '',
+      education: '',
+      experience: '',
+      skills: [] as string[],
+      company: '',
+      designation: '',
+      address: extractedText ? extractedText.slice(0, 500) : '',
+      source_url: fileUrl,
+      filename,
+      parse_status: isPdf || isDoc
+        ? 'manual_review_required'
+        : lower.endsWith('.txt') && extractedText
+          ? 'text_extracted'
+          : 'unsupported_format',
+      parse_message: isPdf || isDoc
+        ? 'Resume uploaded successfully. Please fill in the details manually or use the preview to copy information.'
+        : lower.endsWith('.txt') && extractedText
+          ? 'Plain-text content extracted. Please review and fill in the structured fields.'
+          : 'Unsupported file format. Please upload a PDF or Word document.',
     };
 
     return res.json({ success: true, data: parsed });
   } catch (error: any) {
     return res.status(500).json({ success: false, message: error.message });
   }
+});
+
+// ── 5. Parse-resume capability status ────────────────────────────────────────
+registrationEnhancedRouter.get('/parse-resume/status', (_req, res) => {
+  res.json({
+    success: true,
+    data: {
+      parsing_available: false,
+      supported_formats: ['pdf', 'docx', 'doc'],
+      message: 'Automatic parsing not available. Manual entry required.',
+    },
+  });
 });
