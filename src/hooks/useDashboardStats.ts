@@ -3,15 +3,17 @@ import { hrmsApi } from "@/lib/hrmsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
 
+const EXCLUDE_FROM_DAILY_TOTAL = ['MTRL', 'PTRL', 'LWP'];
+
 async function getEligibleLeaveTotals(empId: string, year: number) {
   try {
     const res = await hrmsApi.get<{ data: any[] }>(`/api/leave/balance/${empId}?year=${year}`);
-    const rows = res.data ?? [];
+    const rows = (res.data ?? []).filter(r => !EXCLUDE_FROM_DAILY_TOTAL.includes(r.leave_code));
     return {
-      totalLeaves: rows.reduce((s, r) => s + (Number(r.allocated_days) ?? Number(r.max_days_per_year) ?? 0), 0),
-      usedLeaves: rows.reduce((s, r) => s + (Number(r.used_days) ?? 0), 0),
+      totalLeaves: rows.reduce((s, r) => s + (Number(r.allocated_days) || Number(r.max_days_per_year) || 0), 0),
+      usedLeaves: rows.reduce((s, r) => s + (Number(r.used_days) || 0), 0),
       availableLeaves: rows.reduce(
-        (s, r) => s + ((Number(r.allocated_days) ?? 0) - (Number(r.used_days) ?? 0) + (Number(r.adjusted_days) ?? 0)),
+        (s, r) => s + ((Number(r.allocated_days) || 0) - (Number(r.used_days) || 0) + (Number(r.adjusted_days) || 0)),
         0
       ),
     };
@@ -57,10 +59,12 @@ export function useDashboardStats() {
       } catch { /* non-fatal */ }
 
       let pendingApprovals = 0;
-      try {
-        const pendingRes = await hrmsApi.get<{ data: any[] }>(`/api/leave/requests?status=pending`);
-        pendingApprovals = (pendingRes.data ?? []).length;
-      } catch { /* non-fatal */ }
+      if (isAdminOrHR) {
+        try {
+          const pendingRes = await hrmsApi.get<{ data: any[] }>(`/api/leave/requests?status=pending`);
+          pendingApprovals = (pendingRes.data ?? []).length;
+        } catch { /* non-fatal */ }
+      }
 
       let totalEmployees: number | null = null;
       if (isAdminOrHR) {

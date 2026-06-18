@@ -13,8 +13,8 @@ interface LeaveInfo {
   employee_name: string;
   employee_avatar?: string;
   leave_type: string;
-  start_date: string;
-  end_date: string;
+  from_date: string;
+  to_date: string;
 }
 
 export function WhosOut() {
@@ -36,8 +36,8 @@ export function WhosOut() {
           : `${leave.first_name ?? ""} ${leave.last_name ?? ""}`.trim() || "Unknown",
         employee_avatar: leave.avatar_url ?? undefined,
         leave_type: leave.leave_type_name ?? leave.leave_type ?? "Leave",
-        start_date: leave.start_date,
-        end_date: leave.end_date,
+        from_date: leave.from_date,
+        to_date: leave.to_date,
       }));
     },
   });
@@ -81,9 +81,9 @@ export function WhosOut() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{leave.employee_name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {leave.start_date === leave.end_date
+                    {leave.from_date === leave.to_date
                       ? "Today only"
-                      : `Until ${format(parseISO(normalizeDate(leave.end_date)), "MMM d")}`}
+                      : `Until ${format(parseISO(normalizeDate(leave.to_date)), "MMM d")}`}
                   </p>
                 </div>
                 <Badge variant="outline" className="text-xs shrink-0">

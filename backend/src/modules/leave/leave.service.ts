@@ -80,18 +80,18 @@ export const leaveService = {
       throw new Error(`Leave type not found: ${input.leaveTypeId}`);
     }
 
-    // Gender-restricted leave types
-    if (['ML', 'MTRL', 'PL', 'PTRL'].includes(leaveCode)) {
+    // Gender-restricted leave types (ML = Medical Leave, available to all; MTRL = Maternity, female only)
+    if (['MTRL', 'PTRL'].includes(leaveCode)) {
       const [empRows] = await db.execute<RowDataPacket[]>(
         "SELECT gender FROM employees WHERE id = ? LIMIT 1", [input.employeeId]
       );
       const gender = ((empRows[0] as any)?.gender ?? "").toLowerCase().trim();
       const isFemale = ["female", "f"].includes(gender);
       const isMale   = ["male", "m"].includes(gender);
-      if (['ML', 'MTRL'].includes(leaveCode) && !isFemale) {
+      if (leaveCode === 'MTRL' && !isFemale) {
         throw new Error("Maternity leave is only applicable for female employees");
       }
-      if (['PL', 'PTRL'].includes(leaveCode) && !isMale) {
+      if (leaveCode === 'PTRL' && !isMale) {
         throw new Error("Paternity leave is only applicable for male employees");
       }
     }

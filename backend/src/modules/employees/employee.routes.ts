@@ -538,12 +538,12 @@ router.get("/:id/stat-card", requireAuth, h(async (req: any, res: any) => {
   let leaveBalances: RowDataPacket[] = [];
   try {
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT lbl.leave_code, lt.leave_name,
-              lbl.opening_balance + lbl.accrued_days - lbl.used_days AS available_days,
+      `SELECT lt.leave_code, lt.leave_name,
+              (lbl.allocated_days + COALESCE(lbl.adjusted_days,0) - lbl.used_days) AS available_days,
               lbl.used_days
          FROM leave_balance_ledger lbl
-         LEFT JOIN leave_type_master lt ON lt.leave_code = lbl.leave_code
-        WHERE lbl.employee_id = ? AND YEAR(lbl.valid_for) = YEAR(NOW())`,
+         JOIN leave_type_master lt ON lt.id = lbl.leave_type_id
+        WHERE lbl.employee_id = ? AND lbl.balance_year = YEAR(NOW()) AND lt.active_status = 1`,
       [targetId]
     );
     leaveBalances = rows;
