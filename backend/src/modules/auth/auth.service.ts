@@ -15,7 +15,7 @@ const RESET_EXPIRES_HOURS = 24;
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
-  user: { id: string; email: string; isBlocked: boolean; mustChangePassword?: boolean };
+  user: { id: string; email: string; isBlocked: boolean; mustChangePassword?: boolean; isReadOnly?: boolean };
 }
 
 function mysqlDateTime(date: Date): string {

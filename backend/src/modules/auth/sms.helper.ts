@@ -22,10 +22,7 @@ export async function sendOtpSms(phone: string, otpCode: string): Promise<boolea
     const message = `Your HRMS password reset OTP is: ${otpCode}. Valid for 10 minutes. Do not share this code with anyone.`;
 
     // Send SMS
-    const result = await provider.send({
-      to: phone,
-      body: message,
-    });
+    const result = await provider.send(phone, 'OTP', message);
 
     console.log(`[OTP SMS] Sent to ${phone}: ${result.success ? 'SUCCESS' : 'FAILED'}`);
     return result.success;
