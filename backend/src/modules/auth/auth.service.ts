@@ -175,51 +175,68 @@ export const authService = {
     // Handle inactive employees with grace period
     let isReadOnly = false;
     if (user.active_status === 0 || user.active_status === false) {
-      // Check if within 90-day grace period
-      const [empRows] = await db.execute<RowDataPacket[]>(
-        `SELECT id, access_end_date FROM employees WHERE user_id = ? LIMIT 1`,
-        [user.id]
-      );
-      const emp = empRows[0] as any;
-      let accessEndDate = emp?.access_end_date;
+      // Check if within 90-day grace period (access_end_date column added in migration 215)
+      let emp: any = null;
+      let hasAccessEndDate = true;
+      try {
+        const [empRows] = await db.execute<RowDataPacket[]>(
+          `SELECT id, access_end_date FROM employees WHERE user_id = ? LIMIT 1`,
+          [user.id]
+        );
+        emp = empRows[0] as any;
+      } catch {
+        // Migration 215 not yet run — column doesn't exist, treat as no grace period data
+        hasAccessEndDate = false;
+        const [empRows] = await db.execute<RowDataPacket[]>(
+          `SELECT id FROM employees WHERE user_id = ? LIMIT 1`,
+          [user.id]
+        );
+        emp = empRows[0] as any;
+      }
 
-      // If grace period not set, set it now (since trigger may not exist due to permission constraints)
-      if (!accessEndDate && emp?.id) {
+      let accessEndDate = hasAccessEndDate ? emp?.access_end_date : null;
+
+      // If grace period not set, set it now (only if column exists)
+      if (hasAccessEndDate && !accessEndDate && emp?.id) {
         const gracePeriodEnd = new Date();
         gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 90);
         const gracePeriodEndStr = gracePeriodEnd.toISOString().split('T')[0];
 
-        await db.execute(
-          `UPDATE employees SET access_end_date = ? WHERE id = ?`,
-          [gracePeriodEndStr, emp.id]
-        );
-        accessEndDate = gracePeriodEndStr;
-        console.log(`[Auth] Set 90-day grace period for employee ${emp.id}: ${gracePeriodEndStr}`);
+        try {
+          await db.execute(
+            `UPDATE employees SET access_end_date = ? WHERE id = ?`,
+            [gracePeriodEndStr, emp.id]
+          );
+          accessEndDate = gracePeriodEndStr;
+        } catch { /* column still missing, skip */ }
       }
 
-      if (!accessEndDate || new Date(accessEndDate) < new Date()) {
-        // Grace period expired
-        // Log denied access
+      if (hasAccessEndDate && (!accessEndDate || new Date(accessEndDate) < new Date())) {
+        // Grace period expired — block login
         if (emp?.id) {
-          await db.execute(
-            `INSERT INTO auth_inactive_access_log (employee_id, ip_address, user_agent, access_granted, denial_reason)
-             VALUES (?, NULL, NULL, 0, 'Grace period expired')`,
-            [emp.id]
-          );
+          try {
+            await db.execute(
+              `INSERT INTO auth_inactive_access_log (employee_id, ip_address, user_agent, access_granted, denial_reason)
+               VALUES (?, NULL, NULL, 0, 'Grace period expired')`,
+              [emp.id]
+            );
+          } catch { /* log table may not exist yet */ }
         }
         throw new Error('Account is inactive. Access period has ended. Contact HR for assistance.');
       }
 
-      // Within grace period - allow read-only access
-      isReadOnly = true;
+      // Within grace period (or migration not yet run) — allow read-only access
+      isReadOnly = hasAccessEndDate;
 
-      // Log the inactive access
+      // Log the inactive access (table may not exist yet if migration 215 pending)
       if (emp?.id) {
-        await db.execute(
-          `INSERT INTO auth_inactive_access_log (employee_id, ip_address, user_agent, access_granted)
-           VALUES (?, NULL, NULL, 1)`,
-          [emp.id]
-        );
+        try {
+          await db.execute(
+            `INSERT INTO auth_inactive_access_log (employee_id, ip_address, user_agent, access_granted)
+             VALUES (?, NULL, NULL, 1)`,
+            [emp.id]
+          );
+        } catch { /* log table not yet created */ }
       }
     }
 
@@ -431,14 +448,26 @@ export const authService = {
     const normalizedPhone = phone.replace(/[^\d]/g, ''); // Strip non-digits
 
     // Find active OR inactive-with-grace-period employee by phone
-    const [empRows] = await db.execute<RowDataPacket[]>(
-      `SELECT e.id, e.employee_code, e.mobile, e.active_status, e.access_end_date, e.user_id
-       FROM employees e
-       WHERE e.mobile LIKE ?
-         AND (e.active_status = 1 OR (e.active_status = 0 AND e.access_end_date >= CURDATE()))
-       LIMIT 1`,
-      [`%${normalizedPhone}%`]
-    );
+    let empRows: RowDataPacket[];
+    try {
+      [empRows] = await db.execute<RowDataPacket[]>(
+        `SELECT e.id, e.employee_code, e.mobile, e.active_status, e.access_end_date, e.user_id
+         FROM employees e
+         WHERE e.mobile LIKE ?
+           AND (e.active_status = 1 OR (e.active_status = 0 AND e.access_end_date >= CURDATE()))
+         LIMIT 1`,
+        [`%${normalizedPhone}%`]
+      );
+    } catch {
+      // Fallback: migration 215 not yet run
+      [empRows] = await db.execute<RowDataPacket[]>(
+        `SELECT e.id, e.employee_code, e.mobile, e.active_status, e.user_id
+         FROM employees e
+         WHERE e.mobile LIKE ? AND e.active_status = 1
+         LIMIT 1`,
+        [`%${normalizedPhone}%`]
+      );
+    }
 
     const employee = empRows[0] as any;
     if (!employee || !employee.user_id) {
