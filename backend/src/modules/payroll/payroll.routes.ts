@@ -887,13 +887,20 @@ router.get("/runs/:id/neft-summary", requireRole("admin", "finance", "payroll"),
   res.json({ success: true, data: (rows as RowDataPacket[])[0] });
 }));
 
-// GET /api/payroll/runs/:runId/neft-lines — per-employee bank details + net salary for Finance review
+// GET /api/payroll/runs/:runId/neft-lines
+// Per-employee bank details (full account numbers) + net salary for Finance NEFT file preparation
+// Returns decrypted full bank account numbers — use for NEFT transfer prep only, not dashboard display
 router.get(
   "/runs/:runId/neft-lines",
   requireAuth,
   requireRole("admin", "finance", "payroll"),
   h(async (req: AuthenticatedRequest, res: Response) => {
     const { runId } = req.params;
+
+    // Validate runId is a valid UUID
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(runId)) {
+      return res.status(400).json({ success: false, error: "Invalid run ID format" });
+    }
 
     const [runRows] = await db.execute<RowDataPacket[]>(
       `SELECT id, run_month, status FROM salary_prep_run WHERE id = ? LIMIT 1`,
