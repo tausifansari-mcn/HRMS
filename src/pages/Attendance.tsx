@@ -749,7 +749,7 @@ const Attendance = () => {
           </section>
 
           {/* Calendar View */}
-          {user?.id && (
+          {currentEmployee?.id && (
             <section className="space-y-4">
               <div>
                 <h2 className="text-base font-semibold tracking-tight text-slate-950">
@@ -761,7 +761,7 @@ const Attendance = () => {
               </div>
 
               <AttendanceCalendar
-                employeeId={user.id}
+                employeeId={currentEmployee.id}
                 initialMonth={Number(selectedMonth)}
                 initialYear={Number(selectedYear)}
               />
