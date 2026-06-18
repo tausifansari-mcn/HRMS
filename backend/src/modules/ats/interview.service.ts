@@ -246,7 +246,10 @@ async function handleCandidateSelection(candidateId: string) {
       `You have been selected for ${candidate.applied_for_role ?? 'the role'} at ${candidate.branch_display_name ?? ''}. Please complete your onboarding.`,
       candidateId,
     ]
-  ).catch(() => {}); // notification table may not exist on all deployments
+  ).catch((err: unknown) => {
+    // notification table may not exist on all deployments
+    console.error('[interview] Selection notification failed for candidate', candidateId, ':', err instanceof Error ? err.message : String(err));
+  });
 }
 
 /**

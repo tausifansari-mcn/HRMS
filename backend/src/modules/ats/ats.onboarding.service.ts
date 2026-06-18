@@ -614,8 +614,9 @@ export async function approveOffer(offerId: string, approverId: string, remarks?
     module: 'ATS',
     triggeredBy: approverId,
     metadata: { candidate_id: candidateId, offer_id: offerId },
-  }).catch(() => {
+  }).catch((err: unknown) => {
     // Employee creation is already committed; journey logging can be retried independently.
+    console.error('[onboarding] Journey log failed for employee', employeeId, ':', err instanceof Error ? err.message : String(err));
   });
 
   // Fire IT provisioning tasks — runs after transaction commits, fire-and-forget

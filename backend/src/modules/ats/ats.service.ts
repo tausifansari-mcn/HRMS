@@ -268,7 +268,9 @@ export const atsService = {
         hrName: 'HR Team',
         hrPhone: '',
       }).catch(() => { /* already logged in ats_email_log */ });
-      sendOnboardingToken(candidateId, userId).catch(() => {});
+      sendOnboardingToken(candidateId, userId).catch((err: unknown) => {
+        console.error('[ats] Onboarding token email failed for candidate', candidateId, ':', err instanceof Error ? err.message : String(err));
+      });
     } else if (toStage === 'Rejected' && candidate.email) {
       // Professional rejection email — replaces the old plain-text rejection
       sendRejectedEmailProfessional({
@@ -278,14 +280,17 @@ export const atsService = {
         branchDisplayName: (candidate as any).branch_name ?? candidate.applied_for_branch ?? '',
         processName: (candidate as any).process_name ?? null,
         applicationRef: candidate.candidate_code ?? null,
-      }).catch(() => {
+      }).catch((err: unknown) => {
+        console.error('[ats] Professional rejection email failed for candidate', candidateId, ', trying fallback:', err instanceof Error ? err.message : String(err));
         // Fallback to legacy rejection email if professional template fails
         sendRejectedEmail({
           candidateId,
           to: candidate.email!,
           candidateName: candidate.full_name ?? '',
           branchName: candidate.applied_for_branch ?? '',
-        }).catch(() => {});
+        }).catch((fallbackErr: unknown) => {
+          console.error('[ats] Fallback rejection email also failed for candidate', candidateId, ':', fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr));
+        });
       });
     }
 

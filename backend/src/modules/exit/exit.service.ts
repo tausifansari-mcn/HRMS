@@ -169,10 +169,16 @@ export const exitService = {
       ]
     );
 
-    await createExitHealthSnapshot(id).catch(() => null);
+    await createExitHealthSnapshot(id).catch((err: unknown) => {
+      console.error('[exit] Health snapshot creation failed for exit request', id, ':', err instanceof Error ? err.message : String(err));
+      return null;
+    });
 
     // Fire-and-forget: notify manager of resignation
-    notifyManagerOfResignation(input.employeeId, id).catch(() => null);
+    notifyManagerOfResignation(input.employeeId, id).catch((err: unknown) => {
+      console.error('[exit] Manager notification failed for exit request', id, ':', err instanceof Error ? err.message : String(err));
+      return null;
+    });
 
     return this.getExitRequest(id);
   },
@@ -208,14 +214,20 @@ export const exitService = {
     );
 
     if (["accepted", "notice_serving"].includes(nextStatus)) {
-      await createDefaultClearanceTasks(id, (existing as any).employee_id).catch(() => null);
+      await createDefaultClearanceTasks(id, (existing as any).employee_id).catch((err: unknown) => {
+        console.error('[exit] Clearance task creation failed for exit request', id, ':', err instanceof Error ? err.message : String(err));
+        return null;
+      });
     }
 
     if (nextStatus === "exited") {
       await db.execute(
         `UPDATE employees SET employment_status = 'inactive', updated_at = NOW() WHERE id = ?`,
         [(existing as any).employee_id]
-      ).catch(() => null);
+      ).catch((err: unknown) => {
+        console.error('[exit] Employee status update failed for exit request', id, ':', err instanceof Error ? err.message : String(err));
+        return null;
+      });
 
       // Create a pending F&F record so payroll team is alerted to process settlement
       await db.execute(
