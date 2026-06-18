@@ -98,6 +98,7 @@ import dialerRouter from "./modules/dialer/dialer.routes.js";
 import { externalDbRouter } from "./modules/external-db/external-db.routes.js";
 import { aprRouter } from "./modules/apr/apr.routes.js";
 import { qualityDashboardRouter } from "./modules/quality-dashboard/quality-dashboard.routes.js";
+import { performanceDashboardRouter } from "./modules/performance-dashboard/performance-dashboard.routes.js";
 import { kpiMasterRouter } from "./modules/kpi/kpi-master.routes.js";
 import taskRouter from "./modules/tasks/task.routes.js";
 import { payrollMastersRouter } from "./modules/payroll-masters/payrollMasters.routes.js";
@@ -235,6 +236,7 @@ app.use('/api/reports', reportingLeaveBalanceRouter);
 app.use('/api/reports', reportingRouter);
 app.use('/api/control-tower', controlTowerRouter);
 app.use("/api/quality-dashboard", qualityDashboardRouter);
+app.use("/api/performance-dashboard", performanceDashboardRouter);
 app.use("/api/legacy", legacyRouter);
 app.use("/api/expenses", expenseRouter);
 

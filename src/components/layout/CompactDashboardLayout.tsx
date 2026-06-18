@@ -112,6 +112,7 @@ const navGroups: NavGroup[] = [
       { label: "My KPIs",          href: "/my-kpi",                  icon: <Activity className="h-[15px] w-[15px]" />,    description: "Live KPI" },
       { label: "Management",       href: "/management/dashboard",    icon: <BarChart3 className="h-[15px] w-[15px]" />,   pageCode: "MANAGEMENT_DASHBOARD", description: "Management" },
       { label: "Control Tower",    href: "/control-tower",           icon: <Activity className="h-[15px] w-[15px]" />,    pageCode: "CONTROL_TOWER", description: "Control tower" },
+      { label: "Agent Performance", href: "/agent-performance",      icon: <Activity className="h-[15px] w-[15px]" />,    roles: ["admin","hr","ceo","qa","analyst","manager","process_manager","branch_head"], description: "Cross-source KPI" },
     ],
   },
   {
