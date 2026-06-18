@@ -290,6 +290,10 @@ wfmRouter.get(
       return res.status(400).json({ success: false, error: "Invalid date format. Use YYYY-MM-DD" });
     }
 
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(employeeId)) {
+      return res.status(400).json({ success: false, error: "Invalid employeeId" });
+    }
+
     const { db: dbConn } = await import("../../db/mysql.js");
 
     // 1. Attendance record + biometric log
@@ -330,7 +334,8 @@ wfmRouter.get(
         WHERE employee_id = ?
           AND (
             DATE(punch_time) = ?
-            OR (DATE(punch_time) = DATE_SUB(?, INTERVAL 1 DAY) AND TIME(punch_time) >= '00:00:00' AND TIME(punch_time) < '06:00:00')
+            -- include early-morning tail-end punches: prev calendar day midnight–06:00 that belong to prior night shift
+            OR (DATE(punch_time) = DATE_SUB(?, INTERVAL 1 DAY) AND TIME(punch_time) < '06:00:00')
           )
         ORDER BY punch_time ASC`,
       [employeeId, date, date]
