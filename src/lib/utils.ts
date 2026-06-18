@@ -2,6 +2,23 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { format, parseISO, isValid } from "date-fns";
 
+/**
+ * Normalize a date string before JS Date/parseISO parsing.
+ * "YYYY-MM-DD" strings are treated as UTC midnight by default, which shifts
+ * the rendered date one day back in UTC+ timezones (e.g. IST).
+ * Appending T00:00:00 (no Z) forces local-time interpretation.
+ */
+export function normalizeDate(value: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value.trim())
+    ? `${value.trim()}T00:00:00`
+    : value;
+}
+
+/** Parse a date-only or full ISO string as local time (no UTC shift). */
+export function parseLocalDate(value: string): Date {
+  return parseISO(normalizeDate(value));
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -17,11 +34,17 @@ export function formatDate(dateString: string | null | undefined, formatString: 
   if (!dateString) return "";
 
   try {
-    // Handle ISO strings and date-only strings
-    const date = parseISO(dateString);
+    // For date-only strings (YYYY-MM-DD), parseISO treats them as UTC midnight
+    // which shifts the date backward in IST (+5:30) and similar timezones.
+    // Appending T00:00:00 (no Z) forces local-time parsing and keeps the correct date.
+    const normalized = /^\d{4}-\d{2}-\d{2}$/.test(dateString.trim())
+      ? `${dateString.trim()}T00:00:00`
+      : dateString;
+
+    const date = parseISO(normalized);
 
     if (!isValid(date)) {
-      return dateString; // Return original if parsing fails
+      return dateString;
     }
 
     return format(date, formatString);

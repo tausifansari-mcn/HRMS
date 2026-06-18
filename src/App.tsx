@@ -79,6 +79,9 @@ const NativeLMSMyLearning = lazy(() => import("./pages/NativeLMSMyLearning"));
 const NativeLMSCoordinator = lazy(() => import("./pages/NativeLMSCoordinator"));
 const LMSIntegrationAdmin = lazy(() => import("./pages/LMSIntegrationAdmin"));
 const NativePlaceholderPage = lazy(() => import("./pages/NativePlaceholderPage"));
+const NativeOperationsDashboard = lazy(() => import("./pages/NativeOperationsDashboard"));
+const NativeQualityDashboard = lazy(() => import("./pages/NativeQualityDashboard"));
+const NativeAgentPerformanceDashboard = lazy(() => import("./pages/NativeAgentPerformanceDashboard"));
 const NativeLMSIntegration = lazy(() => import("./pages/NativeLMSIntegration"));
 
 const NativeWFMRoster = lazy(() => import("./pages/NativeWFMRoster"));
@@ -99,53 +102,64 @@ const NativePerformanceFeedbackAssignments = lazy(() => import("./pages/NativePe
 const NativePerformanceFeedbackForm = lazy(() => import("./pages/NativePerformanceFeedbackForm"));
 const NativePerformanceFeedbackTeamReports = lazy(() => import("./pages/NativePerformanceFeedbackTeamReports"));
 
-const NativeEmployeeStatCard = lazy(() => import("./pages/NativeEmployeeStatCard"));
-const NativeEngagement = lazy(() => import("./pages/NativeEngagement"));
-const NativeBadges = lazy(() => import("./pages/NativeBadges"));
-const NativeKudos = lazy(() => import("./pages/NativeKudos"));
-const NativeSurveys = lazy(() => import("./pages/NativeSurveys"));
-const NativeLeaderboard = lazy(() => import("./pages/NativeLeaderboard"));
-const NativeEngagementCommandCenter = lazy(() => import("./pages/NativeEngagementCommandCenter"));
+// People
+const NativeEmployeeStatCard        = lazy(() => import("./pages/NativeEmployeeStatCard"));
 const NativePeopleExperienceCommandCenter = lazy(() => import("./pages/NativePeopleExperienceCommandCenter"));
-const NativeExitCommandCenter = lazy(() => import("./pages/NativeExitCommandCenter"));
-const NativeOfferLetterGeneration = lazy(() => import("./pages/NativeOfferLetterGeneration"));
-const NativeMasterReports = lazy(() => import("./pages/NativeMasterReports"));
 
-const NativeAssetsManager = lazy(() => import("./pages/NativeAssetsManager"));
-const NativeHelpdesk = lazy(() => import("./pages/NativeHelpdesk"));
-const NativeLetters = lazy(() => import("./pages/NativeLetters"));
-const NativeLifecycle = lazy(() => import("./pages/NativeLifecycle"));
-const NativeEmployeeLifecycle = lazy(() => import("./pages/NativeEmployeeLifecycle"));
-const NativeOrgMasters = lazy(() => import("./pages/NativeOrgMasters"));
-const NativeWorkflowAdmin = lazy(() => import("./pages/NativeWorkflowAdmin"));
-const NativeBenefitsClaims = lazy(() => import("./pages/NativeBenefitsClaims"));
-const NativeCareerPlanning = lazy(() => import("./pages/NativeCareerPlanning"));
-const NativePIPManagement = lazy(() => import("./pages/NativePIPManagement"));
-const NativeERP = lazy(() => import("./pages/NativeERP"));
-const NativeGoalsAppraisal = lazy(() => import("./pages/NativeGoalsAppraisal"));
-const NativeWorkInbox = lazy(() => import("./pages/NativeWorkInbox"));
-const NativeMobilityManagement = lazy(() => import("./pages/NativeMobilityManagement"));
-const NativeJobsPortal = lazy(() => import("./pages/NativeJobsPortal"));
-const NativeAdvancedReports = lazy(() => import("./pages/NativeAdvancedReports"));
-const NativeStatutoryCompliance = lazy(() => import("./pages/NativeStatutoryCompliance"));
-const NativeLabourCompliance = lazy(() => import("./pages/NativeLabourCompliance"));
-const NativeDPDPCompliance = lazy(() => import("./pages/NativeDPDPCompliance"));
-const NativeMaternityLeave = lazy(() => import("./pages/NativeMaternityLeave"));
-const NativeIntegrationHub = lazy(() => import("./pages/NativeIntegrationHub"));
-const EnhancedClientMaster = lazy(() => import("./pages/EnhancedClientMaster"));
-const NativeLocationPolicyMasters = lazy(() => import("./pages/NativeLocationPolicyMasters"));
+// Engagement
+const NativeEngagement                = lazy(() => import("./pages/NativeEngagement"));
+const NativeBadges                    = lazy(() => import("./pages/NativeBadges"));
+const NativeKudos                     = lazy(() => import("./pages/NativeKudos"));
+const NativeSurveys                   = lazy(() => import("./pages/NativeSurveys"));
+const NativeLeaderboard               = lazy(() => import("./pages/NativeLeaderboard"));
+const NativeEngagementCommandCenter   = lazy(() => import("./pages/NativeEngagementCommandCenter"));
 
-const NativePayslipCenter = lazy(() => import("./pages/NativePayslipCenter"));
-const NativeTaxDeclaration = lazy(() => import("./pages/NativeTaxDeclaration"));
-const NativeFullFinal = lazy(() => import("./pages/NativeFullFinal"));
-const NativeStatutoryConfig = lazy(() => import("./pages/NativeStatutoryConfig"));
-const NativePayrollMasters = lazy(() => import("./pages/NativePayrollMasters"));
-const NativeSalaryPackages = lazy(() => import("./pages/NativeSalaryPackages"));
-const NativeIncentives = lazy(() => import("./pages/NativeIncentives"));
+// Exit
+const NativeExitCommandCenter         = lazy(() => import("./pages/NativeExitCommandCenter"));
 
-const NativeTemplateManager = lazy(() => import("./pages/NativeTemplateManager"));
-const NativeDispatchCenter = lazy(() => import("./pages/NativeDispatchCenter"));
-const NativeDispatchHistory = lazy(() => import("./pages/NativeDispatchHistory"));
+// Offer Letters & Master Reports
+const NativeOfferLetterGeneration   = lazy(() => import("./pages/NativeOfferLetterGeneration"));
+const NativeMasterReports           = lazy(() => import("./pages/NativeMasterReports"));
+
+// HR Ops
+const NativeAssetsManager           = lazy(() => import("./pages/NativeAssetsManager"));
+const NativeHelpdesk                = lazy(() => import("./pages/NativeHelpdesk"));
+const NativeLetters                 = lazy(() => import("./pages/NativeLetters"));
+const NativeLifecycle               = lazy(() => import("./pages/NativeLifecycle"));
+const NativeEmployeeLifecycle       = lazy(() => import("./pages/NativeEmployeeLifecycle"));
+const NativeOrgMasters              = lazy(() => import("./pages/NativeOrgMasters"));
+const NativeWorkflowAdmin           = lazy(() => import("./pages/NativeWorkflowAdmin"));
+const NativeBenefitsClaims          = lazy(() => import("./pages/NativeBenefitsClaims"));
+const NativeCareerPlanning          = lazy(() => import("./pages/NativeCareerPlanning"));
+const NativePIPManagement           = lazy(() => import("./pages/NativePIPManagement"));
+const NativeERP                     = lazy(() => import("./pages/NativeERP"));
+const NativeGoalsAppraisal          = lazy(() => import("./pages/NativeGoalsAppraisal"));
+const NativeWorkInbox               = lazy(() => import("./pages/NativeWorkInbox"));
+const NativeMobilityManagement      = lazy(() => import("./pages/NativeMobilityManagement"));
+const NativeJobsPortal              = lazy(() => import("./pages/NativeJobsPortal"));
+const NativeAdvancedReports         = lazy(() => import("./pages/NativeAdvancedReports"));
+const NativeStatutoryCompliance     = lazy(() => import("./pages/NativeStatutoryCompliance"));
+const NativeLabourCompliance        = lazy(() => import("./pages/NativeLabourCompliance"));
+const NativeDPDPCompliance          = lazy(() => import("./pages/NativeDPDPCompliance"));
+const NativeMaternityLeave          = lazy(() => import("./pages/NativeMaternityLeave"));
+const NativeIntegrationHub          = lazy(() => import("./pages/NativeIntegrationHub"));
+const EnhancedClientMaster          = lazy(() => import("./pages/EnhancedClientMaster"));
+const NativeLocationPolicyMasters   = lazy(() => import("./pages/NativeLocationPolicyMasters"));
+
+// Payroll
+const NativePayslipCenter           = lazy(() => import("./pages/NativePayslipCenter"));
+const NativeTaxDeclaration          = lazy(() => import("./pages/NativeTaxDeclaration"));
+const NativeFullFinal               = lazy(() => import("./pages/NativeFullFinal"));
+const NativeStatutoryConfig         = lazy(() => import("./pages/NativeStatutoryConfig"));
+const NativePayrollMasters          = lazy(() => import("./pages/NativePayrollMasters"));
+const NativeSalaryPackages          = lazy(() => import("./pages/NativeSalaryPackages"));
+const NativeIncentives              = lazy(() => import("./pages/NativeIncentives"));
+const PayrollOvertimeManagement     = lazy(() => import("./pages/PayrollOvertimeManagement"));
+
+// Communication
+const NativeTemplateManager         = lazy(() => import("./pages/NativeTemplateManager"));
+const NativeDispatchCenter          = lazy(() => import("./pages/NativeDispatchCenter"));
+const NativeDispatchHistory         = lazy(() => import("./pages/NativeDispatchHistory"));
 const NativeNotificationPreferences = lazy(() => import("./pages/NativeNotificationPreferences"));
 const NativeCommunicationConfig = lazy(() => import("./pages/NativeCommunicationConfig"));
 const NativeCallCentreConfig = lazy(() => import("./pages/NativeCallCentreConfig"));
@@ -174,6 +188,13 @@ const NativeAttendanceRulesMaster = lazy(() => import("./pages/NativeAttendanceR
 const NativeCustomizationManager = lazy(() => import("./pages/customization/NativeCustomizationManager"));
 const NativeCustomizationRuleEditor = lazy(() => import("./pages/customization/NativeCustomizationRuleEditor"));
 const EmployeeJourney = lazy(() => import("./pages/EmployeeJourney"));
+
+// Expenses
+const MyExpenses = lazy(() => import("./pages/expenses/MyExpenses"));
+const NewExpenseClaim = lazy(() => import("./pages/expenses/NewExpenseClaim"));
+const ExpenseApprovals = lazy(() => import("./pages/expenses/ExpenseApprovals"));
+const FinanceQueue = lazy(() => import("./pages/expenses/FinanceQueue"));
+const ExpenseReports = lazy(() => import("./pages/expenses/ExpenseReports"));
 
 const PortalLogin = lazy(() => import("./pages/portal/PortalLogin"));
 const PortalOverview = lazy(() => import("./pages/portal/PortalOverview"));
@@ -272,8 +293,9 @@ const App = () => (
               <Route path="/wfm/extensions" element={<ProtectedRoute><Gate pageCode="WFM_EXTENSIONS"><NativeWFMExtensions /></Gate></ProtectedRoute>} />
               <Route path="/wfm-manager-approvals" element={<ProtectedRoute><Gate pageCode="WFM_ROSTER"><NativeWFMManagerApproval /></Gate></ProtectedRoute>} />
               <Route path="/roster-preference" element={<ProtectedRoute><Gate pageCode="WFM_ROSTER"><NativeRosterPreference /></Gate></ProtectedRoute>} />
-              <Route path="/quality/dashboard" element={<ProtectedRoute><Gate pageCode="QUALITY_DASHBOARD"><NativePlaceholderPage title="Quality Dashboard" module="Quality" /></Gate></ProtectedRoute>} />
-              <Route path="/operations/dashboard" element={<ProtectedRoute><Gate pageCode="OPERATIONS_DASHBOARD"><NativePlaceholderPage title="Operations Dashboard" module="Operations" /></Gate></ProtectedRoute>} />
+              <Route path="/quality/dashboard" element={<ProtectedRoute><Gate pageCode="QUALITY_DASHBOARD"><NativeQualityDashboard /></Gate></ProtectedRoute>} />
+              <Route path="/agent-performance" element={<ProtectedRoute><NativeAgentPerformanceDashboard /></ProtectedRoute>} />
+              <Route path="/operations/dashboard" element={<ProtectedRoute><Gate pageCode="OPERATIONS_DASHBOARD"><NativeOperationsDashboard /></Gate></ProtectedRoute>} />
               <Route path="/performance/command-center" element={<ProtectedRoute><Gate pageCode="WORKFORCE_COMMAND_CENTER"><UnifiedPerformanceCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/settings/access-control" element={<ProtectedRoute><Gate pageCode="ACCESS_CONTROL"><UnifiedAccessControl /></Gate></ProtectedRoute>} />
               <Route path="/security-center" element={<ProtectedRoute roles={['admin', 'ceo', 'hr']}><NativeSecurityCenter /></ProtectedRoute>} />
@@ -335,6 +357,9 @@ const App = () => (
               <Route path="/payroll/masters" element={<ProtectedRoute><Gate pageCode="PAYROLL_MASTERS"><NativePayrollMasters /></Gate></ProtectedRoute>} />
               <Route path="/payroll/salary-packages" element={<ProtectedRoute><Gate pageCode="SALARY_PACKAGES"><NativeSalaryPackages /></Gate></ProtectedRoute>} />
               <Route path="/payroll/incentives" element={<ProtectedRoute><Gate pageCode="PAYROLL_INCENTIVES"><NativeIncentives /></Gate></ProtectedRoute>} />
+              <Route path="/payroll/overtime" element={<ProtectedRoute roles={['admin', 'wfm']}><PayrollOvertimeManagement /></ProtectedRoute>} />
+
+              {/* Communication */}
               <Route path="/communication/templates" element={<ProtectedRoute roles={['admin', 'hr']}><NativeTemplateManager /></ProtectedRoute>} />
               <Route path="/communication/dispatch" element={<ProtectedRoute roles={['admin', 'hr']}><NativeDispatchCenter /></ProtectedRoute>} />
               <Route path="/communication/history" element={<ProtectedRoute roles={['admin', 'hr']}><NativeDispatchHistory /></ProtectedRoute>} />
@@ -359,6 +384,16 @@ const App = () => (
               <Route path="/rta-board" element={<ProtectedRoute><Gate pageCode="RTA_BOARD"><NativeRTABoard /></Gate></ProtectedRoute>} />
               <Route path="/attendance-rules-master" element={<ProtectedRoute roles={['admin', 'hr']}><NativeAttendanceRulesMaster /></ProtectedRoute>} />
               <Route path="/changelog" element={<ProtectedRoute><Changelog /></ProtectedRoute>} />
+
+              {/* Expenses */}
+              <Route path="/expenses" element={<ProtectedRoute><MyExpenses /></ProtectedRoute>} />
+              <Route path="/expenses/new" element={<ProtectedRoute><NewExpenseClaim /></ProtectedRoute>} />
+              <Route path="/expenses/new/:claimId" element={<ProtectedRoute><NewExpenseClaim /></ProtectedRoute>} />
+              <Route path="/expenses/approvals" element={<ProtectedRoute><ExpenseApprovals /></ProtectedRoute>} />
+              <Route path="/expenses/finance" element={<ProtectedRoute><FinanceQueue /></ProtectedRoute>} />
+              <Route path="/expenses/reports" element={<ProtectedRoute><ExpenseReports /></ProtectedRoute>} />
+              <Route path="/expenses/:claimId" element={<ProtectedRoute><NewExpenseClaim /></ProtectedRoute>} />
+
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

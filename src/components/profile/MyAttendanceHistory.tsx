@@ -34,16 +34,20 @@ const statusStyles: Record<string, string> = {
 };
 
 export function MyAttendanceHistory({ employeeId }: MyAttendanceHistoryProps) {
+  const today = new Date();
+  const fromDate = new Date(today);
+  fromDate.setDate(today.getDate() - 30);
+  const fromStr = fromDate.toISOString().slice(0, 10);
+  const toStr = today.toISOString().slice(0, 10);
+
   const { data: records, isLoading, error } = useQuery({
-    queryKey: ["my-attendance-history", employeeId],
+    queryKey: ["my-attendance-history", employeeId, fromStr, toStr],
     queryFn: async () => {
       try {
-        console.log("[MyAttendanceHistory] Fetching attendance for employee:", employeeId);
-        const res = await hrmsApi.get<{success:boolean;data:any}>("/api/wfm/attendance/daily");
-        console.log("[MyAttendanceHistory] Response:", res);
+        const params = new URLSearchParams({ employeeId, fromDate: fromStr, toDate: toStr, limit: "60" });
+        const res = await hrmsApi.get<{success:boolean;data:any}>(`/api/wfm/attendance/daily?${params}`);
         return (res.data ?? []) as AttendanceRecord[];
       } catch (err: any) {
-        console.error("[MyAttendanceHistory] Error fetching attendance:", err);
         throw new Error(err.response?.data?.error || err.message || "Failed to load attendance records");
       }
     },
@@ -56,7 +60,8 @@ export function MyAttendanceHistory({ employeeId }: MyAttendanceHistoryProps) {
     queryKey: ["my-attendance-breaks", recordIds],
     queryFn: async () => {
       if (recordIds.length === 0) return [];
-      const res = await hrmsApi.get<{success:boolean;data:any}>("/api/wfm/attendance/daily");
+      const ids = recordIds.join(",");
+      const res = await hrmsApi.get<{success:boolean;data:any}>(`/api/wfm/attendance/breaks?recordIds=${ids}`);
       return (res.data ?? []) as unknown as AttendanceBreak[];
     },
     enabled: recordIds.length > 0,
@@ -148,7 +153,9 @@ export function MyAttendanceHistory({ employeeId }: MyAttendanceHistoryProps) {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                        {format(new Date(record.record_date), "MMM d, yyyy")}
+                        {record.date
+                          ? format(new Date(record.date + "T00:00:00"), "MMM d, yyyy")
+                          : format(new Date(record.record_date + "T00:00:00"), "MMM d, yyyy")}
                       </div>
                     </TableCell>
                     <TableCell>

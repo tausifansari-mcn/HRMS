@@ -225,7 +225,8 @@ export function useEmployeeDirectoryAnalytics(filters: EmployeeDirectoryFilters)
       };
     },
     placeholderData: (previous) => previous,
-    staleTime: 30_000,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
   });
 }
 

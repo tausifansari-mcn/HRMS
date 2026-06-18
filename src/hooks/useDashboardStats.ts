@@ -3,15 +3,17 @@ import { hrmsApi } from "@/lib/hrmsApi";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
 
+const EXCLUDE_FROM_DAILY_TOTAL = ['MTRL', 'PTRL', 'LWP'];
+
 async function getEligibleLeaveTotals(empId: string, year: number) {
   try {
     const res = await hrmsApi.get<{ data: any[] }>(`/api/leave/balance/${empId}?year=${year}`);
-    const rows = res.data ?? [];
+    const rows = (res.data ?? []).filter(r => !EXCLUDE_FROM_DAILY_TOTAL.includes(r.leave_code));
     return {
-      totalLeaves: rows.reduce((s, r) => s + (Number(r.allocated_days) ?? Number(r.max_days_per_year) ?? 0), 0),
-      usedLeaves: rows.reduce((s, r) => s + (Number(r.used_days) ?? 0), 0),
+      totalLeaves: rows.reduce((s, r) => s + (Number(r.allocated_days) || Number(r.max_days_per_year) || 0), 0),
+      usedLeaves: rows.reduce((s, r) => s + (Number(r.used_days) || 0), 0),
       availableLeaves: rows.reduce(
-        (s, r) => s + ((Number(r.allocated_days) ?? 0) - (Number(r.used_days) ?? 0) + (Number(r.adjusted_days) ?? 0)),
+        (s, r) => s + ((Number(r.allocated_days) || 0) - (Number(r.used_days) || 0) + (Number(r.adjusted_days) || 0)),
         0
       ),
     };
@@ -26,8 +28,10 @@ export function useDashboardStats() {
 
   return useQuery({
     queryKey: ["dashboard-stats", user?.id, isAdminOrHR],
-    refetchInterval: 30000,
+    refetchInterval: 5 * 60_000,   // was 30s — reduces server load 10×
+    refetchOnWindowFocus: true,
     queryFn: async () => {
+      // Batch 1: resolve the employee record (needed for all subsequent calls)
       let myEmployee: { id: string } | null = null;
       try {
         const meRes = await hrmsApi.get<{ data: any }>("/api/employees/me");
@@ -39,36 +43,32 @@ export function useDashboardStats() {
       }
 
       const today = new Date().toISOString().split("T")[0];
-      let amOnLeave = false;
-      try {
-        const leavesRes = await hrmsApi.get<{ data: any[] }>(
-          `/api/leave/requests?employeeId=${myEmployee.id}&status=approved&activeOn=${today}`
-        );
-        amOnLeave = (leavesRes.data ?? []).length > 0;
-      } catch { /* non-fatal */ }
-
       const currentYear = new Date().getFullYear();
-      const { totalLeaves, usedLeaves, availableLeaves } = await getEligibleLeaveTotals(myEmployee.id, currentYear);
 
-      let myAssetsCount = 0;
-      try {
-        const assetsRes = await hrmsApi.get<{ data: any[] }>(`/api/assets-mgmt/employee/${myEmployee.id}`);
-        myAssetsCount = (assetsRes.data ?? []).length;
-      } catch { /* non-fatal */ }
+      // Batch 2: fire all independent calls in parallel
+      const [leavesResult, leaveTotals, assetsResult, pendingResult, statsResult] = await Promise.allSettled([
+        hrmsApi.get<{ data: any[] }>(`/api/leave/requests?employeeId=${myEmployee.id}&status=approved&activeOn=${today}`),
+        getEligibleLeaveTotals(myEmployee.id, currentYear),
+        hrmsApi.get<{ data: any[] }>(`/api/assets-mgmt/employee/${myEmployee.id}`),
+        isAdminOrHR ? hrmsApi.get<{ data: any[] }>(`/api/leave/requests?status=pending`) : Promise.resolve(null),
+        isAdminOrHR ? hrmsApi.get<{ data: any }>("/api/employees/stats") : Promise.resolve(null),
+      ]);
 
-      let pendingApprovals = 0;
-      try {
-        const pendingRes = await hrmsApi.get<{ data: any[] }>(`/api/leave/requests?status=pending`);
-        pendingApprovals = (pendingRes.data ?? []).length;
-      } catch { /* non-fatal */ }
-
-      let totalEmployees: number | null = null;
-      if (isAdminOrHR) {
-        try {
-          const statsRes = await hrmsApi.get<{ data: any }>("/api/employees/stats");
-          totalEmployees = statsRes.data?.total_employees ?? null;
-        } catch { /* non-fatal */ }
-      }
+      const amOnLeave = leavesResult.status === "fulfilled"
+        ? (leavesResult.value?.data ?? []).length > 0
+        : false;
+      const { totalLeaves, usedLeaves, availableLeaves } = leaveTotals.status === "fulfilled"
+        ? leaveTotals.value
+        : { totalLeaves: null, usedLeaves: null, availableLeaves: null };
+      const myAssetsCount = assetsResult.status === "fulfilled"
+        ? (assetsResult.value?.data ?? []).length
+        : 0;
+      const pendingApprovals = pendingResult.status === "fulfilled"
+        ? (pendingResult.value?.data ?? []).length
+        : 0;
+      const totalEmployees = statsResult.status === "fulfilled"
+        ? (statsResult.value?.data?.total_employees ?? null)
+        : null;
 
       return {
         totalEmployees,

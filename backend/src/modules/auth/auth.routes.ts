@@ -168,6 +168,38 @@ router.post("/forgot-password", authLimiter, h(async (req: any, res: any) => {
   return res.json({ success: true, message: "If that email exists, a reset link has been sent." });
 }));
 
+// POST /api/auth/forgot-password-otp — public (rate limited) — SMS/WhatsApp OTP
+router.post("/forgot-password-otp", authLimiter, h(async (req: any, res: any) => {
+  const { phone } = req.body;
+  if (!phone) return res.status(400).json({ error: "Phone number required" });
+
+  try {
+    const result = await authService.forgotPasswordOtp(phone);
+    return res.json(result);
+  } catch (error: any) {
+    console.error("[HRMS] OTP send failed:", error.message);
+    return res.json({ success: true, message: "If this phone number is registered, you will receive an OTP." });
+  }
+}));
+
+// POST /api/auth/verify-otp-reset — public — verify OTP and reset password
+router.post("/verify-otp-reset", authLimiter, h(async (req: any, res: any) => {
+  const { phone, otp, newPassword } = req.body;
+  if (!phone || !otp || !newPassword) {
+    return res.status(400).json({ error: "Phone, OTP, and new password required" });
+  }
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters" });
+  }
+
+  try {
+    await authService.verifyOtpAndResetPassword(phone, otp, newPassword);
+    return res.json({ success: true, message: "Password reset successful" });
+  } catch (error: any) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+}));
+
 // POST /api/auth/reset-password — public
 router.post("/reset-password", h(async (req: any, res: any) => {
   const { token, password } = req.body;

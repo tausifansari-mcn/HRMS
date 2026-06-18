@@ -278,7 +278,7 @@ export default function NativeOperationsKPI() {
       );
       setMetrics(metricsRes.data ?? []);
 
-      const leaderboardParams = new URLSearchParams({ period, family: "operations" });
+      const leaderboardParams = new URLSearchParams({ period, family: "operations", limit: "500" });
       if (selectedProcess) leaderboardParams.set("process_id", selectedProcess);
 
       const lbRes = await hrmsApi.get<{ data: LeaderboardEntry[] }>(

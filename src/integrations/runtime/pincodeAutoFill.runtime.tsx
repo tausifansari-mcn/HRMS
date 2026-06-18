@@ -25,7 +25,7 @@ const setNativeValue = (element: TextControl, value: string) => {
 const getFieldLabel = (element: Element): string => {
   const parentLabel = element.closest("label")?.textContent || "";
   const wrapperLabel = element.parentElement?.querySelector("label")?.textContent || "";
-  const fieldLabel = element.closest(".native-ats-fg, .space-y-1\.5, [data-field]")?.querySelector("label")?.textContent || "";
+  const fieldLabel = element.closest(".native-ats-fg, .space-y-1\\.5, [data-field]")?.querySelector("label")?.textContent || "";
   return `${parentLabel} ${wrapperLabel} ${fieldLabel}`.toLowerCase();
 };
 
@@ -100,7 +100,7 @@ const applyPincodeDetails = (anchor: Element, details: PincodeDetails, pincode: 
 };
 
 const getMountAnchor = (control: TextControl): Element => {
-  return control.closest(".native-ats-fg, .space-y-1\.5") || control.parentElement || control;
+  return control.closest(".native-ats-fg, .space-y-1\\.5") || control.parentElement || control;
 };
 
 const mountWidget = (control: TextControl) => {

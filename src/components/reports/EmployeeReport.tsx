@@ -40,7 +40,7 @@ import {
   ChevronsUpDown,
   Loader2,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, parseLocalDate } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/currency";
@@ -111,8 +111,8 @@ export function EmployeeReport() {
       const types = (typesRes.data || []).filter((type: any) => eligibleTypeIds.has(type.id));
       const allRequests = (requestsRes.data || []).filter((request: any) =>
         eligibleTypeIds.has(request.leave_type_id) &&
-        new Date(request.start_date) >= new Date(`${year}-01-01`) &&
-        new Date(request.start_date) <= new Date(`${year}-12-31`)
+        parseLocalDate(request.start_date) >= new Date(year, 0, 1) &&
+        parseLocalDate(request.start_date) <= new Date(year, 11, 31)
       );
 
       // Dynamically calculate used days from approved requests for the year
@@ -311,8 +311,8 @@ export function EmployeeReport() {
           a.asset?.name ?? "-",
           a.asset?.asset_code ?? "-",
           a.asset?.category ?? "-",
-          a.assigned_date ? format(new Date(a.assigned_date), "dd MMM yyyy") : "-",
-          a.returned_date ? format(new Date(a.returned_date), "dd MMM yyyy") : "Active",
+          a.assigned_date ? format(parseLocalDate(a.assigned_date), "dd MMM yyyy") : "-",
+          a.returned_date ? format(parseLocalDate(a.returned_date), "dd MMM yyyy") : "Active",
         ]),
         theme: "striped",
         headStyles: { fillColor: [37, 99, 235] },
@@ -472,7 +472,7 @@ export function EmployeeReport() {
                     {selectedEmployee.hire_date && (
                       <span className="flex items-center gap-1.5">
                         <Calendar className="h-3.5 w-3.5" />
-                        Joined {format(new Date(selectedEmployee.hire_date), "MMM yyyy")}
+                        Joined {format(new Date(/^\d{4}-\d{2}-\d{2}$/.test(selectedEmployee.hire_date) ? `${selectedEmployee.hire_date}T00:00:00` : selectedEmployee.hire_date), "MMM yyyy")}
                       </span>
                     )}
                   </div>
@@ -536,10 +536,10 @@ export function EmployeeReport() {
                             <TableRow key={r.id}>
                               <TableCell>{r.type_name}</TableCell>
                               <TableCell>
-                                {format(new Date(r.start_date), "dd MMM yyyy")}
+                                {format(parseLocalDate(r.start_date), "dd MMM yyyy")}
                               </TableCell>
                               <TableCell>
-                                {format(new Date(r.end_date), "dd MMM yyyy")}
+                                {format(parseLocalDate(r.end_date), "dd MMM yyyy")}
                               </TableCell>
                               <TableCell>{r.days_count}</TableCell>
                               <TableCell>
@@ -622,7 +622,7 @@ export function EmployeeReport() {
                         attendanceData.records.slice(0, 15).map((r: any) => (
                           <TableRow key={r.attendance_date || r.id}>
                             <TableCell>
-                              {r.attendance_date ? format(new Date(r.attendance_date), "dd MMM yyyy") : "-"}
+                              {r.attendance_date ? format(parseLocalDate(r.attendance_date), "dd MMM yyyy") : "-"}
                             </TableCell>
                             <TableCell>
                               {r.first_login ? format(new Date(r.first_login), "HH:mm") : "-"}
@@ -775,12 +775,12 @@ export function EmployeeReport() {
                           </TableCell>
                           <TableCell>
                             {a.assigned_date
-                              ? format(new Date(a.assigned_date), "dd MMM yyyy")
+                              ? format(parseLocalDate(a.assigned_date), "dd MMM yyyy")
                               : "-"}
                           </TableCell>
                           <TableCell>
                             {a.returned_date ? (
-                              format(new Date(a.returned_date), "dd MMM yyyy")
+                              format(parseLocalDate(a.returned_date), "dd MMM yyyy")
                             ) : (
                               <Badge variant="default">Active</Badge>
                             )}

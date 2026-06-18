@@ -3,6 +3,7 @@ import { isOfficialEmail, OFFICIAL_EMAIL_MESSAGE } from "../../shared/officialEm
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const officialEmail = z.string().trim().email().refine(isOfficialEmail, OFFICIAL_EMAIL_MESSAGE);
+const personalEmail = z.string().trim().email(); // No domain restriction for personal emails
 
 export const createEmployeeSchema = z.object({
   employeeCode: z.string().trim().min(1).max(50),
@@ -10,6 +11,8 @@ export const createEmployeeSchema = z.object({
   lastName: z.string().trim().max(100).nullable().optional(),
   email: officialEmail.nullable().optional(),
   mobile: z.string().trim().max(20).nullable().optional(),
+  personalEmail: personalEmail.nullable().optional(),
+  personalMobile: z.string().trim().max(20).nullable().optional(),
   gender: z.enum(["Male", "Female", "Other"]).optional(),
   dateOfBirth: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD").optional(),
   dateOfJoining: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
@@ -31,6 +34,8 @@ export const updateEmployeeSchema = z.object({
   lastName: z.string().trim().max(100).nullable().optional(),
   email: officialEmail.nullable().optional(),
   mobile: z.string().trim().max(20).nullable().optional(),
+  personalEmail: personalEmail.nullable().optional(),
+  personalMobile: z.string().trim().max(20).nullable().optional(),
   gender: z.enum(["Male", "Female", "Other"]).optional(),
   dateOfBirth: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD").optional(),
   dateOfJoining: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD").optional(),

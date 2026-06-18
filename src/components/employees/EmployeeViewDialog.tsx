@@ -58,7 +58,11 @@ interface EmployeeStatCard {
 
 function formatDate(value?: string | null) {
   if (!value) return "Not recorded";
-  return new Date(value).toLocaleDateString("en-IN", {
+  // Append T00:00:00 for date-only strings to avoid UTC parsing shifting the date in IST
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value.trim())
+    ? `${value.trim()}T00:00:00`
+    : value;
+  return new Date(normalized).toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -79,10 +83,8 @@ export function EmployeeViewDialog({ employee, open, onOpenChange }: EmployeeVie
     enabled: open && !!employee?.id,
   });
 
-  if (!employee) return null;
-
   const details = data?.employee;
-  const displayName = details?.full_name || employee.name;
+  const displayName = (employee ? (details?.full_name || employee.name) : "") || "";
   const initials = displayName
     .split(" ")
     .slice(0, 2)
@@ -92,7 +94,7 @@ export function EmployeeViewDialog({ employee, open, onOpenChange }: EmployeeVie
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto p-0">
+      {employee && <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>{displayName} employee profile</DialogTitle>
           <DialogDescription>Employee details and complete lifecycle journey</DialogDescription>
@@ -236,7 +238,7 @@ export function EmployeeViewDialog({ employee, open, onOpenChange }: EmployeeVie
             />
           </TabsContent>
         </Tabs>
-      </DialogContent>
+      </DialogContent>}
     </Dialog>
   );
 }

@@ -1,3 +1,4 @@
+import compression from "compression";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
@@ -5,6 +6,7 @@ import morgan from "morgan";
 
 import { env } from "./config/env.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
+import { listEndpointLimiter, payrollRunLimiter, reportLimiter } from "./middleware/rateLimiter.js";
 import { healthRouter } from "./routes/health.routes.js";
 import { processRouter } from "./modules/process/process.routes.js";
 import { integrationRouter } from "./modules/integration-hub/integration.routes.js";
@@ -98,29 +100,40 @@ import legacyRouter from "./modules/legacy/legacy.routes.js";
 import dialerRouter from "./modules/dialer/dialer.routes.js";
 import { externalDbRouter } from "./modules/external-db/external-db.routes.js";
 import { aprRouter } from "./modules/apr/apr.routes.js";
+import { qualityDashboardRouter } from "./modules/quality-dashboard/quality-dashboard.routes.js";
+import { performanceDashboardRouter } from "./modules/performance-dashboard/performance-dashboard.routes.js";
 import { kpiMasterRouter } from "./modules/kpi/kpi-master.routes.js";
 import taskRouter from "./modules/tasks/task.routes.js";
 import { payrollMastersRouter } from "./modules/payroll-masters/payrollMasters.routes.js";
 import { incentivesRouter } from "./modules/incentives/incentives.routes.js";
+import { expenseRouter } from "./modules/expenses/expense.routes.js";
 
 export const app = express();
 
 app.set("trust proxy", 1);
 
-function allowedOrigins(): string[] {
-  const configured = String(process.env.CORS_ALLOWED_ORIGINS || "")
+// Compute once at startup — never rebuild on every request
+const ALLOWED_ORIGINS: ReadonlySet<string> = new Set([
+  env.FRONTEND_URL,
+  ...String(process.env.CORS_ALLOWED_ORIGINS || "")
     .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-  return Array.from(new Set([env.FRONTEND_URL, ...configured]));
-}
+    .map((o) => o.trim())
+    .filter(Boolean),
+]);
 
 function isAllowedOrigin(origin: string): boolean {
   if (env.NODE_ENV !== "production" && (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:"))) return true;
-  if (allowedOrigins().includes(origin)) return true;
-  return false;
+  return ALLOWED_ORIGINS.has(origin);
 }
 
+app.use(compression({
+  level: 6,
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.path.includes("/stream") || req.path.includes("/biometric-punch")) return false;
+    return compression.filter(req, res);
+  },
+}));
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(cors({
   origin: (origin, callback) => {
@@ -154,16 +167,16 @@ app.use("/api/leave", leaveSecureRouter);
 app.use("/api/leave", leaveRouter);
 app.use("/api/payroll", payrollStatutoryConfigCompatRouter);
 app.use("/api/payroll", payrollLinesCompatRouter);
-app.use("/api/payroll", payrollSecureRouter);
-app.use("/api/payroll", payrollRouter);
-app.use("/api/payroll", payrollExtendedRouter);
-app.use("/api/payroll", payrollMoreRouter);
+app.use("/api/payroll", payrollRunLimiter, payrollSecureRouter);
+app.use("/api/payroll", listEndpointLimiter, payrollRouter);
+app.use("/api/payroll", listEndpointLimiter, payrollExtendedRouter);
+app.use("/api/payroll", listEndpointLimiter, payrollMoreRouter);
 app.use("/api/payroll-compliance", payrollComplianceRouter);
-app.use("/api/employees", employeeReportMasterRouter);
-app.use("/api/employees", employeeSecureRouter);
-app.use("/api/employees", employeeGovernanceRouter);
+app.use("/api/employees", listEndpointLimiter, employeeReportMasterRouter);
+app.use("/api/employees", listEndpointLimiter, employeeSecureRouter);
+app.use("/api/employees", listEndpointLimiter, employeeGovernanceRouter);
 app.use("/api/employees", employeePhotoCompatRouter);
-app.use("/api/employees", employeeRouter);
+app.use("/api/employees", listEndpointLimiter, employeeRouter);
 app.use("/api/rm-change", rmChangeRouter);
 app.use("/api/kpi/process-role", kpiProcessRoleRouter);
 app.use("/api/kpi-master", kpiMasterRouter);
@@ -231,10 +244,13 @@ app.use('/api/wfm/biometric-summary', biometricSummaryRouter);
 app.use("/api/customization", customizationRouter);
 app.use("/api/roster-master", rosterMasterRouter);
 app.use("/api/roster-capacity", rosterCapacityRouter);
-app.use('/api/reports', reportingLeaveBalanceRouter);
-app.use('/api/reports', reportingRouter);
+app.use('/api/reports', reportLimiter, reportingLeaveBalanceRouter);
+app.use('/api/reports', reportLimiter, reportingRouter);
 app.use('/api/control-tower', controlTowerRouter);
+app.use("/api/quality-dashboard", qualityDashboardRouter);
+app.use("/api/performance-dashboard", performanceDashboardRouter);
 app.use("/api/legacy", legacyRouter);
+app.use("/api/expenses", expenseRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

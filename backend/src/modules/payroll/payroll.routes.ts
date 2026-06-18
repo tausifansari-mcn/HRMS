@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../../middleware/authMiddleware.js";
 import { requireRole } from "../../middleware/requireRole.js";
 import { requireScopedRole } from "../../middleware/scopeMiddleware.js";
+import { requireWFMAccess } from "../../middleware/requireWFMAccess.js";
 import { buildScopeWhereClause } from "../../shared/scopeAccess.js";
 import { getEmployeeForUser, hasRole } from "../../shared/accessGuard.js";
 import { payrollController as c } from "./payroll.controller.js";
@@ -26,6 +27,37 @@ router.use(requireAuth);
 
 router.get("/structures", requireRole("admin", "hr", "finance", "payroll"), h(c.listStructures));
 router.post("/structures", requireRole("admin", "hr", "finance", "payroll"), h(c.createStructure));
+
+// ─── Employee Salaries (per-employee assignment with computed monthly amounts) ─
+router.get("/employee-salaries", requireRole("admin", "hr", "finance", "payroll"), h(async (req: AuthenticatedRequest, res: Response) => {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT
+       esa.id,
+       esa.employee_id,
+       esa.ctc_annual,
+       esa.effective_from,
+       ss.id             AS structure_id,
+       ss.structure_code,
+       ss.structure_name,
+       ss.basic_pct,
+       ss.hra_pct,
+       ROUND((esa.ctc_annual / 12) * ss.basic_pct  / 100, 2)                                          AS basic_salary,
+       ROUND((esa.ctc_annual / 12) * ss.hra_pct    / 100, 2)                                          AS hra,
+       ROUND((esa.ctc_annual / 12) - ((esa.ctc_annual / 12) * ss.basic_pct / 100)
+                                   - ((esa.ctc_annual / 12) * ss.hra_pct   / 100), 2)                 AS special_allowance,
+       CONCAT_WS(' ', e.first_name, e.last_name)  AS employee_name,
+       e.employee_code,
+       e.email                                     AS employee_email,
+       e.avatar_url                                AS employee_avatar
+     FROM employee_salary_assignment esa
+     JOIN salary_structure_master ss ON ss.id = esa.structure_id
+     JOIN employees e               ON e.id  = esa.employee_id
+     WHERE esa.active_status = 1
+       AND e.employment_status = 'active'
+     ORDER BY e.employee_code`
+  );
+  return res.json({ success: true, data: rows });
+}));
 
 // ─── Components ───────────────────────────────────────────────────────────────
 
@@ -150,6 +182,14 @@ router.post("/runs/:id/calculate", requireRole("admin", "finance", "payroll"), a
 // ─── Run Lines ────────────────────────────────────────────────────────────────
 
 router.patch("/lines/:id", requireRole("admin", "finance", "payroll"), h(c.updateLine));
+
+// ─── Overtime (WFM-only) ──────────────────────────────────────────────────────
+
+router.patch("/lines/:lineId/overtime",
+  requireAuth,
+  requireWFMAccess,
+  h(c.updateOvertime)
+);
 
 // ─── Advances ─────────────────────────────────────────────────────────────────
 
@@ -625,6 +665,97 @@ router.get(
   })
 );
 
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+// GET /api/payroll/analytics/trends?months=6
+router.get("/analytics/trends", requireRole("admin", "hr", "finance", "payroll"), h(async (req: AuthenticatedRequest, res: Response) => {
+  const months = Math.min(24, Math.max(1, Number(req.query.months ?? 6)));
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT spr.run_month,
+            COUNT(DISTINCT spl.employee_id) AS headcount,
+            ROUND(SUM(spl.gross_salary),2)    AS total_gross,
+            ROUND(SUM(spl.total_deductions),2) AS total_deductions,
+            ROUND(SUM(spl.net_salary),2)      AS total_net
+     FROM salary_prep_line spl
+     JOIN salary_prep_run spr ON spr.id = spl.run_id
+     WHERE spr.run_month >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL ? MONTH), '%Y-%m')
+       AND spl.status != 'cancelled'
+     GROUP BY spr.run_month
+     ORDER BY spr.run_month ASC`,
+    [months]
+  );
+  return res.json({ success: true, data: rows });
+}));
+
+// GET /api/payroll/analytics?dimension=department&runMonth=2026-06
+router.get("/analytics", requireRole("admin", "hr", "finance", "payroll"), h(async (req: AuthenticatedRequest, res: Response) => {
+  const dimension = (req.query.dimension as string) || "department";
+  let runMonth = req.query.runMonth as string | undefined;
+
+  if (!runMonth) {
+    const [latest] = await db.execute<RowDataPacket[]>(
+      `SELECT run_month FROM salary_prep_run WHERE status NOT IN ('draft','cancelled')
+       ORDER BY run_month DESC LIMIT 1`
+    );
+    runMonth = (latest as any[])[0]?.run_month;
+    if (!runMonth) return res.json({ success: true, runMonth: null, kpi: {}, data: [] });
+  }
+
+  const [kpiRows] = await db.execute<RowDataPacket[]>(
+    `SELECT COUNT(DISTINCT spl.employee_id)             AS headcount,
+            ROUND(SUM(spl.net_salary),2)                AS total_net,
+            ROUND(AVG(spl.net_salary),2)                AS avg_net,
+            ROUND(SUM(spl.gross_salary),2)              AS total_gross,
+            ROUND(SUM(COALESCE(spl.pf_employer,0)),2)   AS total_pf_employer,
+            ROUND(SUM(COALESCE(spl.esic_employer,0)),2) AS total_esic_employer
+     FROM salary_prep_line spl
+     JOIN salary_prep_run spr ON spr.id = spl.run_id AND spr.run_month = ?
+     WHERE spl.status != 'cancelled'`,
+    [runMonth]
+  );
+
+  const DIM: Record<string, { sel: string; join: string; grp: string }> = {
+    department: {
+      sel:  "COALESCE(dm.dept_name, 'Unknown') AS dimension_name",
+      join: "LEFT JOIN department_master dm ON dm.id = e.department_id",
+      grp:  "e.department_id, dm.dept_name",
+    },
+    branch: {
+      sel:  "COALESCE(bm.branch_name, 'Unknown') AS dimension_name",
+      join: "LEFT JOIN branch_master bm ON bm.id = e.branch_id",
+      grp:  "e.branch_id, bm.branch_name",
+    },
+    process: {
+      sel:  "COALESCE(pm.process_name, 'Unknown') AS dimension_name",
+      join: "LEFT JOIN process_master pm ON pm.id = e.process_id",
+      grp:  "e.process_id, pm.process_name",
+    },
+  };
+  const d = DIM[dimension] ?? DIM.department;
+
+  const [dimRows] = await db.execute<RowDataPacket[]>(
+    `SELECT ${d.sel},
+            COUNT(DISTINCT spl.employee_id)                                                           AS headcount,
+            ROUND(SUM(spl.basic),2)                                                                   AS total_basic,
+            ROUND(SUM(COALESCE(spl.hra,0)+COALESCE(spl.special_allowance,0)+COALESCE(spl.incentive_total,0)),2) AS total_allowances,
+            ROUND(SUM(spl.gross_salary),2)                                                            AS total_gross,
+            ROUND(SUM(spl.total_deductions),2)                                                        AS total_deductions,
+            ROUND(SUM(spl.net_salary),2)                                                              AS total_net,
+            ROUND(SUM(COALESCE(spl.pf_employer,0)),2)                                                 AS total_pf_employer,
+            ROUND(SUM(COALESCE(spl.esic_employer,0)),2)                                               AS total_esic_employer
+     FROM salary_prep_line spl
+     JOIN salary_prep_run spr ON spr.id = spl.run_id AND spr.run_month = ?
+     LEFT JOIN employees e ON e.id = spl.employee_id
+     ${d.join}
+     WHERE spl.status != 'cancelled'
+     GROUP BY ${d.grp}
+     ORDER BY total_net DESC`,
+    [runMonth]
+  );
+
+  return res.json({ success: true, runMonth, kpi: (kpiRows as any[])[0] ?? {}, data: dimRows });
+}));
+
 // ─── PT Slabs ─────────────────────────────────────────────────────────────────
 
 // GET /api/payroll/pt-slabs — list PT slabs; optional ?state_code=
@@ -755,6 +886,69 @@ router.get("/runs/:id/neft-summary", requireRole("admin", "finance", "payroll"),
   );
   res.json({ success: true, data: (rows as RowDataPacket[])[0] });
 }));
+
+// GET /api/payroll/runs/:runId/neft-lines
+// Per-employee bank details (full account numbers) + net salary for Finance NEFT file preparation
+// Returns decrypted full bank account numbers — use for NEFT transfer prep only, not dashboard display
+router.get(
+  "/runs/:runId/neft-lines",
+  requireAuth,
+  requireRole("admin", "finance", "payroll"),
+  h(async (req: AuthenticatedRequest, res: Response) => {
+    const { runId } = req.params;
+
+    // Validate runId is a valid UUID
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(runId)) {
+      return res.status(400).json({ success: false, error: "Invalid run ID format" });
+    }
+
+    const [runRows] = await db.execute<RowDataPacket[]>(
+      `SELECT id, run_month, status FROM salary_prep_run WHERE id = ? LIMIT 1`,
+      [runId]
+    );
+    if (!(runRows as RowDataPacket[]).length) {
+      return res.status(404).json({ success: false, error: "Payroll run not found" });
+    }
+    const run = (runRows as RowDataPacket[])[0];
+
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT e.employee_code,
+              e.first_name,
+              e.last_name,
+              COALESCE(NULLIF(e.full_name,''), CONCAT(e.first_name,' ',COALESCE(e.last_name,''))) AS employee_name,
+              ebd.bank_name,
+              ebd.ifsc_code,
+              COALESCE(ebd.account_holder_name, CONCAT(e.first_name,' ',COALESCE(e.last_name,''))) AS account_holder_name,
+              AES_DECRYPT(ebd.account_number, ?) AS account_number,
+              spl.net_salary,
+              spl.gross_salary,
+              spl.total_deductions,
+              spl.status AS line_status
+         FROM salary_prep_line spl
+         JOIN employees e ON e.id = spl.employee_id
+         LEFT JOIN employee_bank_detail ebd ON ebd.employee_id = spl.employee_id
+        WHERE spl.run_id = ?
+          AND spl.net_salary > 0
+        ORDER BY e.employee_code ASC`,
+      [env.PAYROLL_BANK_KEY, runId]
+    );
+
+    const lines = (rows as RowDataPacket[]).map((r: any) => ({
+      ...r,
+      account_number: r.account_number?.toString() ?? null,
+    }));
+
+    return res.json({
+      success: true,
+      run,
+      data: lines,
+      meta: {
+        count: lines.length,
+        total_net: lines.reduce((sum: number, r: any) => sum + Number(r.net_salary ?? 0), 0),
+      },
+    });
+  })
+);
 
 // GET /api/payroll/runs/:id/neft-export — generate NEFT disbursement CSV
 router.get("/runs/:id/neft-export", requireRole("admin", "finance", "payroll"), h(async (req: AuthenticatedRequest, res: Response) => {

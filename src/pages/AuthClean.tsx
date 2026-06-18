@@ -1,12 +1,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, Mail, ShieldCheck, Users, Clock, BarChart3, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, Mail, ShieldCheck, Users, Clock, BarChart3, CheckCircle2, Phone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoginSmartGreeting } from "@/components/integrations/LoginSmartGreeting";
+import { hrmsApi } from "@/lib/hrmsApi";
 
 const companyLogo = "/mcn-logo.png?v=999";
 const currentYear = new Date().getFullYear();
@@ -18,12 +19,21 @@ const FEATURES = [
   { icon: CheckCircle2, label: "Leave & Payroll", desc: "Streamlined approvals and payroll processing" },
 ];
 
+type ForgotPasswordChannel = 'email' | 'sms';
+type ForgotPasswordStep = 'send' | 'verify';
+
 export default function AuthClean() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [resetEmail, setResetEmail] = useState("");
+  const [resetPhone, setResetPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
+  const [forgotChannel, setForgotChannel] = useState<ForgotPasswordChannel>('email');
+  const [forgotStep, setForgotStep] = useState<ForgotPasswordStep>('send');
   const [loading, setLoading] = useState(false);
   const { signIn, forgotPassword, user, mustChangePassword } = useAuth();
   const { toast } = useToast();
@@ -47,19 +57,76 @@ export default function AuthClean() {
 
   const handleForgot = async (event: FormEvent) => {
     event.preventDefault();
-    if (!resetEmail.trim()) {
-      toast({ title: "Reset Password", description: "Enter your registered official email." });
+
+    if (forgotChannel === 'email') {
+      if (!resetEmail.trim()) {
+        toast({ title: "Reset Password", description: "Enter your registered official email." });
+        return;
+      }
+      setLoading(true);
+      const { error } = await forgotPassword(resetEmail.trim());
+      setLoading(false);
+      if (error) {
+        toast({ title: "Reset Password", description: error.message });
+        return;
+      }
+      toast({ title: "Reset Link Sent", description: "If this email is registered, a reset link has been sent." });
+      setShowForgot(false);
+    } else {
+      // SMS OTP flow
+      if (!resetPhone.trim()) {
+        toast({ title: "Reset Password", description: "Enter your registered mobile number." });
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await hrmsApi.post('/api/auth/forgot-password-otp', { phone: resetPhone.trim() });
+        setLoading(false);
+        if (res.data.success) {
+          toast({ title: "OTP Sent", description: res.data.message });
+          setForgotStep('verify');
+        } else {
+          toast({ title: "Error", description: res.data.message || "Failed to send OTP" });
+        }
+      } catch (error: any) {
+        setLoading(false);
+        toast({ title: "Error", description: error.response?.data?.error || "Failed to send OTP" });
+      }
+    }
+  };
+
+  const handleVerifyOtp = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!otp.trim() || !newPassword.trim()) {
+      toast({ title: "Reset Password", description: "Enter OTP and new password." });
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast({ title: "Reset Password", description: "Password must be at least 8 characters." });
       return;
     }
     setLoading(true);
-    const { error } = await forgotPassword(resetEmail.trim());
-    setLoading(false);
-    if (error) {
-      toast({ title: "Reset Password", description: error.message });
-      return;
+    try {
+      const res = await hrmsApi.post('/api/auth/verify-otp-reset', {
+        phone: resetPhone.trim(),
+        otp: otp.trim(),
+        newPassword: newPassword
+      });
+      setLoading(false);
+      if (res.data.success) {
+        toast({ title: "Success", description: "Password reset successful. Please login." });
+        setShowForgot(false);
+        setForgotStep('send');
+        setOtp('');
+        setNewPassword('');
+        setResetPhone('');
+      } else {
+        toast({ title: "Error", description: res.data.error || "Invalid or expired OTP" });
+      }
+    } catch (error: any) {
+      setLoading(false);
+      toast({ title: "Error", description: error.response?.data?.error || "Failed to reset password" });
     }
-    toast({ title: "Reset Link Sent", description: "If this email is registered, a reset link has been sent." });
-    setShowForgot(false);
   };
 
   return (
@@ -269,42 +336,169 @@ export default function AuthClean() {
                 </>
               ) : (
                 <>
-                  <div className="mb-6">
+                  <div className="mb-5">
                     <h2 className="text-xl font-black text-slate-950">Reset Password</h2>
-                    <p className="mt-1.5 text-sm text-slate-500">Enter your registered official email address.</p>
+                    <p className="mt-1.5 text-sm text-slate-500">
+                      {forgotStep === 'send' ? 'Choose how to reset your password' : 'Enter OTP and set new password'}
+                    </p>
                   </div>
 
-                  <form onSubmit={handleForgot} className="space-y-4">
-                    <div className="relative">
-                      <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        type="email"
-                        value={resetEmail}
-                        onChange={(e) => setResetEmail(e.target.value)}
-                        placeholder="official.email@company.com"
-                        className="h-11 rounded-xl border-slate-200 bg-slate-50 pl-10 focus:bg-white"
-                        disabled={loading}
-                      />
-                    </div>
+                  {forgotStep === 'send' && (
+                    <>
+                      {/* Channel tabs */}
+                      <div className="mb-4 flex gap-2 rounded-xl bg-slate-50 p-1">
+                        <button
+                          type="button"
+                          onClick={() => setForgotChannel('email')}
+                          className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${
+                            forgotChannel === 'email'
+                              ? 'bg-white text-[#1B6AB5] shadow-sm'
+                              : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          <Mail className="inline h-4 w-4 mr-1.5" />
+                          Email
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setForgotChannel('sms')}
+                          className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${
+                            forgotChannel === 'sms'
+                              ? 'bg-white text-[#1B6AB5] shadow-sm'
+                              : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          <Phone className="inline h-4 w-4 mr-1.5" />
+                          SMS/OTP
+                        </button>
+                      </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="submit"
-                        disabled={loading}
-                        className="flex h-11 items-center justify-center gap-2 rounded-xl font-bold text-white"
-                        style={{ background: "#1B6AB5" }}
-                      >
-                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Link"}
-                      </button>
-                      <button
-                        type="button"
-                        className="h-11 rounded-xl border border-slate-200 bg-white font-bold text-slate-700 hover:bg-slate-50"
-                        onClick={() => setShowForgot(false)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
+                      <form onSubmit={handleForgot} className="space-y-4">
+                        {forgotChannel === 'email' ? (
+                          <div className="relative">
+                            <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <Input
+                              type="email"
+                              value={resetEmail}
+                              onChange={(e) => setResetEmail(e.target.value)}
+                              placeholder="official.email@company.com"
+                              className="h-11 rounded-xl border-slate-200 bg-slate-50 pl-10 focus:bg-white focus:border-[#1B6AB5] focus:ring-[#1B6AB5]/20"
+                              disabled={loading}
+                            />
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <Input
+                              type="tel"
+                              value={resetPhone}
+                              onChange={(e) => setResetPhone(e.target.value)}
+                              placeholder="9876543210"
+                              className="h-11 rounded-xl border-slate-200 bg-slate-50 pl-10 focus:bg-white focus:border-[#1B6AB5] focus:ring-[#1B6AB5]/20"
+                              disabled={loading}
+                            />
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            type="submit"
+                            disabled={loading}
+                            className="flex h-11 items-center justify-center gap-2 rounded-xl font-bold text-white"
+                            style={{ background: "#1B6AB5" }}
+                          >
+                            {loading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : forgotChannel === 'email' ? (
+                              "Send Link"
+                            ) : (
+                              "Send OTP"
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            className="h-11 rounded-xl border border-slate-200 bg-white font-bold text-slate-700 hover:bg-slate-50"
+                            onClick={() => {
+                              setShowForgot(false);
+                              setForgotStep('send');
+                              setResetPhone('');
+                              setResetEmail('');
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    </>
+                  )}
+
+                  {forgotStep === 'verify' && forgotChannel === 'sms' && (
+                    <form onSubmit={handleVerifyOtp} className="space-y-4">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="otp" className="text-sm font-bold text-slate-700">
+                          6-Digit OTP
+                        </Label>
+                        <Input
+                          id="otp"
+                          type="text"
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="123456"
+                          maxLength={6}
+                          className="h-11 rounded-xl border-slate-200 bg-slate-50 text-center text-lg tracking-widest focus:bg-white focus:border-[#1B6AB5] focus:ring-[#1B6AB5]/20"
+                          disabled={loading}
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="newPassword" className="text-sm font-bold text-slate-700">
+                          New Password
+                        </Label>
+                        <div className="relative">
+                          <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                          <Input
+                            id="newPassword"
+                            type={showNewPassword ? "text" : "password"}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Min. 8 characters"
+                            className="h-11 rounded-xl border-slate-200 bg-slate-50 pl-10 pr-11 focus:bg-white focus:border-[#1B6AB5] focus:ring-[#1B6AB5]/20"
+                            disabled={loading}
+                          />
+                          <button
+                            type="button"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            onClick={() => setShowNewPassword((v) => !v)}
+                            tabIndex={-1}
+                          >
+                            {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="submit"
+                          disabled={loading}
+                          className="flex h-11 items-center justify-center gap-2 rounded-xl font-bold text-white"
+                          style={{ background: "#1B6AB5" }}
+                        >
+                          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reset Password"}
+                        </button>
+                        <button
+                          type="button"
+                          className="h-11 rounded-xl border border-slate-200 bg-white font-bold text-slate-700 hover:bg-slate-50"
+                          onClick={() => {
+                            setForgotStep('send');
+                            setOtp('');
+                            setNewPassword('');
+                          }}
+                        >
+                          Back
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </>
               )}
             </div>

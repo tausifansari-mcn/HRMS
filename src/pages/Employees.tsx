@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   Bar,
@@ -34,6 +34,7 @@ import { AdminPasswordResetDialog } from "@/components/admin/AdminPasswordResetD
 import { BulkDeleteDialog } from "@/components/employees/BulkDeleteDialog";
 import { BulkAssignManagerDialog } from "@/components/employees/BulkAssignManagerDialog";
 import { DateRangeExportDialog } from "@/components/export/DateRangeExportDialog";
+import { ProcessWiseChart } from "@/components/employees/ProcessWiseChart";
 
 import {
   useBulkDeleteEmployees,
@@ -46,6 +47,7 @@ import {
 } from "@/hooks/useEmployees";
 import { useIsAdminOrHR } from "@/hooks/useUserRole";
 import { useSorting } from "@/hooks/useSorting";
+import { useDebounce } from "@/hooks/useDebounce";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -159,7 +161,7 @@ const Employees = () => {
   const [bulkAssignManagerOpen, setBulkAssignManagerOpen] = useState(false);
   const [employeesToAssignManager, setEmployeesToAssignManager] = useState<Employee[]>([]);
 
-  const deferredSearch = useDeferredValue(searchQuery.trim());
+  const debouncedSearch = useDebounce(searchQuery.trim(), 300);
   const recordStatus = statusFilter === "active" || statusFilter === "onboarding"
     ? "active"
     : statusFilter === "all"
@@ -177,7 +179,7 @@ const Employees = () => {
     limit: pageSize,
     recordStatus,
     status: employmentStatus,
-    search: deferredSearch || undefined,
+    search: debouncedSearch || undefined,
     departmentId: departmentFilter === "all" ? undefined : departmentFilter,
     processId: processFilter === "all" ? undefined : processFilter,
     branchId: branchFilter === "all" ? undefined : branchFilter,
@@ -187,7 +189,7 @@ const Employees = () => {
     limit: 1,
     recordStatus,
     status: employmentStatus,
-    search: deferredSearch || undefined,
+    search: debouncedSearch || undefined,
     departmentId: departmentFilter === "all" ? undefined : departmentFilter,
     processId: processFilter === "all" ? undefined : processFilter,
     branchId: branchFilter === "all" ? undefined : branchFilter,
@@ -242,7 +244,7 @@ const Employees = () => {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedEmployeeIds([]);
-  }, [deferredSearch, departmentFilter, processFilter, branchFilter, statusFilter, pageSize]);
+  }, [debouncedSearch, departmentFilter, processFilter, branchFilter, statusFilter, pageSize]);
 
   const filterByDateRange = (
     items: Employee[],
@@ -548,11 +550,11 @@ const Employees = () => {
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {isLoading ? (
-            <>
+            <div className="flex gap-6">
               {[1, 2, 3, 4].map((item) => (
-                <Skeleton key={item} className="h-32 rounded-2xl" />
+                <Skeleton key={item} className="h-20 w-24 rounded-xl" />
               ))}
-            </>
+            </div>
           ) : (
             <>
               <EmployeeMetricCard
@@ -649,11 +651,11 @@ const Employees = () => {
                 <SelectValue placeholder="Department" />
               </SelectTrigger>
 
-              <SelectContent className="bg-white text-slate-900">
-                <SelectItem value="all" className="text-slate-900">All Departments</SelectItem>
+              <SelectContent className="bg-white">
+                <SelectItem value="all" className="text-slate-900 font-medium">All Departments</SelectItem>
 
                 {departments.map((dept) => (
-                  <SelectItem key={dept.id} value={dept.id} className="text-slate-900">
+                  <SelectItem key={dept.id} value={dept.id} className="text-slate-900 font-medium">
                     {dept.name}
                   </SelectItem>
                 ))}
@@ -664,10 +666,10 @@ const Employees = () => {
               <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm text-slate-900 shadow-sm [&>span]:text-slate-900">
                 <SelectValue placeholder="Process" />
               </SelectTrigger>
-              <SelectContent className="bg-white text-slate-900">
-                <SelectItem value="all" className="text-slate-900">All Processes</SelectItem>
+              <SelectContent className="bg-white">
+                <SelectItem value="all" className="text-slate-900 font-medium">All Processes</SelectItem>
                 {processes.map((process) => (
-                  <SelectItem key={process.id} value={process.id} className="text-slate-900">
+                  <SelectItem key={process.id} value={process.id} className="text-slate-900 font-medium">
                     {process.name}
                   </SelectItem>
                 ))}
@@ -678,10 +680,10 @@ const Employees = () => {
               <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm text-slate-900 shadow-sm [&>span]:text-slate-900">
                 <SelectValue placeholder="Branch" />
               </SelectTrigger>
-              <SelectContent className="bg-white text-slate-900">
-                <SelectItem value="all" className="text-slate-900">All Branches</SelectItem>
+              <SelectContent className="bg-white">
+                <SelectItem value="all" className="text-slate-900 font-medium">All Branches</SelectItem>
                 {branches.map((branch) => (
-                  <SelectItem key={branch.id} value={branch.id} className="text-slate-900">
+                  <SelectItem key={branch.id} value={branch.id} className="text-slate-900 font-medium">
                     {branch.name}
                   </SelectItem>
                 ))}
@@ -692,12 +694,12 @@ const Employees = () => {
               <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm text-slate-900 shadow-sm [&>span]:text-slate-900">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
-              <SelectContent className="bg-white text-slate-900">
-                <SelectItem value="all" className="text-slate-900">Active & Inactive</SelectItem>
-                <SelectItem value="active" className="text-slate-900">Active</SelectItem>
-                <SelectItem value="inactive" className="text-slate-900">Inactive</SelectItem>
-                <SelectItem value="onboarding" className="text-slate-900">Onboarding</SelectItem>
-                <SelectItem value="offboarded" className="text-slate-900">Offboarded</SelectItem>
+              <SelectContent className="bg-white">
+                <SelectItem value="all" className="text-slate-900 font-medium">Active & Inactive</SelectItem>
+                <SelectItem value="active" className="text-slate-900 font-medium">Active</SelectItem>
+                <SelectItem value="inactive" className="text-slate-900 font-medium">Inactive</SelectItem>
+                <SelectItem value="onboarding" className="text-slate-900 font-medium">Onboarding</SelectItem>
+                <SelectItem value="offboarded" className="text-slate-900 font-medium">Offboarded</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -706,8 +708,7 @@ const Employees = () => {
 
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
           <span className="rounded-full bg-slate-100 px-3 py-1 font-medium">
-            {directoryTotal} matching employee
-            {directoryTotal === 1 ? "" : "s"}
+            {directoryTotal === 0 ? "No employees found" : `${directoryTotal} matching employee${directoryTotal === 1 ? "" : "s"}`}
           </span>
 
           {departmentFilter !== "all" && (

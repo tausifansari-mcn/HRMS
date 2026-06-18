@@ -7,6 +7,8 @@ export interface Employee {
   full_name: string;
   email: string | null;
   mobile: string | null;
+  personal_email: string | null;
+  personal_phone: string | null;
   gender: "Male" | "Female" | "Other" | null;
   date_of_birth: string | null;
   date_of_joining: string;

@@ -132,15 +132,28 @@ export async function listKudos(
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  // Add active employee filter to ensure only active employees are shown
+  const activeFilter = conditions.length
+    ? "AND sender.active_status = 1 AND receiver.active_status = 1"
+    : "WHERE sender.active_status = 1 AND receiver.active_status = 1";
+
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT kt.*, km.kudos_title, km.kudos_icon, km.kudos_category,
-            CASE WHEN kt.is_anonymous = 1 THEN 'Anonymous' ELSE sender.full_name END as sender_name,
-            receiver.full_name as receiver_name
+            CASE WHEN kt.is_anonymous = 1 THEN 'Anonymous'
+                 ELSE CONCAT(sender.full_name, ' (', sender.employee_code, ')')
+            END as sender_name,
+            CONCAT(receiver.full_name, ' (', receiver.employee_code, ')') as receiver_name,
+            sender.employee_code as sender_code,
+            receiver.employee_code as receiver_code,
+            sender.full_name as sender_full_name,
+            receiver.full_name as receiver_full_name
        FROM kudos_transaction kt
        JOIN employees sender ON sender.id = kt.sender_id
        JOIN employees receiver ON receiver.id = kt.receiver_id
        LEFT JOIN kudos_master km ON km.kudos_template_id = kt.kudos_template_id
        ${where}
+       ${activeFilter}
       ORDER BY kt.sent_at DESC
       LIMIT ${safeLimit}`,
     params

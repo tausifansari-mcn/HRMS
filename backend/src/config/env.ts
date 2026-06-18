@@ -16,7 +16,7 @@ const envSchema = z.object({
   DB_USER:     z.string().default("root"),
   DB_PASSWORD: z.string().default(""),
   DB_NAME:     z.string().default("mas_hrms"),
-  DB_POOL_MAX: z.coerce.number().default(10),
+  DB_POOL_MAX: z.coerce.number().default(25),
 
   // Independent MCN LMS MySQL DB. Use dedicated LMS_DB_* credentials in production.
   LMS_DB_HOST:     z.string().default("192.168.11.225"),

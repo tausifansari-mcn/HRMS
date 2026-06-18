@@ -43,7 +43,9 @@ export async function testNcosecConnection(): Promise<{ ok: boolean; error?: str
   try {
     const result = await testPoolForKey('cosec_biometric');
     if (result.ok) return result;
-  } catch {}
+  } catch (err: unknown) {
+    console.error('[ncosecDb] Config-based pool test failed:', err instanceof Error ? err.message : String(err));
+  }
   // fallback to env-var pool
   try {
     const p = await getLegacyPool();

@@ -75,11 +75,18 @@ export const updatePrepLineSchema = z.object({
   remarks: z.string().trim().nullable().optional(),
 });
 
+export const updateOvertimeSchema = z.object({
+  overtimeHours: z.number().min(0).max(200),
+  overtimeAmount: z.number().min(0),
+});
+
 export const runFiltersSchema = z.object({
   runMonth: z.string().regex(MONTH_REGEX).optional(),
   status: z.string().optional(),
   branchId: z.string().uuid().optional(),
   processId: z.string().uuid().optional(),
+  search: z.string().optional(),
+  departmentId: z.string().uuid().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(1000).default(50),
 });
@@ -101,5 +108,6 @@ export type AssignSalaryInput = z.infer<typeof assignSalarySchema>;
 export type CreateRunInput = z.infer<typeof createRunSchema>;
 export type UpdateRunStatusInput = z.infer<typeof updateRunStatusSchema>;
 export type UpdatePrepLineInput = z.infer<typeof updatePrepLineSchema>;
+export type UpdateOvertimeInput = z.infer<typeof updateOvertimeSchema>;
 export type RunFilters = z.infer<typeof runFiltersSchema>;
 export type AdvanceInput = z.infer<typeof advanceSchema>;

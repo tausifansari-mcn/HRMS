@@ -9,17 +9,18 @@ import { Calendar } from "@/components/ui/calendar";
 import { ChevronLeft, ChevronRight, CalendarDays, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
-import { 
-  format, 
-  startOfMonth, 
-  endOfMonth, 
-  addMonths, 
-  subMonths, 
-  eachDayOfInterval, 
-  parseISO, 
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  addMonths,
+  subMonths,
+  eachDayOfInterval,
+  parseISO,
   isWithinInterval,
-  isSameDay
+  isSameDay,
 } from "date-fns";
+import { normalizeDate } from "@/lib/utils";
 
 interface LeaveData {
   id: string;
@@ -110,8 +111,8 @@ export function LeaveCalendarView() {
 
   // Generate all dates that have leaves
   const leaveDates = leaves.flatMap((leave) => {
-    const start = parseISO(leave.start_date ?? "");
-    const end = parseISO(leave.end_date ?? "");
+    const start = parseISO(normalizeDate(leave.start_date ?? ""));
+    const end = parseISO(normalizeDate(leave.end_date ?? ""));
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
     return eachDayOfInterval({ start, end });
   });
@@ -119,8 +120,8 @@ export function LeaveCalendarView() {
   // Get leaves for selected date
   const selectedDateLeaves = selectedDate
     ? leaves.filter((leave) => {
-        const start = parseISO(leave.start_date ?? "");
-        const end = parseISO(leave.end_date ?? "");
+        const start = parseISO(normalizeDate(leave.start_date ?? ""));
+        const end = parseISO(normalizeDate(leave.end_date ?? ""));
         if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
         return isWithinInterval(selectedDate, { start, end });
       })
@@ -267,7 +268,7 @@ export function LeaveCalendarView() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{fullName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {format(parseISO(leave.start_date ?? ""), "MMM d")} - {format(parseISO(leave.end_date ?? ""), "MMM d")}
+                        {format(parseISO(normalizeDate(leave.start_date ?? "")), "MMM d")} - {format(parseISO(normalizeDate(leave.end_date ?? "")), "MMM d")}
                         <span className="ml-1">({leave.days_count ?? 0} day{Number(leave.days_count ?? 0) > 1 ? "s" : ""})</span>
                       </p>
                     </div>

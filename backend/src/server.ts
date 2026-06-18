@@ -10,6 +10,8 @@ import { startAccessExpiryScheduler } from "./workers/access-expiry.worker.js";
 import { startITProvisioningLockScheduler } from "./modules/it-provisioning/it-provisioning.cron.js";
 import { startOfficialEmailComplianceScheduler } from "./workers/official-email-compliance.worker.js";
 import { startIntegrationScheduler } from "./workers/integration-scheduler.worker.js";
+import { startLeaveMonthlyWorker } from "./workers/leave-monthly-credit.worker.js";
+import { startAnnualLeaveWorker } from "./workers/leave-annual-el-credit.worker.js";
 import { migrateLegacyIntegrationSecrets } from "./modules/external-db/external-db.service.js";
 
 function startServer() {
@@ -24,7 +26,9 @@ function startServer() {
       legacySyncWorker.start();
       startAccessExpiryScheduler();
       startITProvisioningLockScheduler();
-      console.log(`[schedulers] tenure, communication, attendance, legacy-sync, access-expiry, it-provisioning started`);
+      startLeaveMonthlyWorker();
+      startAnnualLeaveWorker();
+      console.log(`[schedulers] tenure, communication, attendance, legacy-sync, access-expiry, it-provisioning, leave-monthly, leave-annual started`);
     } else {
       console.log(`[schedulers] disabled (set ENABLE_SCHEDULERS=true to enable)`);
     }
@@ -32,9 +36,16 @@ function startServer() {
   });
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)),
+  ]).catch(err => { console.warn(`[startup] ${label} skipped:`, err.message); return null; });
+}
+
 async function initializeRuntime() {
-  await migrateLegacyIntegrationSecrets();
-  const cosecActive = await bootstrapCosecIntegration();
+  await withTimeout(migrateLegacyIntegrationSecrets(), 8000, 'migrateLegacyIntegrationSecrets');
+  const cosecActive = await withTimeout(bootstrapCosecIntegration(), 8000, 'bootstrapCosecIntegration');
   console.log(`[cosec-sync] automatic schedule ${cosecActive ? "active" : "inactive"}`);
   startServer();
 }

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { hrmsApi } from "@/lib/hrmsApi";
 import { format } from "date-fns";
+import { parseLocalDate } from "@/lib/utils";
 
 export interface Asset {
   id: string;
@@ -28,7 +29,7 @@ export function useAssets() {
         type: (a.asset_category ?? "accessory").toLowerCase() as Asset["type"],
         serialNumber: a.serial_number ?? "",
         purchaseDate: a.purchase_date
-          ? format(new Date(a.purchase_date), "MMM d, yyyy")
+          ? format(parseLocalDate(a.purchase_date), "MMM d, yyyy")
           : "Unknown",
         cost: Number(a.purchase_cost ?? 0),
         status: (a.status ?? "available") as Asset["status"],
@@ -212,8 +213,8 @@ export function useAssetHistory(assetId: string | null) {
       const res = await hrmsApi.get<{ data: any[] }>(`/api/assets-mgmt/${assetId}/history`);
       return (res.data ?? []).map((row: any) => ({
         id: row.id,
-        assignedDate: row.assigned_date ? format(new Date(row.assigned_date), "MMM d, yyyy") : "",
-        returnedDate: row.returned_date ? format(new Date(row.returned_date), "MMM d, yyyy") : null,
+        assignedDate: row.assigned_date ? format(parseLocalDate(row.assigned_date), "MMM d, yyyy") : "",
+        returnedDate: row.returned_date ? format(parseLocalDate(row.returned_date), "MMM d, yyyy") : null,
         notes: row.notes ?? null,
         employee: {
           name: row.employee_name || row.employee_code || "Unknown employee",

@@ -9,6 +9,7 @@ import {
   runFiltersSchema,
   updatePrepLineSchema,
   updateRunStatusSchema,
+  updateOvertimeSchema,
 } from "./payroll.validation.js";
 import { payrollService } from "./payroll.service.js";
 
@@ -127,6 +128,17 @@ export const payrollController = {
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
     const data = await payrollService.updateLine(req.params.id, parsed.data, (req as any).userId ?? "system");
     res.json({ data });
+  },
+
+  async updateOvertime(req: Request, res: Response) {
+    const parsed = updateOvertimeSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    const data = await payrollService.updateOvertime(
+      req.params.lineId,
+      parsed.data,
+      (req as any).authUser?.id ?? "system"
+    );
+    res.json({ success: true, data });
   },
 
   // ─── Advances ──────────────────────────────────────────────────────────────

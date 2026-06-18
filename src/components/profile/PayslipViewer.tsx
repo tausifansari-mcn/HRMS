@@ -38,6 +38,7 @@ import {
   Minus,
   Plus,
   ShieldCheck,
+  TrendingUp,
   Wallet,
 } from "lucide-react";
 import { downloadMasCallnetPayslip } from "@/lib/masCallnetPayslipGeneratorV2";
@@ -126,13 +127,21 @@ const formatCurrency = (amount: number) => {
 };
 
 const getStatusBadge = (status: string) => {
-  switch (status) {
+  const normalizedStatus = (status || "").toLowerCase().trim();
+  switch (normalizedStatus) {
     case "paid":
+    case "credited":
+    case "disbursed":
       return <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Paid</Badge>;
     case "processed":
+    case "approved":
       return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20">Processed</Badge>;
-    default:
+    case "draft":
+    case "pending":
       return <Badge variant="secondary">Draft</Badge>;
+    default:
+      // If status is not recognized but payslip has data, show as Processed
+      return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20">Processed</Badge>;
   }
 };
 
@@ -142,6 +151,18 @@ export function PayslipViewer({ employeeId, employeeName, employeeCode }: Paysli
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
   const [showNewPayslipAlert, setShowNewPayslipAlert] = useState(false);
   const [salaryVisible, setSalaryVisible] = useState(false);
+
+  // Fetch employee CTC
+  const { data: employeeData } = useQuery<{ ctc: number | null }>({
+    queryKey: ["employee-ctc", employeeId],
+    queryFn: async () => {
+      const res = await hrmsApi.get<{ success: boolean; data: { ctc: number | null } }>(
+        `/api/employees/${employeeId}/ctc`
+      );
+      return res.data ?? { ctc: null };
+    },
+    enabled: !!employeeId,
+  });
 
   const renderSensitive = (value: ReactNode, className = "") => (
     <>
@@ -377,6 +398,31 @@ export function PayslipViewer({ employeeId, employeeName, employeeCode }: Paysli
         </div>
       </CardHeader>
       <CardContent className="space-y-6 px-0 pt-6">
+        {/* CTC Card - Prominent Display */}
+        {employeeData?.ctc && (
+          <Card className="rounded-3xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 shadow-md">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-amber-800">
+                    <TrendingUp className="size-4" />
+                    Annual CTC (Cost to Company)
+                  </div>
+                  <p className="mt-2 text-3xl font-black tabular-nums text-amber-900">
+                    {renderSensitive(formatCurrency(employeeData.ctc))}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-700">
+                    Monthly: {renderSensitive(formatCurrency(employeeData.ctc / 12))}
+                  </p>
+                </div>
+                <div className="flex size-16 items-center justify-center rounded-2xl bg-amber-200/50">
+                  <Wallet className="size-8 text-amber-700" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <section className="grid gap-4 sm:grid-cols-3">
           {[
             {

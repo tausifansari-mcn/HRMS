@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { cn } from "@/lib/utils";
+import { cn, normalizeDate } from "@/lib/utils";
 
 interface Employee {
   id: string;
@@ -98,7 +98,7 @@ function initialsForName(name: string) {
 }
 
 function calcTenure(dateOfJoining: string): string {
-  const join = new Date(dateOfJoining);
+  const join = new Date(normalizeDate(dateOfJoining));
   const now = new Date();
   let years = now.getFullYear() - join.getFullYear();
   let months = now.getMonth() - join.getMonth();
@@ -111,7 +111,7 @@ function calcTenure(dateOfJoining: string): string {
 }
 
 function fmtDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(normalizeDate(dateStr)).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 const JOURNEY_CONFIG: Record<string, { icon: React.ReactNode; colour: string; label: string }> = {
