@@ -83,7 +83,7 @@ export function LeaveRequestHistory({ employeeId }: LeaveRequestHistoryProps) {
   const requests: LeaveRequest[] = [
     ...(hrmsRequests ?? []),
     ...filteredLegacy,
-  ].sort((a, b) => new Date(b.from_date).getTime() - new Date(a.from_date).getTime());
+  ].sort((a, b) => new Date(normalizeDate(b.from_date)).getTime() - new Date(normalizeDate(a.from_date)).getTime());
 
   if (isLoading) {
     return (

@@ -52,8 +52,8 @@ export function TeamLeaveCalendar() {
   // Get all dates that have leaves
   const leaveDates = teamLeaves.flatMap((leave) => {
     const dates: Date[] = [];
-    const start = parseISO(leave.start_date);
-    const end = parseISO(leave.end_date);
+    const start = parseISO(normalizeDate(leave.start_date));
+    const end = parseISO(normalizeDate(leave.end_date));
     const current = new Date(start);
     while (current <= end) {
       dates.push(new Date(current));

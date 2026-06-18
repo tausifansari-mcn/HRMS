@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { Employee } from "./EmployeeTable";
 import { Loader2, Hash, IndianRupee, History, ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react";
 import { format } from "date-fns";
+import { parseLocalDate } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -993,9 +994,9 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
                                     >
                                       <div className="flex items-center justify-between">
                                         <span className="text-xs font-medium text-muted-foreground">
-                                          {format(new Date(history.effective_from), "MMM d, yyyy")}
+                                          {format(parseLocalDate(history.effective_from), "MMM d, yyyy")}
                                           {history.effective_to && (
-                                            <> → {format(new Date(history.effective_to), "MMM d, yyyy")}</>
+                                            <> → {format(parseLocalDate(history.effective_to), "MMM d, yyyy")}</>
                                           )}
                                         </span>
                                       </div>

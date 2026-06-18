@@ -17,6 +17,7 @@ import { useCreateReview, useUpdateReview, useDeleteReview } from "@/hooks/usePe
 import { RatingStars } from "./RatingStars";
 import { performanceStatusColors } from "@/lib/statusStyles";
 import { format } from "date-fns";
+import { parseLocalDate } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface TeamReviewsManagerProps {
@@ -389,7 +390,7 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
                    <div key={review.id} className="flex items-center justify-between p-3 rounded-lg border border-dashed">
                      <div>
                        <p className="font-medium text-sm">{review.employee.first_name} {review.employee.last_name}</p>
-                       <p className="text-xs text-muted-foreground">{review.review_period} • {format(new Date(review.review_date), "MMM d, yyyy")}</p>
+                       <p className="text-xs text-muted-foreground">{review.review_period} • {format(parseLocalDate(review.review_date), "MMM d, yyyy")}</p>
                      </div>
                      <div className="flex items-center gap-2">
                        {review.overall_rating && renderStars(review.overall_rating)}
@@ -411,7 +412,7 @@ export function TeamReviewsManager({ managerId, managerName }: TeamReviewsManage
                   <div key={review.id} className="flex items-center justify-between p-3 rounded-lg border">
                     <div>
                       <p className="font-medium text-sm">{review.employee.first_name} {review.employee.last_name}</p>
-                      <p className="text-xs text-muted-foreground">{review.review_period} • {format(new Date(review.review_date), "MMM d, yyyy")}</p>
+                      <p className="text-xs text-muted-foreground">{review.review_period} • {format(parseLocalDate(review.review_date), "MMM d, yyyy")}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       {review.overall_rating && renderStars(review.overall_rating)}

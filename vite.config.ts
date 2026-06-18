@@ -96,7 +96,11 @@ export default defineConfig(({ mode }) => ({
           "vendor-react":   ["react", "react-dom", "react-router-dom"],
           "vendor-query":   ["@tanstack/react-query"],
           "vendor-ui":      ["@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu", "@radix-ui/react-select", "@radix-ui/react-tabs", "@radix-ui/react-tooltip"],
-"vendor-utils":   ["date-fns", "clsx", "tailwind-merge", "class-variance-authority"],
+          "vendor-utils":   ["date-fns", "clsx", "tailwind-merge", "class-variance-authority"],
+          // Heavy libraries — lazy-loaded only when relevant pages are visited
+          "vendor-charts":  ["recharts"],
+          "vendor-pdf":     ["jspdf", "jspdf-autotable"],
+          "vendor-xlsx":    ["xlsx"],
         },
       },
     },

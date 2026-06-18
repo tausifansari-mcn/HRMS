@@ -1,5 +1,6 @@
 import { ExpenseItem } from '../../integrations/expenses/types';
 import { ReceiptUpload } from './ReceiptUpload';
+import { normalizeDate } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
@@ -30,7 +31,7 @@ export function ExpenseItemsList({ items, claimId, editable, onDeleteItem }: Exp
       <TableBody>
         {items.map(item => (
           <TableRow key={item.id}>
-            <TableCell className="text-sm">{new Date(item.expense_date).toLocaleDateString('en-IN')}</TableCell>
+            <TableCell className="text-sm">{new Date(normalizeDate(item.expense_date)).toLocaleDateString('en-IN')}</TableCell>
             <TableCell className="text-sm">{item.description}</TableCell>
             <TableCell className="text-sm text-muted-foreground">{item.vendor_name ?? '—'}</TableCell>
             <TableCell className="text-right font-medium">

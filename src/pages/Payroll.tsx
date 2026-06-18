@@ -704,30 +704,30 @@ const Payroll = () => {
 
   const DimFilterBar = () => (
     <div className="grid gap-3 sm:grid-cols-3">
-      <Select value={filterBranchId} onValueChange={setFilterBranchId}>
+      <Select value={filterBranchId || "__all"} onValueChange={(v) => setFilterBranchId(v === "__all" ? "" : v)}>
         <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm shadow-sm">
           <SelectValue placeholder="All Branches" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">All Branches</SelectItem>
+          <SelectItem value="__all">All Branches</SelectItem>
           {branchOptions.map((b) => <SelectItem key={b.id} value={b.id}>{b.branch_name}</SelectItem>)}
         </SelectContent>
       </Select>
-      <Select value={filterDepartmentId} onValueChange={setFilterDepartmentId}>
+      <Select value={filterDepartmentId || "__all"} onValueChange={(v) => setFilterDepartmentId(v === "__all" ? "" : v)}>
         <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm shadow-sm">
           <SelectValue placeholder="All Departments" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">All Departments</SelectItem>
+          <SelectItem value="__all">All Departments</SelectItem>
           {departmentOptions.map((d) => <SelectItem key={d.id} value={d.id}>{d.dept_name}</SelectItem>)}
         </SelectContent>
       </Select>
-      <Select value={filterProcessId} onValueChange={setFilterProcessId}>
+      <Select value={filterProcessId || "__all"} onValueChange={(v) => setFilterProcessId(v === "__all" ? "" : v)}>
         <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-white text-sm shadow-sm">
           <SelectValue placeholder="All Processes" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">All Processes</SelectItem>
+          <SelectItem value="__all">All Processes</SelectItem>
           {processOptions.map((p) => <SelectItem key={p.id} value={p.id}>{p.process_name}</SelectItem>)}
         </SelectContent>
       </Select>

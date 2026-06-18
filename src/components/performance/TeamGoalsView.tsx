@@ -20,6 +20,7 @@ import { goalStatusColors } from "@/lib/statusStyles";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCreateGoal, useUpdateGoal, useDeleteGoal } from "@/hooks/usePerformance";
 import { format } from "date-fns";
+import { parseLocalDate } from "@/lib/utils";
 
 interface TeamGoalsViewProps {
   managerId: string;
@@ -210,7 +211,7 @@ export function TeamGoalsView({ managerId }: TeamGoalsViewProps) {
                         <div className="flex flex-wrap gap-1.5">
                           <Badge variant="outline" className={`text-xs ${statusColors[goal.status]}`}>{goal.status.replace("_", " ")}</Badge>
                           <Badge variant="outline" className={`text-xs ${priorityColors[goal.priority]}`}>{goal.priority}</Badge>
-                          {goal.due_date && <Badge variant="outline" className="text-xs gap-1"><Calendar className="h-3 w-3" />{format(new Date(goal.due_date), "MMM d")}</Badge>}
+                          {goal.due_date && <Badge variant="outline" className="text-xs gap-1"><Calendar className="h-3 w-3" />{format(parseLocalDate(goal.due_date), "MMM d")}</Badge>}
                         </div>
                       </div>
                     ))}
