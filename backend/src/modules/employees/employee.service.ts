@@ -45,7 +45,7 @@ async function getEmployeeContext(id: string) {
   const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT e.*,
             COALESCE(NULLIF(TRIM(e.official_email), ''), e.email) AS email,
-            e.personal_email, e.personal_mobile,
+            e.personal_email, e.personal_phone,
             d.designation_name, dept.dept_name, b.branch_name, p.process_name,
             CONCAT(m.first_name, ' ', COALESCE(m.last_name, '')) AS manager_name
        FROM employees e
@@ -73,7 +73,7 @@ export const employeeService = {
     await db.execute(
       `INSERT INTO employees
          (id, employee_code, first_name, last_name, email, official_email, mobile,
-          personal_email, personal_mobile, gender,
+          personal_email, personal_phone, gender,
           date_of_birth, date_of_joining, salary_start_date, employment_type,
           branch_id, department_id, process_id, designation_id, reporting_manager_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -315,7 +315,7 @@ export const employeeService = {
     }
     if (input.mobile            !== undefined) { sets.push("mobile = ?");               params.push(input.mobile ?? null); }
     if (input.personalEmail     !== undefined) { sets.push("personal_email = ?");       params.push(input.personalEmail ?? null); }
-    if (input.personalMobile    !== undefined) { sets.push("personal_mobile = ?");      params.push(input.personalMobile ?? null); }
+    if (input.personalMobile    !== undefined) { sets.push("personal_phone = ?");      params.push(input.personalMobile ?? null); }
     if (input.gender            !== undefined) { sets.push("gender = ?");               params.push(input.gender); }
     if (input.dateOfBirth       !== undefined) { sets.push("date_of_birth = ?");        params.push(input.dateOfBirth ?? null); }
     if (input.dateOfJoining     !== undefined) { sets.push("date_of_joining = ?");      params.push(input.dateOfJoining); }
