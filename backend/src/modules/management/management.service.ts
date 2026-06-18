@@ -22,13 +22,45 @@ function monthKeys(monthCount: number): string[] {
 }
 
 export const managementService = {
-  async getTeamKpiSummary(filters: { process_id?: string; period?: string; branch_id?: string }) {
+  /**
+   * Resolve a list of employee IDs that are direct reports of the given manager employee ID.
+   * Falls back to an empty array if no reports found (not an error).
+   */
+  async getDirectReportIds(managerEmployeeId: string): Promise<string[]> {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT id FROM employees
+        WHERE (reporting_manager_id = ? OR manager_id = ?)
+          AND active_status = 1
+        LIMIT 500`,
+      [managerEmployeeId, managerEmployeeId]
+    );
+    return (rows as RowDataPacket[]).map((r) => String(r.id));
+  },
+
+  async getTeamKpiSummary(filters: {
+    process_id?: string;
+    period?: string;
+    branch_id?: string;
+    /** When provided, restricts results to employees in this list */
+    employee_ids?: string[];
+  }) {
     const conds: string[] = ["e.active_status = 1"];
     const params: unknown[] = [];
     if (filters.process_id) { conds.push("e.process_id = ?"); params.push(filters.process_id); }
     if (filters.branch_id)  { conds.push("e.branch_id = ?");  params.push(filters.branch_id); }
+    if (filters.employee_ids && filters.employee_ids.length > 0) {
+      const placeholders = filters.employee_ids.map(() => "?").join(",");
+      conds.push(`e.id IN (${placeholders})`);
+      params.push(...filters.employee_ids);
+    }
     const period = filters.period ?? new Date().toISOString().slice(0, 7);
     conds.push("DATE_FORMAT(kda.score_date, '%Y-%m') = ?"); params.push(period);
+
+    // Previous period for trend calculation
+    const prevDate = new Date(period + "-01");
+    prevDate.setUTCMonth(prevDate.getUTCMonth() - 1);
+    const prevPeriod = `${prevDate.getUTCFullYear()}-${String(prevDate.getUTCMonth() + 1).padStart(2, "0")}`;
+
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT
          e.id AS employee_id,
@@ -53,7 +85,6 @@ export const managementService = {
                END * 100
              ) * kpc.weightage) / NULLIF(SUM(kpc.weightage), 0) DESC
          ) AS rank_position,
-         'stable' AS trend,
          p.process_name
          FROM kpi_daily_actual kda
          JOIN employees e ON e.id = kda.employee_id
@@ -68,15 +99,74 @@ export const managementService = {
         LIMIT 200`,
       [period, ...params]
     );
-    return rows as RowDataPacket[];
+
+    // Build trend by comparing current period score to previous period score
+    const empIds = (rows as RowDataPacket[]).map((r) => String(r.employee_id));
+    const prevScoreMap: Record<string, number> = {};
+
+    if (empIds.length > 0) {
+      const prevConds: string[] = ["e.active_status = 1", "DATE_FORMAT(kda.score_date, '%Y-%m') = ?"];
+      const prevParams: unknown[] = [prevPeriod];
+      const prevPlaceholders = empIds.map(() => "?").join(",");
+      prevConds.push(`e.id IN (${prevPlaceholders})`);
+      prevParams.push(...empIds);
+
+      const [prevRows] = await db.execute<RowDataPacket[]>(
+        `SELECT
+           e.id AS employee_id,
+           ROUND(
+             SUM((
+               CASE WHEN kmm.direction = 'lower_is_better'
+                    THEN LEAST(kpc.target_value / NULLIF(kda.actual_value, 0), 1.2)
+                    ELSE LEAST(kda.actual_value / NULLIF(kpc.target_value, 0), 1.2)
+               END * 100
+             ) * kpc.weightage) / NULLIF(SUM(kpc.weightage), 0),
+             2
+           ) AS overall_score
+           FROM kpi_daily_actual kda
+           JOIN employees e ON e.id = kda.employee_id
+           JOIN kpi_process_config kpc ON kpc.process_id = e.process_id AND kpc.metric_id = kda.metric_id
+           JOIN kpi_metric_master kmm ON kmm.id = kda.metric_id
+          WHERE ${prevConds.join(" AND ")}
+          GROUP BY e.id`,
+        prevParams
+      );
+
+      for (const prev of prevRows as RowDataPacket[]) {
+        prevScoreMap[String(prev.employee_id)] = numberValue(prev.overall_score);
+      }
+    }
+
+    return (rows as RowDataPacket[]).map((row) => {
+      const empId = String(row.employee_id);
+      const curr = numberValue(row.overall_score);
+      let trend: "up" | "down" | "stable" = "stable";
+      if (empId in prevScoreMap) {
+        const prev = prevScoreMap[empId];
+        if (curr > prev + 1) trend = "up";
+        else if (curr < prev - 1) trend = "down";
+      }
+      return { ...row, trend };
+    });
   },
 
-  async listCoachingSessions(filters: { employee_id?: string; coach_user_id?: string; status?: string }) {
+  async listCoachingSessions(filters: {
+    employee_id?: string;
+    coach_user_id?: string;
+    status?: string;
+    /** When provided, restricts to sessions for employees in this list */
+    employee_ids?: string[];
+  }) {
     const conds: string[] = ["1=1"];
     const params: unknown[] = [];
     if (filters.employee_id)   { conds.push("cs.employee_id = ?");   params.push(filters.employee_id); }
     if (filters.coach_user_id) { conds.push("cs.coach_user_id = ?"); params.push(filters.coach_user_id); }
     if (filters.status)        { conds.push("cs.status = ?");        params.push(filters.status); }
+    if (filters.employee_ids && filters.employee_ids.length > 0) {
+      const placeholders = filters.employee_ids.map(() => "?").join(",");
+      conds.push(`cs.employee_id IN (${placeholders})`);
+      params.push(...filters.employee_ids);
+    }
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT cs.*, e.employee_code, e.full_name AS employee_name FROM coaching_session cs
          JOIN employees e ON e.id = cs.employee_id
@@ -100,12 +190,23 @@ export const managementService = {
     return (rows as RowDataPacket[])[0];
   },
 
-  async listAlerts(filters: { employee_id?: string; severity?: string; acknowledged?: boolean }) {
+  async listAlerts(filters: {
+    employee_id?: string;
+    severity?: string;
+    acknowledged?: boolean;
+    /** When provided, restricts to alerts for employees in this list */
+    employee_ids?: string[];
+  }) {
     const conds: string[] = ["1=1"];
     const params: unknown[] = [];
     if (filters.employee_id)                { conds.push("pa.employee_id = ?"); params.push(filters.employee_id); }
     if (filters.severity)                   { conds.push("pa.severity = ?");    params.push(filters.severity); }
     if (filters.acknowledged !== undefined) { conds.push("pa.acknowledged = ?"); params.push(filters.acknowledged ? 1 : 0); }
+    if (filters.employee_ids && filters.employee_ids.length > 0) {
+      const placeholders = filters.employee_ids.map(() => "?").join(",");
+      conds.push(`pa.employee_id IN (${placeholders})`);
+      params.push(...filters.employee_ids);
+    }
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT pa.*, e.employee_code, e.full_name AS employee_name FROM performance_alert pa
          JOIN employees e ON e.id = pa.employee_id
@@ -208,9 +309,23 @@ export const managementService = {
     );
   },
 
-  async getDashboardSummary(processId?: string) {
+  async getDashboardSummary(processId?: string, employeeIds?: string[]) {
+    // Build scope conditions
+    const hasEmpScope = employeeIds && employeeIds.length > 0;
     const processClause = processId ? "AND e.process_id = ?" : "";
-    const params: unknown[] = processId ? [processId] : [];
+    const processParams: unknown[] = processId ? [processId] : [];
+
+    // When we have an explicit employee list, use IN clause; otherwise fall back to process filter
+    const buildEmpConds = (alias: string) => {
+      if (hasEmpScope) {
+        const placeholders = employeeIds!.map(() => "?").join(",");
+        return { clause: `AND ${alias}.id IN (${placeholders})`, params: [...employeeIds!] };
+      }
+      return { clause: processClause, params: [...processParams] };
+    };
+
+    const empConds = buildEmpConds("e");
+
     const [
       workforceRows,
       leaveRows,
@@ -226,22 +341,22 @@ export const managementService = {
              BETWEEN DATE_SUB(CURDATE(), INTERVAL 29 DAY) AND CURDATE()
            ) AS exits_30d
          FROM employees e
-         WHERE 1=1 ${processClause}`,
-        params
+         WHERE 1=1 ${empConds.clause}`,
+        empConds.params
       ),
       db.execute<RowDataPacket[]>(
         `SELECT COUNT(*) AS pending_leaves
            FROM leave_request lr
            JOIN employees e ON e.id = lr.employee_id
-          WHERE LOWER(lr.status) = 'pending' ${processClause}`,
-        params
+          WHERE LOWER(lr.status) = 'pending' ${empConds.clause}`,
+        empConds.params
       ),
       db.execute<RowDataPacket[]>(
         `SELECT COUNT(*) AS open_tickets
            FROM helpdesk_ticket ht
            JOIN employees e ON e.id = ht.employee_id
-          WHERE ht.status IN ('open', 'in_progress') ${processClause}`,
-        params
+          WHERE ht.status IN ('open', 'in_progress') ${empConds.clause}`,
+        empConds.params
       ),
       db.execute<RowDataPacket[]>(
         `SELECT
@@ -252,12 +367,13 @@ export const managementService = {
          JOIN employees e ON e.id = adr.employee_id
          WHERE adr.record_date = (
            SELECT MAX(record_date) FROM attendance_daily_record WHERE record_date <= CURDATE()
-         ) ${processClause}`,
-        params
+         ) ${empConds.clause}`,
+        empConds.params
       ),
       this.getTeamKpiSummary({
-        process_id: processId,
+        process_id: hasEmpScope ? undefined : processId,
         period: new Date().toISOString().slice(0, 7),
+        employee_ids: employeeIds,
       }),
     ]);
 
@@ -267,7 +383,7 @@ export const managementService = {
     const exits = numberValue(workforce.exits_30d);
     const attendanceTotal = numberValue(attendance.total);
     const averageKpi = kpiRows.length
-      ? kpiRows.reduce((sum, row) => sum + numberValue(row.overall_score), 0) / kpiRows.length
+      ? (kpiRows as any[]).reduce((sum, row) => sum + numberValue(row.overall_score), 0) / kpiRows.length
       : 0;
 
     return {

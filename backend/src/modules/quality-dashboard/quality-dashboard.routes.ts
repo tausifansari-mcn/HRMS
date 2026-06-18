@@ -26,8 +26,9 @@ const ALLOWED_ROLES = ["admin", "hr", "ceo", "qa", "analyst", "manager", "proces
  */
 async function resolveScope(req: AuthenticatedRequest): Promise<{
   global: boolean;
-  campaignIds: string[] | null;  // filter Shivamgiri.apr by campaign_id
-  agentCodes: string[] | null;   // filter db_audit by User / Shivamgiri by UserID
+  campaignIds: string[] | null;         // filter Shivamgiri.apr by campaign_id
+  agentCodes: string[] | null;          // filter db_audit by User / Shivamgiri by UserID (branch scope)
+  resolvedAuditCodes?: string[] | null; // filter db_audit for process managers (resolved from process_id)
 }> {
   const userId = req.authUser!.id;
 
@@ -39,16 +40,25 @@ async function resolveScope(req: AuthenticatedRequest): Promise<{
   // Process manager / manager: get their assigned processes from user_assignment_scope
   if (await hasRole(userId, "process_manager", "manager")) {
     const [scopeRows] = await db.execute<RowDataPacket[]>(
-      `SELECT DISTINCT pm.process_name
+      `SELECT DISTINCT uas.process_id, pm.process_name
        FROM user_assignment_scope uas
        JOIN process_master pm ON pm.id = uas.process_id
        WHERE uas.user_id = ? AND uas.active_status = 1 AND uas.process_id IS NOT NULL`,
       [userId]
     );
+    const processIds = (scopeRows as any[]).map((r) => r.process_id as string).filter(Boolean);
     const names = (scopeRows as any[]).map((r) => r.process_name as string).filter(Boolean);
-    if (!names.length) return { global: false, campaignIds: [], agentCodes: [] };
-    // Map mas_hrms process_name → Shivamgiri campaign_id (same values, direct match)
-    return { global: false, campaignIds: names, agentCodes: null };
+    if (!names.length) return { global: false, campaignIds: [], agentCodes: [], resolvedAuditCodes: [] };
+    // Resolve employee codes in these processes for db_audit filtering
+    let resolvedAuditCodes: string[] | null = null;
+    if (processIds.length) {
+      const ph = processIds.map(() => "?").join(",");
+      const [empRows] = await db.execute<RowDataPacket[]>(
+        `SELECT employee_code FROM employees WHERE process_id IN (${ph}) AND active_status = 1`, processIds
+      );
+      resolvedAuditCodes = (empRows as any[]).map((r) => r.employee_code as string).filter(Boolean);
+    }
+    return { global: false, campaignIds: names, agentCodes: null, resolvedAuditCodes };
   }
 
   // Branch head: get all agent emp_codes in their branch
@@ -97,13 +107,14 @@ function dateDefaults(query: Record<string, unknown>): { from: string; to: strin
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function auditScopeCond(scope: Awaited<ReturnType<typeof resolveScope>>, params: any[]): string {
   if (scope.global) return "";
-  if (scope.agentCodes !== null) {
-    if (!scope.agentCodes.length) { params.push("__no_match__"); return " AND User = ?"; }
-    const ph = scope.agentCodes.map(() => "?").join(",");
-    params.push(...scope.agentCodes);
+  // Use agentCodes if available (branch_head scope or process manager with resolved codes)
+  const codes = scope.agentCodes ?? scope.resolvedAuditCodes ?? null;
+  if (codes !== null) {
+    if (!codes.length) { params.push("__no_match__"); return " AND User = ?"; }
+    const ph = codes.map(() => "?").join(",");
+    params.push(...codes);
     return ` AND User IN (${ph})`;
   }
-  // campaignIds for db_audit — no direct campaign column; return empty (process scope maps to UserID not User)
   return "";
 }
 
@@ -218,21 +229,23 @@ router.get("/agents", requireRole(...ALLOWED_ROLES), h(async (req: Authenticated
 
   const [rows] = await pool.execute<RowDataPacket[]>(`
     SELECT
-      User as agent_name,
+      cqa.User AS agent_code,
+      COALESCE(NULLIF(e.full_name,''), CONCAT_WS(' ', e.first_name, COALESCE(e.last_name,'')), cqa.User) AS agent_name,
       COUNT(*) as total_calls,
-      ROUND(AVG(quality_percentage), 2) as avg_score,
-      COUNT(CASE WHEN quality_percentage >= 80 THEN 1 END) as calls_above_80,
-      COUNT(CASE WHEN quality_percentage < 50 THEN 1 END) as calls_below_50,
+      ROUND(AVG(cqa.quality_percentage), 2) as avg_score,
+      COUNT(CASE WHEN cqa.quality_percentage >= 80 THEN 1 END) as calls_above_80,
+      COUNT(CASE WHEN cqa.quality_percentage < 50 THEN 1 END) as calls_below_50,
       CASE
-        WHEN AVG(quality_percentage) >= 90 THEN 'excellent'
-        WHEN AVG(quality_percentage) >= 80 THEN 'good'
-        WHEN AVG(quality_percentage) >= 70 THEN 'average'
-        WHEN AVG(quality_percentage) >= 60 THEN 'below_average'
+        WHEN AVG(cqa.quality_percentage) >= 90 THEN 'excellent'
+        WHEN AVG(cqa.quality_percentage) >= 80 THEN 'good'
+        WHEN AVG(cqa.quality_percentage) >= 70 THEN 'average'
+        WHEN AVG(cqa.quality_percentage) >= 60 THEN 'below_average'
         ELSE 'poor'
       END as band
-    FROM db_audit.call_quality_assessment
-    WHERE CallDate BETWEEN ? AND ? AND User IS NOT NULL AND User != ''${clientCond}${scopeCond}
-    GROUP BY User
+    FROM db_audit.call_quality_assessment cqa
+    LEFT JOIN mas_hrms.employees e ON e.employee_code = cqa.User
+    WHERE cqa.CallDate BETWEEN ? AND ? AND cqa.User IS NOT NULL AND cqa.User != ''${clientCond}${scopeCond}
+    GROUP BY cqa.User, e.full_name, e.first_name, e.last_name
     HAVING COUNT(*) >= 3
     ORDER BY avg_score DESC
     LIMIT ?
@@ -248,14 +261,16 @@ router.get("/clients", requireRole(...ALLOWED_ROLES), h(async (req, res) => {
 
   const [rows] = await pool.execute<RowDataPacket[]>(`
     SELECT
-      ClientId as client_id,
+      cqa.ClientId as client_id,
+      COALESCE(cm.client_name, cqa.ClientId) as client_name,
       COUNT(*) as total_calls,
-      ROUND(AVG(quality_percentage), 2) as avg_score,
-      COUNT(DISTINCT User) as agent_count
-    FROM db_audit.call_quality_assessment
-    WHERE CallDate BETWEEN ? AND ?
-      AND ClientId IS NOT NULL AND ClientId != ''
-    GROUP BY ClientId
+      ROUND(AVG(cqa.quality_percentage), 2) as avg_score,
+      COUNT(DISTINCT cqa.User) as agent_count
+    FROM db_audit.call_quality_assessment cqa
+    LEFT JOIN mas_hrms.client_master cm ON cm.client_code = cqa.ClientId
+    WHERE cqa.CallDate BETWEEN ? AND ?
+      AND cqa.ClientId IS NOT NULL AND cqa.ClientId != ''
+    GROUP BY cqa.ClientId, cm.client_name
     ORDER BY total_calls DESC
     LIMIT 20
   `, [from, to]);
@@ -271,28 +286,30 @@ router.get("/apr", requireRole(...ALLOWED_ROLES), h(async (req, res) => {
 
   const [rows] = await pool.execute<RowDataPacket[]>(`
     SELECT
-      UserID as agent_code,
-      DATE_FORMAT(ReportDate, '%Y-%m-%d') as date,
-      campaign_id,
-      Calls,
-      TIME_TO_SEC(COALESCE(AHT, '00:00:00')) as aht_seconds,
-      TIME_TO_SEC(COALESCE(Login_Time, '00:00:00')) as login_seconds,
-      TIME_TO_SEC(COALESCE(Net_Login, '00:00:00')) as net_login_seconds,
-      TIME_TO_SEC(COALESCE(BIO, '00:00:00')) as bio_seconds,
-      TIME_TO_SEC(COALESCE(LUNCH, '00:00:00')) as lunch_seconds,
-      TIME_TO_SEC(COALESCE(QA, '00:00:00')) as qa_seconds,
-      TIME_TO_SEC(COALESCE(TRAINING, '00:00:00')) as training_seconds,
-      TIME_TO_SEC(COALESCE(DISMX, '00:00:00')) as dismx_seconds,
-      CASE WHEN TIME_TO_SEC(COALESCE(Login_Time,'00:00:00')) > 0
-        THEN ROUND((TIME_TO_SEC(COALESCE(BIO,'00:00:00')) + TIME_TO_SEC(COALESCE(LUNCH,'00:00:00')) +
-                    TIME_TO_SEC(COALESCE(QA,'00:00:00')) + TIME_TO_SEC(COALESCE(TRAINING,'00:00:00')) +
-                    TIME_TO_SEC(COALESCE(DISMX,'00:00:00'))) /
-                   TIME_TO_SEC(COALESCE(Login_Time,'00:00:00')) * 100, 1)
+      apr.UserID AS agent_code,
+      COALESCE(NULLIF(e.full_name,''), CONCAT_WS(' ', e.first_name, COALESCE(e.last_name,'')), apr.UserID) AS agent_name,
+      DATE_FORMAT(apr.ReportDate, '%Y-%m-%d') as date,
+      apr.campaign_id,
+      apr.Calls,
+      TIME_TO_SEC(COALESCE(apr.AHT, '00:00:00')) as aht_seconds,
+      TIME_TO_SEC(COALESCE(apr.Login_Time, '00:00:00')) as login_seconds,
+      TIME_TO_SEC(COALESCE(apr.Net_Login, '00:00:00')) as net_login_seconds,
+      TIME_TO_SEC(COALESCE(apr.BIO, '00:00:00')) as bio_seconds,
+      TIME_TO_SEC(COALESCE(apr.LUNCH, '00:00:00')) as lunch_seconds,
+      TIME_TO_SEC(COALESCE(apr.QA, '00:00:00')) as qa_seconds,
+      TIME_TO_SEC(COALESCE(apr.TRAINING, '00:00:00')) as training_seconds,
+      TIME_TO_SEC(COALESCE(apr.DISMX, '00:00:00')) as dismx_seconds,
+      CASE WHEN TIME_TO_SEC(COALESCE(apr.Login_Time,'00:00:00')) > 0
+        THEN ROUND((TIME_TO_SEC(COALESCE(apr.BIO,'00:00:00')) + TIME_TO_SEC(COALESCE(apr.LUNCH,'00:00:00')) +
+                    TIME_TO_SEC(COALESCE(apr.QA,'00:00:00')) + TIME_TO_SEC(COALESCE(apr.TRAINING,'00:00:00')) +
+                    TIME_TO_SEC(COALESCE(apr.DISMX,'00:00:00'))) /
+                   TIME_TO_SEC(COALESCE(apr.Login_Time,'00:00:00')) * 100, 1)
         ELSE NULL
       END as shrinkage_pct
-    FROM Shivamgiri.apr
-    WHERE ReportDate BETWEEN ? AND ?
-    ORDER BY ReportDate DESC
+    FROM Shivamgiri.apr apr
+    LEFT JOIN mas_hrms.employees e ON e.employee_code = apr.UserID
+    WHERE apr.ReportDate BETWEEN ? AND ?
+    ORDER BY apr.ReportDate DESC
     LIMIT ?
   `, [from, to, limit]);
 
@@ -310,25 +327,27 @@ router.get("/apr-summary", requireRole(...ALLOWED_ROLES), h(async (req: Authenti
 
   const [rows] = await pool.execute<RowDataPacket[]>(`
     SELECT
-      campaign_id as process,
-      COUNT(DISTINCT UserID) as agents,
-      ROUND(AVG(Calls), 1) as avg_calls,
-      SEC_TO_TIME(ROUND(AVG(TIME_TO_SEC(COALESCE(AHT,'00:00:00'))),0)) as avg_aht,
+      apr.campaign_id AS process_code,
+      COALESCE(pm.process_name, apr.campaign_id) AS process,
+      COUNT(DISTINCT apr.UserID) as agents,
+      ROUND(AVG(apr.Calls), 1) as avg_calls,
+      SEC_TO_TIME(ROUND(AVG(TIME_TO_SEC(COALESCE(apr.AHT,'00:00:00'))),0)) as avg_aht,
       ROUND(AVG(
-        CASE WHEN TIME_TO_SEC(COALESCE(Login_Time,'00:00:00')) > 0
-        THEN (TIME_TO_SEC(COALESCE(BIO,'00:00:00')) + TIME_TO_SEC(COALESCE(LUNCH,'00:00:00')) +
-              TIME_TO_SEC(COALESCE(QA,'00:00:00')) + TIME_TO_SEC(COALESCE(TRAINING,'00:00:00')) +
-              TIME_TO_SEC(COALESCE(DISMX,'00:00:00'))) /
-             TIME_TO_SEC(COALESCE(Login_Time,'00:00:00')) * 100
+        CASE WHEN TIME_TO_SEC(COALESCE(apr.Login_Time,'00:00:00')) > 0
+        THEN (TIME_TO_SEC(COALESCE(apr.BIO,'00:00:00')) + TIME_TO_SEC(COALESCE(apr.LUNCH,'00:00:00')) +
+              TIME_TO_SEC(COALESCE(apr.QA,'00:00:00')) + TIME_TO_SEC(COALESCE(apr.TRAINING,'00:00:00')) +
+              TIME_TO_SEC(COALESCE(apr.DISMX,'00:00:00'))) /
+             TIME_TO_SEC(COALESCE(apr.Login_Time,'00:00:00')) * 100
         ELSE NULL END
       ), 1) as avg_shrinkage_pct,
-      ROUND(AVG(TIME_TO_SEC(COALESCE(BIO,'00:00:00')))/60, 1) as avg_bio_mins,
-      ROUND(AVG(TIME_TO_SEC(COALESCE(LUNCH,'00:00:00')))/60, 1) as avg_lunch_mins,
-      ROUND(AVG(TIME_TO_SEC(COALESCE(QA,'00:00:00')))/60, 1) as avg_qa_mins,
-      ROUND(AVG(TIME_TO_SEC(COALESCE(TRAINING,'00:00:00')))/60, 1) as avg_training_mins
-    FROM Shivamgiri.apr
-    WHERE ReportDate BETWEEN ? AND ?${scopeCond}
-    GROUP BY campaign_id
+      ROUND(AVG(TIME_TO_SEC(COALESCE(apr.BIO,'00:00:00')))/60, 1) as avg_bio_mins,
+      ROUND(AVG(TIME_TO_SEC(COALESCE(apr.LUNCH,'00:00:00')))/60, 1) as avg_lunch_mins,
+      ROUND(AVG(TIME_TO_SEC(COALESCE(apr.QA,'00:00:00')))/60, 1) as avg_qa_mins,
+      ROUND(AVG(TIME_TO_SEC(COALESCE(apr.TRAINING,'00:00:00')))/60, 1) as avg_training_mins
+    FROM Shivamgiri.apr apr
+    LEFT JOIN mas_hrms.process_master pm ON pm.process_code = apr.campaign_id
+    WHERE apr.ReportDate BETWEEN ? AND ?${scopeCond}
+    GROUP BY apr.campaign_id, pm.process_name
     ORDER BY avg_calls DESC
     LIMIT 20
   `, params);
@@ -474,7 +493,7 @@ router.get("/agent-risk", requireRole(...ALLOWED_ROLES), h(async (req: Authentic
   let agents = await predictAgentRisk(from, to);
   if (!scope.global && scope.agentCodes !== null) {
     const codesSet = new Set(scope.agentCodes);
-    agents = agents.filter((a: any) => codesSet.has(a.agent_name));
+    agents = agents.filter((a: any) => codesSet.has(a.agent_code));
   }
   return res.json({ success: true, agents });
 }));

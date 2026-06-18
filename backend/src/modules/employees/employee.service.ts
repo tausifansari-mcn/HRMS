@@ -4,7 +4,7 @@ import { db } from "../../db/mysql.js";
 import type { Employee, PaginatedResult } from "./employee.types.js";
 import type { CreateEmployeeInput, EmployeeFilters, UpdateEmployeeInput } from "./employee.validation.js";
 import { assignRole } from "../access/access.service.js";
-import { appendJourneyEvent } from "./journeyLog.service.js";
+import { appendJourneyEvent, appendJourneyEvents } from "./journeyLog.service.js";
 
 const assignSalary = async (
   employeeId: string,
@@ -217,44 +217,9 @@ export const employeeService = {
        FROM employees e
        LEFT JOIN process_master p ON p.id = e.process_id AND p.active_status = 1`;
 
-    const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT e.*,
-         COALESCE(NULLIF(TRIM(e.first_name), ''), NULLIF(TRIM(e.full_name), ''), '') AS first_name,
-         COALESCE(e.last_name, '') AS last_name,
-         e.id AS employee_id,
-         COALESCE(NULLIF(TRIM(e.official_email), ''), NULLIF(TRIM(e.office_email), ''), e.email) AS email,
-         dept.dept_name         AS department_name,
-         desig.designation_name AS designation_name,
-         b.branch_name,
-         p.process_name,
-         cc.cost_centre_name,
-         TRIM(CONCAT(m.first_name, ' ', COALESCE(m.last_name, ''))) AS reporting_manager_name
-       ${fromWithJoins}
-       ${where}
-       ORDER BY e.employee_code ASC
-       LIMIT ${limit} OFFSET ${offset}`,
-      params
-    );
-    const [countRows] = await db.execute<RowDataPacket[]>(
-      `SELECT COUNT(DISTINCT e.id) AS total ${fromForCounts} ${where}`, params
-    );
-    const [statsRows] = await db.execute<RowDataPacket[]>(
-      `SELECT
-         COUNT(DISTINCT e.id) AS total_employees,
-         COUNT(DISTINCT CASE
-           WHEN e.active_status = 1
-            AND (e.employment_status IS NULL OR e.employment_status NOT IN ${inactiveStatusSql})
-           THEN e.id END) AS active_employees,
-         COUNT(DISTINCT CASE
-           WHEN e.active_status = 0
-           THEN e.id END) AS inactive_employees,
-         COUNT(DISTINCT e.department_id) AS department_count
-       ${fromForCounts}
-       ${where}`,
-      params
-    );
-    const [processBreakdownRows] = includeAnalytics
-      ? await db.execute<RowDataPacket[]>(
+    // Run data, combined-stats, and optional analytics in parallel — no sequential waterfall
+    const analyticsQuery: Promise<[RowDataPacket[], unknown]> = includeAnalytics
+      ? db.execute<RowDataPacket[]>(
           `SELECT
              e.process_id,
              COALESCE(NULLIF(TRIM(p.process_name), ''), 'Unassigned') AS process_name,
@@ -262,9 +227,9 @@ export const employeeService = {
                WHEN e.active_status = 1
                 AND (e.employment_status IS NULL OR e.employment_status NOT IN ${inactiveStatusSql})
                THEN e.id END) AS active_count,
-         COUNT(DISTINCT CASE
-           WHEN e.active_status = 0
-           THEN e.id END) AS inactive_count,
+             COUNT(DISTINCT CASE
+               WHEN e.active_status = 0
+               THEN e.id END) AS inactive_count,
              COUNT(DISTINCT e.id) AS total_count
            ${fromForProcessBreakdown}
            ${where}
@@ -273,10 +238,49 @@ export const employeeService = {
            LIMIT 12`,
           params
         )
-      : [[]];
+      : Promise.resolve([[], undefined] as unknown as [RowDataPacket[], unknown]);
+
+    const [[rows], [statsRows], [processBreakdownRows]] = await Promise.all([
+      db.execute<RowDataPacket[]>(
+        `SELECT e.*,
+           COALESCE(NULLIF(TRIM(e.first_name), ''), NULLIF(TRIM(e.full_name), ''), '') AS first_name,
+           COALESCE(e.last_name, '') AS last_name,
+           e.id AS employee_id,
+           COALESCE(NULLIF(TRIM(e.official_email), ''), NULLIF(TRIM(e.office_email), ''), e.email) AS email,
+           dept.dept_name         AS department_name,
+           desig.designation_name AS designation_name,
+           b.branch_name,
+           p.process_name,
+           cc.cost_centre_name,
+           TRIM(CONCAT(m.first_name, ' ', COALESCE(m.last_name, ''))) AS reporting_manager_name
+         ${fromWithJoins}
+         ${where}
+         ORDER BY e.employee_code ASC
+         LIMIT ${limit} OFFSET ${offset}`,
+        params
+      ),
+      // count + stats merged into one query — eliminates a separate COUNT round-trip
+      db.execute<RowDataPacket[]>(
+        `SELECT
+           COUNT(DISTINCT e.id) AS total_employees,
+           COUNT(DISTINCT CASE
+             WHEN e.active_status = 1
+              AND (e.employment_status IS NULL OR e.employment_status NOT IN ${inactiveStatusSql})
+             THEN e.id END) AS active_employees,
+           COUNT(DISTINCT CASE
+             WHEN e.active_status = 0
+             THEN e.id END) AS inactive_employees,
+           COUNT(DISTINCT e.department_id) AS department_count
+         ${fromForCounts}
+         ${where}`,
+        params
+      ),
+      analyticsQuery,
+    ]);
+
     return {
       data: rows as Employee[],
-      total: Number((countRows as any)[0]?.total ?? 0),
+      total: Number((statsRows as any)[0]?.total_employees ?? 0),
       page,
       limit,
       stats: {
@@ -365,6 +369,9 @@ export const employeeService = {
     const after = await getEmployeeContext(id);
 
     if (after) {
+      const today = new Date().toISOString().slice(0, 10);
+      const pendingEvents: Parameters<typeof appendJourneyEvents>[0] = [];
+
       const changes = [
         ["designation_id", "designation_change", before.designation_name, after.designation_name],
         ["department_id", "department_change", before.dept_name, after.dept_name],
@@ -378,10 +385,10 @@ export const employeeService = {
 
       for (const [field, eventType, oldValue, newValue] of changes) {
         if (String(before[field] ?? "") === String(after[field] ?? "")) continue;
-        await appendJourneyEvent({
+        pendingEvents.push({
           employeeId: id,
           eventType,
-          eventDate: new Date().toISOString().slice(0, 10),
+          eventDate: today,
           description: `${field.replace(/_/g, " ")} updated`,
           oldValue: oldValue == null ? undefined : String(oldValue),
           newValue: newValue == null ? undefined : String(newValue),
@@ -392,10 +399,10 @@ export const employeeService = {
       }
 
       if ((input as any).ctc !== undefined && Number(before.ctc ?? 0) !== Number(after.ctc ?? 0)) {
-        await appendJourneyEvent({
+        pendingEvents.push({
           employeeId: id,
           eventType: before.ctc == null ? "salary_setup" : "increment",
-          eventDate: new Date().toISOString().slice(0, 10),
+          eventDate: today,
           description: before.ctc == null ? "Initial annual CTC assigned" : "Annual compensation revised",
           oldValue: before.ctc == null ? undefined : String(before.ctc),
           newValue: after.ctc == null ? undefined : String(after.ctc),
@@ -404,6 +411,9 @@ export const employeeService = {
           metadata: { field: "ctc" },
         });
       }
+
+      // Single DB round-trip for all change events
+      await appendJourneyEvents(pendingEvents);
     }
 
     return updated;

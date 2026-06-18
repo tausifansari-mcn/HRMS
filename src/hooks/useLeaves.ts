@@ -96,8 +96,9 @@ export function useLeaveRequests() {
       const rows = await fetchAllLeaveRows();
       return rows.map(mapRawToLeaveRequest);
     },
-    staleTime: 0, // Always fetch fresh data
-    gcTime: 0, // Don't cache (was cacheTime in v4)
+    staleTime: 30_000,       // fresh for 30s — mutations invalidate immediately
+    gcTime: 2 * 60_000,      // keep in background cache for 2 min
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -112,8 +113,9 @@ export function useLeaveStats() {
         rejected: data.filter((r) => r.status === "rejected").length,
       };
     },
-    staleTime: 0, // Always fetch fresh data
-    gcTime: 0, // Don't cache
+    staleTime: 30_000,
+    gcTime: 2 * 60_000,
+    refetchOnWindowFocus: true,
   });
 }
 

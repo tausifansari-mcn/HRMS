@@ -61,7 +61,7 @@ export async function predictAgentRisk(from: string, to: string) {
   const [rows] = await pool.execute<RowDataPacket[]>(`
     WITH agent_metrics AS (
       SELECT
-        User as agent_name,
+        User as agent_code,
         COUNT(*) as total_calls,
         AVG(quality_percentage) as overall_avg,
         AVG(CASE WHEN CallDate >= DATE_SUB(?, INTERVAL 7 DAY) THEN quality_percentage END) as week_avg,
@@ -77,7 +77,8 @@ export async function predictAgentRisk(from: string, to: string) {
       HAVING COUNT(*) >= 5
     )
     SELECT
-      agent_name,
+      am.agent_code,
+      COALESCE(NULLIF(e.full_name,''), CONCAT_WS(' ', e.first_name, COALESCE(e.last_name,'')), am.agent_code) AS agent_name,
       total_calls,
       ROUND(overall_avg, 1) as overall_avg,
       ROUND(week_avg, 1) as week_avg,
@@ -103,7 +104,8 @@ export async function predictAgentRisk(from: string, to: string) {
         WHEN overall_avg >= 90 THEN 'Consider for mentorship role'
         ELSE 'Continue monitoring'
       END as recommended_action
-    FROM agent_metrics
+    FROM agent_metrics am
+    LEFT JOIN mas_hrms.employees e ON e.employee_code = am.agent_code
     ORDER BY
       CASE
         WHEN week_avg < overall_avg - 10 THEN 1
@@ -165,11 +167,13 @@ export async function generateInsights(from: string, to: string) {
 
   // Insight 2: Critical agents
   const [criticalAgents] = await pool.execute<RowDataPacket[]>(`
-    SELECT User, COUNT(*) as poor_calls
-    FROM db_audit.call_quality_assessment
-    WHERE CallDate >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-      AND quality_percentage < 50
-    GROUP BY User
+    SELECT cqa.User, COUNT(*) as poor_calls,
+           COALESCE(NULLIF(e.full_name,''), CONCAT_WS(' ', e.first_name, COALESCE(e.last_name,'')), cqa.User) AS display_name
+    FROM db_audit.call_quality_assessment cqa
+    LEFT JOIN mas_hrms.employees e ON e.employee_code = cqa.User
+    WHERE cqa.CallDate >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+      AND cqa.quality_percentage < 50
+    GROUP BY cqa.User, e.full_name, e.first_name, e.last_name
     HAVING COUNT(*) >= 3
     ORDER BY poor_calls DESC
     LIMIT 3
@@ -180,7 +184,7 @@ export async function generateInsights(from: string, to: string) {
       type: 'critical',
       title: 'Agents Need Immediate Support',
       message: `${criticalAgents.length} agents have 3+ critical calls in last 24 hours`,
-      action: `Priority coaching for: ${criticalAgents.map((a: any) => a.User).join(', ')}`
+      action: `Priority coaching for: ${criticalAgents.map((a: any) => a.display_name).join(', ')}`
     });
   }
 

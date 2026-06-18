@@ -163,8 +163,22 @@ export default function NativeWeekOffPreferences() {
         <Card>
           <CardHeader>
             <CardTitle>Submit / Update My Preference</CardTitle>
-            <CardDescription>Preferences are considered during roster planning and remain subject to coverage needs.</CardDescription>
+            <CardDescription>
+              {latest?.status === "accepted" || latest?.status === "applied"
+                ? "Your preference has been accepted. Contact your manager to make changes."
+                : latest?.status === "submitted"
+                  ? "Your preference is pending review. You may update it until a decision is made."
+                  : "Preferences are considered during roster planning and remain subject to coverage needs."}
+            </CardDescription>
           </CardHeader>
+          {(latest?.status === "accepted" || latest?.status === "applied") ? (
+            <CardContent>
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-800">
+                <CheckCircle2 className="h-5 w-5 shrink-0" />
+                <span className="text-sm font-semibold">Preference locked — accepted by manager. Reach out to your WFM team for changes.</span>
+              </div>
+            </CardContent>
+          ) : (
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div>
               <Label>Roster Week Start</Label>
@@ -195,12 +209,13 @@ export default function NativeWeekOffPreferences() {
             </div>
             <div className="md:col-span-2">
               <Button onClick={() => submitPreference.mutate()} disabled={submitPreference.isPending} className="w-full md:w-auto">
-                <Send className="mr-2 h-4 w-4" /> {submitPreference.isPending ? "Submitting..." : "Submit Preference"}
+                <Send className="mr-2 h-4 w-4" /> {submitPreference.isPending ? "Submitting..." : latest?.status === "rejected" ? "Resubmit Preference" : "Submit Preference"}
               </Button>
               {submitPreference.isSuccess && <span className="ml-3 text-sm font-semibold text-emerald-700">Preference submitted.</span>}
               {submitPreference.isError && <span className="ml-3 text-sm font-semibold text-red-700">Submission failed.</span>}
             </div>
           </CardContent>
+          )}
         </Card>
 
         {canReview && (

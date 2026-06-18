@@ -201,16 +201,18 @@ export function DashboardLayout({ children }: Props) {
       .filter((g) => g.items.length > 0);
   }, [visiblePageCodes, canViewPage, hasAnyRole, isAdminOrHR]);
 
-  const searchableItems = filteredGroups.flatMap((g) =>
-    g.items.map((item) => ({ ...item, groupTitle: g.title }))
+  const searchableItems = useMemo(
+    () => filteredGroups.flatMap((g) => g.items.map((item) => ({ ...item, groupTitle: g.title }))),
+    [filteredGroups]
   );
-  const searchResults = searchQuery.trim()
-    ? searchableItems.filter((item) =>
-        `${item.label} ${item.description ?? ""} ${item.groupTitle}`
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase())
-      )
-    : [];
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return searchableItems.filter((item) =>
+      `${item.label} ${item.description ?? ""} ${item.groupTitle}`.toLowerCase().includes(q)
+    );
+  }, [searchQuery, searchableItems]);
 
   const handleSearchSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -249,7 +251,7 @@ export function DashboardLayout({ children }: Props) {
   const userInitials = (user?.email ?? "MC").slice(0, 2).toUpperCase();
 
   /* ─── Sidebar content (shared between desktop fixed + mobile drawer) ─── */
-  const SidebarContent = () => (
+  const SidebarContent = useMemo(() => (
     <div
       className="flex h-full flex-col"
       style={{ background: "var(--sidebar-canvas)" }}
@@ -342,7 +344,8 @@ export function DashboardLayout({ children }: Props) {
         </Link>
       </div>
     </div>
-  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [filteredGroups, logoError, companyLogo, myProfile, userInitials, displayVersion]);
 
   return (
     <div className="min-h-dvh" style={{ background: "var(--surface-page)" }}>
@@ -366,7 +369,7 @@ export function DashboardLayout({ children }: Props) {
           borderRight: "1px solid var(--sidebar-hairline)",
         }}
       >
-        <SidebarContent />
+        {SidebarContent}
       </aside>
 
       {/* Mobile slide-in sidebar */}
@@ -391,7 +394,7 @@ export function DashboardLayout({ children }: Props) {
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <SidebarContent />
+        {SidebarContent}
       </aside>
 
       {/* Main content area */}

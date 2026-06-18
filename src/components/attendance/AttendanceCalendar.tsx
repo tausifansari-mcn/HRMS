@@ -214,7 +214,7 @@ function DayDetailSheet({
       const res = await hrmsApi.get<{ success: boolean; data: DayDetail }>(
         `/api/wfm/attendance/day-detail/${employeeId}/${date}`
       );
-      if (!res.success) throw new Error("Failed to load day detail");
+      if (!res || !res.success) throw new Error("Failed to load day detail");
       return res.data;
     },
     enabled: open && !!date && !!employeeId,

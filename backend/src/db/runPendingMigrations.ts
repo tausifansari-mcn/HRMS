@@ -142,6 +142,7 @@ const MIGRATION_MANIFEST: string[] = [
   "211_employee_personal_contact_fields.sql",
   "212_reporting_manager_bulk_template.sql",
   "213_salary_prep_line_component_columns.sql",
+  "214_performance_indexes.sql",
 ];
 
 export type MigrationHealth = {

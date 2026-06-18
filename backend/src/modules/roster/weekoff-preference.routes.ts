@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { requireAuth, type AuthenticatedRequest } from "../../middleware/authMiddleware.js";
 import { db } from "../../db/mysql.js";
 import { getEmployeeForUser, hasProcessScope, hasRole } from "../../shared/accessGuard.js";
+import { buildScopeWhereClause } from "../../shared/scopeAccess.js";
 
 export const weekoffPreferenceRouter = Router();
 weekoffPreferenceRouter.use(requireAuth);
@@ -87,11 +88,34 @@ weekoffPreferenceRouter.get("/weekoff-preferences", h(async (req, res) => {
     params.push(emp.id);
   } else {
     if (!processId) return res.status(400).json({ success: false, message: "processId is required" });
-    const broad = await hasRole(userId, "admin", "hr", "wfm");
-    const scoped = await hasProcessScope(userId, processId, null, "manager", "wfm", "assistant_manager", "tl");
-    if (!broad && !scoped) return res.status(403).json({ success: false, message: "Forbidden: mapped process scope required" });
+
+    // All-access roles: super_admin, ceo, payroll, finance
+    const isAllAccess = await hasRole(userId, "super_admin", "ceo", "payroll", "finance");
+    // Branch-scoped roles: admin, hr, wfm, branch_manager see their branch only
+    const isBranchScope = await hasRole(userId, "admin", "hr", "wfm", "branch_manager", "manager", "assistant_manager", "tl");
+    if (!isAllAccess && !isBranchScope) {
+      return res.status(403).json({ success: false, message: "Forbidden" });
+    }
+
     where.push("e.process_id = ?");
     params.push(processId);
+
+    // Non-all-access users get branch-scoped filtering
+    if (!isAllAccess) {
+      const scopeClause = await buildScopeWhereClause(
+        userId,
+        ["admin", "hr", "wfm", "branch_manager", "manager"],
+        { branchId: "e.branch_id", processId: "e.process_id" },
+        { allowAdminBypass: false, allowCeoAllRead: false }
+      );
+      if (scopeClause.sql) {
+        const cleaned = scopeClause.sql.replace(/^WHERE\s+/i, "").trim();
+        if (cleaned) {
+          where.push(`(${cleaned})`);
+          params.push(...scopeClause.params);
+        }
+      }
+    }
   }
 
   if (weekStartDate) {

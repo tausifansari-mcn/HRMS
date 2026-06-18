@@ -40,7 +40,7 @@ export function usePendingRMChangeRequests() {
       hrmsApi
         .get<{ ok: boolean; data: RMChangeRequest[] }>('/api/rm-change/pending')
         .then((r) => r.data),
-    refetchInterval: 30_000,
+    refetchInterval: 5 * 60_000,   // was 30s — non-critical data, no need to hammer server
   });
 }
 

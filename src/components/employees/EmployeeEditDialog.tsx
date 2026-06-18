@@ -406,11 +406,9 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
 
   const salaryTotals = calculateSalaryTotals();
 
-  if (!employee) return null;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      {employee && <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Employee</DialogTitle>
         </DialogHeader>
@@ -1058,7 +1056,7 @@ export function EmployeeEditDialog({ employee, open, onOpenChange }: EmployeeEdi
             </DialogFooter>
           </form>
         )}
-      </DialogContent>
+      </DialogContent>}
     </Dialog>
   );
 }

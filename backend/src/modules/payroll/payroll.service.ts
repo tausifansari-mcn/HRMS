@@ -91,14 +91,13 @@ export const payrollService = {
       ids
     );
 
-    for (const emp of employees) {
-      const asgId = randomUUID();
-      await db.execute(
-        `INSERT INTO employee_salary_assignment (id, employee_id, structure_id, ctc_annual, effective_from)
-         VALUES (?, ?, ?, ?, ?)`,
-        [asgId, emp.id, input.structureId, input.ctcAnnual, input.effectiveFrom]
-      );
-    }
+    // Bulk INSERT — one round-trip regardless of employee count
+    const insertRows = employees.map(emp => [randomUUID(), emp.id, input.structureId, input.ctcAnnual, input.effectiveFrom]);
+    const insertPh = insertRows.map(() => "(?, ?, ?, ?, ?)").join(", ");
+    await db.execute(
+      `INSERT INTO employee_salary_assignment (id, employee_id, structure_id, ctc_annual, effective_from) VALUES ${insertPh}`,
+      insertRows.flat()
+    );
 
     return { assigned: employees.length, skipped: 0 };
   },

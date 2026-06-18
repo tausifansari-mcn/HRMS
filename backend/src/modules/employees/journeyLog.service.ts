@@ -65,6 +65,34 @@ export async function appendJourneyEvent(input: AppendEventInput): Promise<Journ
   return (rows as JourneyEvent[])[0];
 }
 
+/**
+ * Batch-insert multiple journey events in a single round-trip.
+ * Use this instead of calling appendJourneyEvent in a loop.
+ */
+export async function appendJourneyEvents(inputs: AppendEventInput[]): Promise<void> {
+  if (inputs.length === 0) return;
+  const rows = inputs.map(input => [
+    randomUUID(),
+    input.employeeId,
+    input.eventType,
+    input.eventDate,
+    input.description ?? null,
+    input.oldValue ?? null,
+    input.newValue ?? null,
+    input.module ?? null,
+    input.triggeredBy ?? null,
+    input.metadata ? JSON.stringify(input.metadata) : null,
+  ]);
+  const ph = rows.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+  await db.execute(
+    `INSERT INTO employee_journey_log
+       (id, employee_id, event_type, event_date, description,
+        old_value, new_value, module, triggered_by, metadata)
+     VALUES ${ph}`,
+    rows.flat()
+  );
+}
+
 export async function listJourneyEvents(
   employeeId: string,
   filters?: ListFilters

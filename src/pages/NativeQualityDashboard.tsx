@@ -33,9 +33,9 @@ interface Summary {
   fail_rate_accuracy: number; scope_label?: string;
 }
 interface TrendPoint { date: string; total_calls: number; avg_score: number; above_80: number; below_50: number; }
-interface AgentRow { agent_name: string; total_calls: number; avg_score: number; calls_above_80: number; calls_below_50: number; band: string; }
-interface ClientRow { client_id: string; total_calls: number; avg_score: number; agent_count: number; }
-interface AprRow { process: string; agents: number; avg_calls: number; avg_aht: number; avg_shrinkage_pct: number; avg_bio_mins: number; avg_lunch_mins: number; avg_qa_mins: number; avg_training_mins: number; }
+interface AgentRow { agent_name: string; agent_code?: string; total_calls: number; avg_score: number; calls_above_80: number; calls_below_50: number; band: string; }
+interface ClientRow { client_id: string; client_name?: string; total_calls: number; avg_score: number; agent_count: number; }
+interface AprRow { process: string; process_code?: string; agents: number; avg_calls: number; avg_aht: number; avg_shrinkage_pct: number; avg_bio_mins: number; avg_lunch_mins: number; avg_qa_mins: number; avg_training_mins: number; }
 interface SalesSummary { total_calls: number; sales_done: number; competitor_mentions: number; objection_calls: number; }
 interface Competitor { CompetitorName: string; mentions: number; }
 interface FraudSignals { data_theft: number; financial_fraud: number; collusion: number; escalation_failure: number; unprofessional: number; system_manipulation: number; }
@@ -44,7 +44,7 @@ interface RejectionFunnel { total_calls: number; not_interested: number; objecti
 interface RejectionReason { reason: string; count: number; }
 interface HeatmapCell { score: number; calls: number; critical: number; }
 interface AgentRisk {
-  agent_name: string; total_calls: number; overall_avg: number; week_avg: number;
+  agent_name: string; agent_code?: string; total_calls: number; overall_avg: number; week_avg: number;
   yesterday_avg: number; volatility: number; critical_count: number; trend_delta: number;
   risk_status: string; recommended_action: string;
 }
@@ -391,7 +391,7 @@ export default function NativeQualityDashboard() {
         <select value={clientId} onChange={e => setClientId(e.target.value)}
           className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer">
           <option value="">All Clients</option>
-          {(clientsQ.data ?? []).map(c => <option key={c.client_id} value={c.client_id}>{c.client_id}</option>)}
+          {(clientsQ.data ?? []).map(c => <option key={c.client_id} value={c.client_id}>{c.client_name ?? c.client_id}</option>)}
         </select>
       </div>
       <div className="flex flex-col gap-1">
@@ -465,10 +465,10 @@ export default function NativeQualityDashboard() {
           <h2 className="mb-4 font-black text-slate-900">Client Performance</h2>
           {clientsQ.isLoading ? <Spinner size="sm" /> : clientsQ.isError ? <ErrBanner msg="Failed" /> : (
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={(clientsQ.data ?? []).slice(0, 8)} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+              <BarChart data={(clientsQ.data ?? []).slice(0, 8).map(c => ({ ...c, display_name: c.client_name ?? c.client_id }))} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
-                <YAxis dataKey="client_id" type="category" tick={{ fontSize: 10, fill: "#64748b" }} tickLine={false} width={80} />
+                <YAxis dataKey="display_name" type="category" tick={{ fontSize: 10, fill: "#64748b" }} tickLine={false} width={80} />
                 <Tooltip formatter={(v: number) => [`${v}%`, "Avg Score"]} contentStyle={{ borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: 12 }} />
                 <Bar dataKey="avg_score" fill="#6366f1" radius={[0, 4, 4, 0]} />
               </BarChart>
@@ -494,7 +494,7 @@ export default function NativeQualityDashboard() {
                   {(agentsQ.data ?? []).slice(0, 10).map((a, i) => (
                     <tr key={a.agent_name} className="border-t border-slate-50 transition-colors hover:bg-slate-50/70">
                       <td className="px-4 py-3 font-bold text-slate-300">{i + 1}</td>
-                      <td className="px-4 py-3 font-semibold text-slate-800">{a.agent_name}</td>
+                      <td className="px-4 py-3"><div className="font-semibold text-slate-800">{a.agent_name}</div>{a.agent_code && <div className="text-xs text-slate-400">{a.agent_code}</div>}</td>
                       <td className="px-4 py-3 text-slate-500">{a.total_calls}</td>
                       <td className="px-4 py-3"><ScorePill score={a.avg_score} /></td>
                       <td className="px-4 py-3 text-xs text-slate-500 capitalize">{a.band}</td>
@@ -600,7 +600,7 @@ export default function NativeQualityDashboard() {
                   return (
                     <tr key={agent.agent_name} onClick={() => setSelectedAgent(agent)}
                       className={`border-t border-slate-50 cursor-pointer transition-colors hover:bg-blue-50/40 ${isAtRisk ? "bg-red-50/30" : ""}`}>
-                      <td className="px-4 py-3 font-semibold text-slate-800">{agent.agent_name}</td>
+                      <td className="px-4 py-3"><div className="font-semibold text-slate-800">{agent.agent_name}</div>{agent.agent_code && <div className="text-xs text-slate-400">{agent.agent_code}</div>}</td>
                       <td className="px-4 py-3 text-slate-500">{agent.total_calls}</td>
                       <td className="px-4 py-3"><ScorePill score={agent.overall_avg} /></td>
                       <td className="px-4 py-3"><ScorePill score={agent.week_avg ?? 0} /></td>
@@ -635,7 +635,7 @@ export default function NativeQualityDashboard() {
               <tbody>
                 {(aprQ.data ?? []).map(row => (
                   <tr key={row.process} className="border-t border-slate-50 transition-colors hover:bg-slate-50/70">
-                    <td className="px-4 py-3 font-semibold text-slate-800">{row.process}</td>
+                    <td className="px-4 py-3"><div className="font-semibold text-slate-800">{row.process}</div>{row.process_code && row.process_code !== row.process && <div className="text-xs text-slate-400">{row.process_code}</div>}</td>
                     <td className="px-4 py-3 text-slate-500">{row.agents}</td>
                     <td className="px-4 py-3 text-slate-500">{row.avg_calls}</td>
                     <td className="px-4 py-3 text-slate-500 font-mono">{row.avg_aht}</td>

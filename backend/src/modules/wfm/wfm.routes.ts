@@ -282,9 +282,18 @@ wfmRouter.patch("/week-off-preference/:id/approve", requireAuth, requireRole("ad
 // Combined attendance + COSEC daily aggregate + individual punches for one employee on one date
 wfmRouter.get(
   "/attendance/day-detail/:employeeId/:date",
-  requireRole("admin", "hr", "wfm", "manager", "ceo", "finance", "payroll"),
+  requireAuth,
   h(async (req: any, res: any) => {
     const { employeeId, date } = req.params;
+    // Allow: privileged roles, OR employee viewing their own record
+    const { hasRole: checkRole2 } = await import("../../shared/accessGuard.js");
+    const isPrivileged = await checkRole2(req.authUser!.id, "admin", "hr", "wfm", "manager", "ceo", "finance", "payroll");
+    if (!isPrivileged) {
+      const emp = await getEmployeeForUser(req.authUser!.id);
+      if (!emp || emp.id !== employeeId) {
+        return res.status(403).json({ success: false, error: "Forbidden" });
+      }
+    }
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res.status(400).json({ success: false, error: "Invalid date format. Use YYYY-MM-DD" });

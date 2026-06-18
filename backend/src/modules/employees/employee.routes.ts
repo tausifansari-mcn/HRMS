@@ -280,6 +280,18 @@ router.delete("/:id/photo", requireRole("admin", "hr"), h(async (req: any, res: 
   return res.json({ success: true });
 }));
 
+// GET /api/employees/all — minimal fields for internal dropdowns (id, code, name, dept only)
+router.get("/all", requireRole("admin", "hr", "manager"), h(async (_req: any, res: any) => {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT e.id, e.employee_code, e.first_name, e.last_name, dept.dept_name AS department_name
+       FROM employees e
+       LEFT JOIN department_master dept ON dept.id = e.department_id AND dept.active_status = 1
+      WHERE e.active_status = 1
+      ORDER BY e.employee_code ASC`
+  );
+  return res.json({ success: true, data: rows });
+}));
+
 // GET /api/employees/stats — aggregate counts (must be before /:id to avoid route collision)
 router.get("/stats", requireRole("admin", "hr", "manager", "ceo"), h(async (_req: any, res: any) => {
   const [rows] = await db.execute<RowDataPacket[]>(
@@ -391,6 +403,29 @@ router.get("/directory-masters", requireRole("admin", "hr", "manager"), h(async 
 
   return res.json({ success: true, data: { processes, branches } });
 }));
+
+// GET /api/employees/all — lean dropdown payload, single query, no pagination
+router.get("/all", requireRole("admin", "hr", "manager"), h(async (_req: any, res: any) => {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT e.id,
+            e.employee_code,
+            e.first_name,
+            COALESCE(e.last_name, '') AS last_name,
+            COALESCE(dept.dept_name, '') AS department_name
+       FROM employees e
+       LEFT JOIN department_master dept ON dept.id = e.department_id AND dept.active_status = 1
+      WHERE e.active_status = 1
+        AND (e.employment_status IS NULL
+             OR e.employment_status NOT IN (
+               'Inactive','inactive','Terminated','terminated',
+               'Offboarded','offboarded','Absconded','absconded',
+               'Resigned','resigned','Left','left','Separated','separated'
+             ))
+      ORDER BY e.employee_code ASC`
+  );
+  return res.json({ success: true, data: rows });
+}));
+
 router.post("/",
   requireRole("admin", "hr"),
   requireScopedRole(["hr"], async (req) => ({

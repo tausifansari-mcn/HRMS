@@ -260,102 +260,145 @@ export async function calculatePayrollRun(runId: string, userId: string): Promis
   let totalDed = 0;
   let totalNet = 0;
 
+  const monthStart = `${run.run_month}-01`;
+  const monthEnd   = `${run.run_month}-${String(daysInMonth).padStart(2, "0")}`;
+
   // Fetch employees on approved/active maternity leave covering this pay month.
   // Per MBA 1961 s.5(1) these employees receive full pay — no LWP deduction.
   const maternityExemptIds = await maternityService.getActiveEmployeeIdsForMonth(run.run_month);
 
-  for (const emp of employees) {
-    // 5. Fetch attendance summary for this employee for run_month
-    const monthStart = `${run.run_month}-01`;
-    const monthEnd   = `${run.run_month}-${String(daysInMonth).padStart(2, "0")}`;
+  const empIds = employees.map(e => e.employee_id);
 
-    // Check if attendance_daily_record has been populated for this employee+month
-    const [adrCountRows] = await db.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) AS cnt FROM attendance_daily_record
-       WHERE employee_id = ? AND record_date BETWEEN ? AND ?`,
-      [emp.employee_id, monthStart, monthEnd]
+  if (empIds.length === 0) {
+    await db.execute(
+      `UPDATE salary_prep_run SET status = 'processing', total_employees = 0, total_gross = 0, total_deductions = 0, total_net = 0 WHERE id = ?`,
+      [runId]
     );
-    const hasEngineData = Number((adrCountRows[0] as any).cnt ?? 0) > 0;
+    const [updated] = await db.execute<RowDataPacket[]>("SELECT * FROM salary_prep_run WHERE id = ? LIMIT 1", [runId]);
+    return { run_id: runId, status: (updated as SalaryPrepRun[])[0]?.status ?? "processing", employees_processed: 0, total_gross: 0, total_deductions: 0, total_net: 0 };
+  }
 
-    let att: AttendanceRow;
+  const ph = empIds.map(() => "?").join(",");
 
-    if (hasEngineData) {
-      // Use attendance_daily_record — role-aware (dialler/biometric) with half-days, leaves, holidays
-      const [attRows] = await db.execute<RowDataPacket[]>(
-        `SELECT
-           ? AS employee_id,
-           (SELECT COUNT(*) FROM attendance_daily_record
-            WHERE employee_id = ? AND record_date BETWEEN ? AND ?
-              AND attendance_status NOT IN ('week_off','holiday')) AS working_days,
-           COUNT(CASE WHEN adr.attendance_status = 'present'        THEN 1 END) AS present_days,
-           COUNT(CASE WHEN adr.attendance_status IN ('leave_approved','half_day') THEN 1 END) AS leave_days,
-           COALESCE(SUM(adr.lwp_value), 0)                                       AS lwp_days,
-           COALESCE(SUM(adr.late_mark), 0)                                       AS late_marks,
-           COALESCE(SUM(CASE WHEN adr.attendance_source = 'dialler'
-                              THEN adr.raw_minutes / 60.0 END), NULL)            AS dialer_hours
-         FROM attendance_daily_record adr
-         WHERE adr.employee_id = ? AND adr.record_date BETWEEN ? AND ?`,
-        [emp.employee_id, emp.employee_id, monthStart, monthEnd, emp.employee_id, monthStart, monthEnd]
-      );
-      att = (attRows as AttendanceRow[])[0] ?? {
-        employee_id: emp.employee_id,
-        working_days: defaultWorkingDays,
-        present_days: defaultWorkingDays,
-        leave_days: 0,
-        lwp_days: 0,
-        late_marks: 0,
-        dialer_hours: null,
-      };
-    } else {
-      // Fallback: legacy session-count query (no attendance engine data yet)
-      const [attRows] = await db.execute<RowDataPacket[]>(
-        `SELECT
-           ? AS employee_id,
-           ? AS working_days,
-           COUNT(CASE WHEN s.current_status IN ('Logged Out','Logged In') THEN 1 END) AS present_days,
-           0 AS leave_days,
-           (? - COUNT(CASE WHEN s.current_status IN ('Logged Out','Logged In') THEN 1 END)) AS lwp_days,
-           0 AS late_marks,
-           NULL AS dialer_hours
-         FROM wfm_attendance_session s
-         WHERE s.employee_id = ? AND s.session_date BETWEEN ? AND ?`,
-        [emp.employee_id, defaultWorkingDays, defaultWorkingDays, emp.employee_id, monthStart, monthEnd]
-      );
-      att = (attRows as AttendanceRow[])[0] ?? {
-        employee_id: emp.employee_id,
-        working_days: defaultWorkingDays,
-        present_days: defaultWorkingDays,
-        leave_days: 0,
-        lwp_days: 0,
-        late_marks: 0,
-        dialer_hours: null,
-      };
-    }
+  // ── Batch pre-fetch 1: which employees have engine attendance data ──────────
+  const [adrCountRows] = await db.execute<RowDataPacket[]>(
+    `SELECT employee_id, COUNT(*) AS cnt
+       FROM attendance_daily_record
+      WHERE employee_id IN (${ph}) AND record_date BETWEEN ? AND ?
+      GROUP BY employee_id`,
+    [...empIds, monthStart, monthEnd]
+  );
+  const adrCountByEmp = new Map<string, number>(
+    (adrCountRows as Array<{ employee_id: string; cnt: number }>).map(r => [r.employee_id, Number(r.cnt)])
+  );
+
+  const withEngineIds  = empIds.filter(id => (adrCountByEmp.get(id) ?? 0) > 0);
+  const withoutEngineIds = empIds.filter(id => !adrCountByEmp.has(id) || adrCountByEmp.get(id) === 0);
+
+  // ── Batch pre-fetch 2a: attendance summary for engine employees ─────────────
+  const attByEmp = new Map<string, AttendanceRow>();
+  if (withEngineIds.length > 0) {
+    const ph2 = withEngineIds.map(() => "?").join(",");
+    const [attRows] = await db.execute<RowDataPacket[]>(
+      `SELECT
+         adr.employee_id,
+         SUM(CASE WHEN adr.attendance_status NOT IN ('week_off','holiday') THEN 1 ELSE 0 END) AS working_days,
+         SUM(CASE WHEN adr.attendance_status = 'present' THEN 1 ELSE 0 END) AS present_days,
+         SUM(CASE WHEN adr.attendance_status IN ('leave_approved','half_day') THEN 1 ELSE 0 END) AS leave_days,
+         COALESCE(SUM(adr.lwp_value), 0) AS lwp_days,
+         COALESCE(SUM(adr.late_mark), 0) AS late_marks,
+         COALESCE(SUM(CASE WHEN adr.attendance_source = 'dialler' THEN adr.raw_minutes / 60.0 END), NULL) AS dialer_hours
+       FROM attendance_daily_record adr
+       WHERE adr.employee_id IN (${ph2}) AND adr.record_date BETWEEN ? AND ?
+       GROUP BY adr.employee_id`,
+      [...withEngineIds, monthStart, monthEnd]
+    );
+    for (const r of attRows as AttendanceRow[]) attByEmp.set(r.employee_id, r);
+  }
+
+  // ── Batch pre-fetch 2b: legacy session attendance for non-engine employees ──
+  if (withoutEngineIds.length > 0) {
+    const ph3 = withoutEngineIds.map(() => "?").join(",");
+    const [legacyRows] = await db.execute<RowDataPacket[]>(
+      `SELECT
+         s.employee_id,
+         ? AS working_days,
+         COUNT(CASE WHEN s.current_status IN ('Logged Out','Logged In') THEN 1 END) AS present_days,
+         0 AS leave_days,
+         (? - COUNT(CASE WHEN s.current_status IN ('Logged Out','Logged In') THEN 1 END)) AS lwp_days,
+         0 AS late_marks,
+         NULL AS dialer_hours
+       FROM wfm_attendance_session s
+       WHERE s.employee_id IN (${ph3}) AND s.session_date BETWEEN ? AND ?
+       GROUP BY s.employee_id`,
+      [defaultWorkingDays, defaultWorkingDays, ...withoutEngineIds, monthStart, monthEnd]
+    );
+    for (const r of legacyRows as AttendanceRow[]) attByEmp.set(r.employee_id, r);
+  }
+
+  // ── Batch pre-fetch 3: tax declarations ─────────────────────────────────────
+  const [declRows] = await db.execute<RowDataPacket[]>(
+    `SELECT td.employee_id, td.declared_hra, td.declared_80c, td.declared_80d, td.regime
+       FROM tax_declaration td
+       INNER JOIN (
+         SELECT employee_id, MAX(financial_year) AS fy
+           FROM tax_declaration
+          WHERE employee_id IN (${ph}) AND financial_year IN (?, ?)
+          GROUP BY employee_id
+       ) latest ON latest.employee_id = td.employee_id AND latest.fy = td.financial_year`,
+    [...empIds, financialYear, legacyFinancialYear]
+  );
+  const declByEmp = new Map<string, TaxDeclarationRow>(
+    (declRows as Array<TaxDeclarationRow & { employee_id: string }>).map(r => [r.employee_id, r])
+  );
+
+  // ── Batch pre-fetch 4: salary advance recoveries ─────────────────────────────
+  const [advRows] = await db.execute<RowDataPacket[]>(
+    `SELECT employee_id, COALESCE(SUM(ROUND(amount / recovery_months, 2)), 0) AS monthly_recovery
+       FROM salary_advance_log
+      WHERE employee_id IN (${ph}) AND status = 'active'
+      GROUP BY employee_id`,
+    empIds
+  );
+  const advByEmp = new Map<string, number>(
+    (advRows as Array<{ employee_id: string; monthly_recovery: number }>).map(r => [r.employee_id, Number(r.monthly_recovery)])
+  );
+
+  // ── Batch pre-fetch 5: PT slabs for employees with state codes ───────────────
+  const stateCodes = [...new Set(employees.map(e => e.state_code).filter(Boolean))] as string[];
+  const ptSlabByState = new Map<string, number>();
+  if (stateCodes.length > 0) {
+    // getPtFromSlab is called per unique state+gross combo below; cache only what varies per state
+    // For bulk we'll compute PT inline for each emp after calculating grossAfterLwp
+  }
+
+  // ── Process each employee — pure computation, no DB queries in loop ──────────
+  const insertParams: unknown[] = [];
+  const insertPlaceholders: string[] = [];
+
+  for (const emp of employees) {
+    const defaultAtt: AttendanceRow = {
+      employee_id: emp.employee_id,
+      working_days: defaultWorkingDays,
+      present_days: defaultWorkingDays,
+      leave_days: 0,
+      lwp_days: 0,
+      late_marks: 0,
+      dialer_hours: null,
+    };
+    const att = attByEmp.get(emp.employee_id) ?? defaultAtt;
+    const decl = declByEmp.get(emp.employee_id) ?? null;
+    const advanceRecovery = advByEmp.get(emp.employee_id) ?? 0;
 
     const grossMonthly = emp.ctc_annual / 12;
-
-    // 5a. Fetch tax declaration for this employee / financial year
-    const [declRows] = await db.execute<RowDataPacket[]>(
-      `SELECT declared_hra, declared_80c, declared_80d, regime
-         FROM tax_declaration
-        WHERE employee_id = ? AND financial_year IN (?, ?)
-        ORDER BY financial_year = ? DESC
-        LIMIT 1`,
-      [emp.employee_id, financialYear, legacyFinancialYear, financialYear]
-    );
-    const decl = (declRows as TaxDeclarationRow[])[0] ?? null;
-
-    // 5b. Compute TDS via annual projection
     const annualGross = grossMonthly * 12;
-    const declHra  = decl ? Number(decl.declared_hra)  : 0;
-    const decl80c  = decl ? Number(decl.declared_80c)  : 0;
-    const decl80d  = decl ? Number(decl.declared_80d)  : 0;
-    // Standard deduction applied inside calculateTds; additional declaration deductions here
+    const declHra = decl ? Number(decl.declared_hra) : 0;
+    const decl80c = decl ? Number(decl.declared_80c) : 0;
+    const decl80d = decl ? Number(decl.declared_80d) : 0;
     const taxableIncome = Math.max(0, annualGross - declHra - decl80c - decl80d);
     const tdsResult = calculateTds(taxableIncome, statConfig);
     const tdsMonthly = tdsResult.tds_monthly;
 
-    // 5c. LWP deduction — skip for employees on maternity leave (MBA 1961 s.5(1))
     const workingDays = att.working_days || defaultWorkingDays;
     const lwpDays = att.lwp_days || 0;
     const isOnMaternityLeave = maternityExemptIds.has(emp.employee_id);
@@ -364,16 +407,7 @@ export async function calculatePayrollRun(runId: string, userId: string): Promis
       : 0;
     const grossAfterLwp = Math.max(0, grossMonthly - lwpDeduction);
 
-    // 5d. Salary advance monthly recovery
-    const [advRows] = await db.execute<RowDataPacket[]>(
-      `SELECT COALESCE(SUM(ROUND(amount / recovery_months, 2)), 0) AS monthly_recovery
-         FROM salary_advance_log
-        WHERE employee_id = ? AND status = 'active'`,
-      [emp.employee_id]
-    );
-    const advanceRecovery = Number((advRows as Array<{ monthly_recovery: number }>)[0]?.monthly_recovery ?? 0);
-
-    // Resolve PT from slab when employee has a state_code, else fall back to config value
+    // PT still requires per-employee call when state_code varies, but is fast (in-memory slab lookup)
     const professionalTax = emp.state_code
       ? await getPtFromSlab(emp.state_code, grossAfterLwp)
       : stat.professional_tax;
@@ -381,7 +415,7 @@ export async function calculatePayrollRun(runId: string, userId: string): Promis
     const calc = payrollService.calculateNetSalary({
       grossMonthlyCTC: grossAfterLwp,
       workingDays,
-      lwpDays: 0, // LWP already applied above; pass 0 to avoid double-deduction
+      lwpDays: 0,
       pfEmployeePct: stat.pf_employee_pct,
       esicEmployeePct: stat.esic_employee_pct,
       esicWageLimit: stat.esic_wage_limit,
@@ -392,14 +426,29 @@ export async function calculatePayrollRun(runId: string, userId: string): Promis
       hraPct: emp.hra_pct ?? 20,
     });
 
-    // Net pay = payrollService net + advance recovery deducted on top + approved incentives added
     const empIncentive = incentivesByEmployee.get(emp.employee_id) ?? 0;
     const netPayFinal = Math.max(0, calc.net_salary - advanceRecovery + empIncentive);
-    // LWP is already applied inside grossAfterLwp (reducing gross); don't add it again to deductions.
-    // total_deductions = statutory deductions (PF + ESIC + PT + TDS) + advance recovery only.
     const totalDedFinal = calc.total_deductions + advanceRecovery;
 
-    // 6. Upsert prep line
+    totalGross += calc.gross_salary;
+    totalDed   += totalDedFinal;
+    totalNet   += netPayFinal;
+
+    insertPlaceholders.push(
+      "(UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'calculated')"
+    );
+    insertParams.push(
+      runId, emp.employee_id, emp.employee_code,
+      att.working_days, att.present_days, att.leave_days, att.lwp_days, att.late_marks, att.dialer_hours,
+      calc.basic, calc.hra, calc.special_allowance,
+      calc.gross_salary, totalDedFinal, netPayFinal,
+      calc.pf_employee, calc.pf_employer, calc.esic_employee, calc.esic_employer,
+      calc.professional_tax, tdsMonthly, tdsMonthly, lwpDeduction, advanceRecovery, empIncentive,
+    );
+  }
+
+  // ── Batch upsert all prep lines in a single query ───────────────────────────
+  if (insertPlaceholders.length > 0) {
     await db.execute(
       `INSERT INTO salary_prep_line
          (id, run_id, employee_id, employee_code,
@@ -408,7 +457,7 @@ export async function calculatePayrollRun(runId: string, userId: string): Promis
           gross_salary, total_deductions, net_salary,
           pf_employee, pf_employer, esic_employee, esic_employer,
           professional_tax, tds, tds_amount, lwp_deduction, advance_recovery, incentive_total, status)
-       VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'calculated')
+       VALUES ${insertPlaceholders.join(",")}
        ON DUPLICATE KEY UPDATE
          working_days = VALUES(working_days), present_days = VALUES(present_days),
          lwp_days = VALUES(lwp_days),
@@ -422,19 +471,8 @@ export async function calculatePayrollRun(runId: string, userId: string): Promis
          lwp_deduction = VALUES(lwp_deduction), advance_recovery = VALUES(advance_recovery),
          incentive_total = VALUES(incentive_total),
          status = 'calculated'`,
-      [
-        runId, emp.employee_id, emp.employee_code,
-        att.working_days, att.present_days, att.leave_days, att.lwp_days, att.late_marks, att.dialer_hours,
-        calc.basic, calc.hra, calc.special_allowance,
-        calc.gross_salary, totalDedFinal, netPayFinal,
-        calc.pf_employee, calc.pf_employer, calc.esic_employee, calc.esic_employer,
-        calc.professional_tax, tdsMonthly, tdsMonthly, lwpDeduction, advanceRecovery, empIncentive,
-      ]
+      insertParams
     );
-
-    totalGross += calc.gross_salary;
-    totalDed   += totalDedFinal;
-    totalNet   += netPayFinal;
   }
 
   // 7. Update run totals + status
