@@ -9,10 +9,11 @@ import type { RowDataPacket } from "mysql2";
 import type { Response, NextFunction } from "express";
 import {
   calculateEmployeeEngagementHealth,
-  getEngagementCommandCenter,
   scanEngagementHealth,
   getFilterOptions,
 } from "./engagement-health.service.js";
+import { resolvePeopleExperienceScope } from "../people-experience/people-experience.scope.js";
+import { getPeopleExperienceCommandCenter } from "../people-experience/people-experience.service.js";
 
 export const engagementIntelligenceRouter = Router();
 engagementIntelligenceRouter.use(requireAuth);
@@ -25,7 +26,8 @@ engagementIntelligenceRouter.get(
   "/command-center",
   requireRole("admin", "hr", "manager", "process_manager", "ceo"),
   h(async (req, res) => {
-    const data = await getEngagementCommandCenter(req.query as any);
+    const scope = await resolvePeopleExperienceScope(req);
+    const data = await getPeopleExperienceCommandCenter(scope, req.query as Record<string, string | undefined>);
     return res.json({ success: true, data });
   })
 );

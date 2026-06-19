@@ -231,6 +231,46 @@ export const helpdeskService = {
     return id;
   },
 
+  async ownerWorkload(_filters: Record<string, unknown> = {}) {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT COALESCE(t.assigned_to, 'unassigned') AS owner_user_id,
+              COALESCE(NULLIF(u.full_name,''), u.email, 'Unassigned') AS owner_name,
+              COUNT(*) AS open_count,
+              SUM(t.priority = 'urgent') AS urgent_count
+         FROM helpdesk_ticket t
+         LEFT JOIN users u ON u.id = t.assigned_to
+        WHERE t.status NOT IN ('resolved','closed','cancelled')
+        GROUP BY COALESCE(t.assigned_to, 'unassigned'), owner_name
+        ORDER BY open_count DESC
+        LIMIT 50`
+    );
+    return rows;
+  },
+
+  async aging(_filters: Record<string, unknown> = {}) {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT
+         SUM(TIMESTAMPDIFF(DAY, created_at, NOW()) BETWEEN 0 AND 1) AS bucket_0_1,
+         SUM(TIMESTAMPDIFF(DAY, created_at, NOW()) BETWEEN 2 AND 3) AS bucket_2_3,
+         SUM(TIMESTAMPDIFF(DAY, created_at, NOW()) BETWEEN 4 AND 7) AS bucket_4_7,
+         SUM(TIMESTAMPDIFF(DAY, created_at, NOW()) > 7) AS bucket_7_plus
+       FROM helpdesk_ticket
+       WHERE status NOT IN ('resolved','closed','cancelled')`
+    );
+    return rows[0] ?? {};
+  },
+
+  async rootCauses(_filters: Record<string, unknown> = {}) {
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT COALESCE(root_cause, category, 'Unclassified') AS label, COUNT(*) AS value
+         FROM helpdesk_ticket
+        GROUP BY COALESCE(root_cause, category, 'Unclassified')
+        ORDER BY value DESC
+        LIMIT 20`
+    );
+    return rows;
+  },
+
   // ── Grievances ─────────────────────────────────────────────────────────────
 
   async listGrievances(filters: {
@@ -412,5 +452,48 @@ export const helpdeskService = {
       changeSummary: metadata,
     });
     return { grievance_id: grievanceId, evidence_count_incremented: true };
+  },
+
+  async escalateGrievance(id: string, reason?: string | null) {
+    await db.execute(
+      `UPDATE grievance
+          SET status = 'escalated',
+              escalation_level = COALESCE(escalation_level, 0) + 1,
+              updated_at = NOW()
+        WHERE id = ?`,
+      [id]
+    );
+    if (reason) {
+      await writeSensitiveAuditLog({
+        actorUserId: "system",
+        actionType: "GRIEVANCE_ESCALATED",
+        moduleKey: "PEOPLE_EXPERIENCE",
+        entityType: "grievance",
+        entityId: id,
+        changeSummary: { reason },
+      });
+    }
+    return this.updateGrievance(id, {});
+  },
+
+  async addGrievanceInvestigationNote(id: string, actorUserId: string, note: string) {
+    await writeSensitiveAuditLog({
+      actorUserId,
+      actionType: "GRIEVANCE_INVESTIGATION_NOTE",
+      moduleKey: "PEOPLE_EXPERIENCE",
+      entityType: "grievance",
+      entityId: id,
+      changeSummary: { note_length: note.length },
+    });
+    return this.updateGrievance(id, { investigation_notes: note, status: "under_review" });
+  },
+
+  async addGrievanceEvidence(id: string, evidence: Record<string, unknown>) {
+    const fileName = String(evidence.file_name ?? evidence.name ?? "metadata");
+    return this.addEvidenceMetadata(id, "system", {
+      file_name: fileName,
+      file_type: evidence.file_type ? String(evidence.file_type) : undefined,
+      description: evidence.description ? String(evidence.description) : undefined,
+    });
   },
 };

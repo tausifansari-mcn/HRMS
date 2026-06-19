@@ -183,6 +183,20 @@ router.post("/tickets/:id/rate", h(async (req: AuthenticatedRequest, res: Respon
   res.json({ data });
 }));
 
+router.post("/tickets/:id/rating", h(async (req: AuthenticatedRequest, res: Response) => {
+  const rating = Number(req.body?.rating);
+  if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+    return res.status(400).json({ success: false, error: "rating must be 1-5" });
+  }
+
+  const userId = req.authUser!.id;
+  const emp = await getEmployeeForUser(userId);
+  if (!emp) return res.status(403).json({ success: false, message: "No employee record" });
+
+  const data = await helpdeskService.rateTicket(req.params.id, rating, emp.id);
+  res.json({ success: true, data });
+}));
+
 router.post("/tickets/:id/comments", h(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.authUser!.id;
   const { text, is_internal } = req.body;

@@ -1,517 +1,440 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Activity, AlertTriangle, BarChart2, CheckCircle2, ChevronDown,
-  Clock, Heart, Loader, RefreshCcw, Shield, Star, TrendingUp, Users, Zap,
+  Activity,
+  AlertTriangle,
+  Award,
+  BarChart3,
+  CheckCircle2,
+  Clock,
+  HeartHandshake,
+  MessageSquareWarning,
+  RefreshCcw,
+  ShieldAlert,
+  Sparkles,
+  TicketCheck,
+  Users,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { hrmsApi } from "@/lib/hrmsApi";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+type Summary = {
+  employees_scanned: number;
+  average_engagement_score: number;
+  highly_engaged_count: number;
+  watchlist_count: number;
+  attrition_risk_count: number;
+  open_support_tickets: number;
+  sla_breached_tickets: number;
+  open_grievances?: number;
+  critical_grievances?: number;
+  pending_manager_actions: number;
+  pulse_participation_rate: number;
+  enps_score: number;
+  kudos_given_this_month: number;
+  recognition_coverage_percentage: number;
+};
 
-type RiskLabel = "critical_people_risk" | "attrition_risk" | "watchlist" | "stable" | "highly_engaged";
-
-type HealthSnapshot = {
+type WatchRow = {
   employee_id: string;
   employee_name: string;
-  employee_code: string;
+  employee_code?: string;
   branch_name?: string;
   process_name?: string;
   department_name?: string;
+  manager_name?: string;
+  tenure_days?: number | null;
   engagement_score: number;
-  data_confidence_score?: number;
-  risk_label: RiskLabel;
-  pulse_score?: number;
-  attendance_score?: number;
-  performance_score?: number;
-  support_friction_score?: number;
-  career_growth_score?: number;
-  top_risk_drivers_json?: string;
-  snapshot_date: string;
+  data_confidence_score: number;
+  risk_label: string;
+  risk_reason: string;
+  support_open_count: number;
+  grievance_flag?: boolean;
+  recommended_action: string;
+  owner: string;
+  due_date: string;
+  action_status: string;
 };
 
-type Summary = { risk_label: RiskLabel; count: number; avg_score: number };
+type Bucket = { label: string; value?: number; count?: number; total?: number; healthy?: number; watchlist?: number; risk?: number };
 
-type PEAction = {
-  id: string;
-  employee_id: string;
-  employee_name?: string;
-  action_type: string;
-  priority: string;
-  status: string;
-  owner_user_id?: string;
-  due_date?: string;
-  notes?: string;
-  created_at: string;
+type CommandCenterData = {
+  generated_at: string;
+  scope: { kind: string; label: string };
+  executive_summary: Summary;
+  heatmap: { branch: Bucket[]; process: Bucket[]; manager: Bucket[] };
+  watchlist: WatchRow[];
+  support_health: { total_open: number; sla_breached: number; by_category: Bucket[]; by_priority: Bucket[]; by_status: Bucket[] };
+  grievance_health: { restricted?: boolean; open?: number; anonymous?: number; critical?: number; by_category?: Bucket[] };
+  recognition_health: { kudos_given: number; kudos_received: number; zero_recognition_90d: number };
+  pulse_health: { response_rate: number; average_mood_score: number; enps_score: number };
+  action_queue: Array<{ id: string; employee_name: string; employee_code?: string; source_type: string; action_type: string; priority: string; due_date?: string; status: string; notes?: string }>;
 };
 
-type FilterOptions = {
-  branches: { id: string; name: string }[];
-  processes: { id: string; name: string }[];
-  departments: { id: string; name: string }[];
-  managers: { id: string; name: string }[];
-  risk_labels: string[];
+const RISK_CLASS: Record<string, string> = {
+  highly_engaged: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  stable: "bg-blue-50 text-blue-700 border-blue-200",
+  watchlist: "bg-amber-50 text-amber-700 border-amber-200",
+  attrition_risk: "bg-red-50 text-red-700 border-red-200",
+  critical_people_risk: "bg-rose-100 text-rose-800 border-rose-300",
 };
-
-// ─── Risk helpers ─────────────────────────────────────────────────────────────
-
-const RISK_CONFIG: Record<RiskLabel, { label: string; color: string; bg: string; border: string; icon: React.ReactNode }> = {
-  critical_people_risk: { label: "Critical", color: "text-red-700", bg: "bg-red-100", border: "border-red-300", icon: <AlertTriangle size={14} /> },
-  attrition_risk:       { label: "Attrition Risk", color: "text-orange-700", bg: "bg-orange-100", border: "border-orange-300", icon: <TrendingUp size={14} /> },
-  watchlist:            { label: "Watchlist", color: "text-yellow-700", bg: "bg-yellow-100", border: "border-yellow-300", icon: <Clock size={14} /> },
-  stable:               { label: "Stable", color: "text-blue-700", bg: "bg-blue-100", border: "border-blue-300", icon: <Activity size={14} /> },
-  highly_engaged:       { label: "Highly Engaged", color: "text-green-700", bg: "bg-green-100", border: "border-green-300", icon: <Star size={14} /> },
-};
-
-function RiskBadge({ label }: { label: RiskLabel }) {
-  const cfg = RISK_CONFIG[label] ?? RISK_CONFIG.stable;
-  return (
-    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.color} ${cfg.border}`}>
-      {cfg.icon}{cfg.label}
-    </span>
-  );
-}
-
-function ScoreBar({ value, max = 100, colorClass = "bg-blue-500" }: { value: number; max?: number; colorClass?: string }) {
-  const pct = Math.min(100, Math.max(0, (value / max) * 100));
-  return (
-    <div className="w-full bg-gray-100 rounded-full h-1.5">
-      <div className={`${colorClass} h-1.5 rounded-full transition-all`} style={{ width: `${pct}%` }} />
-    </div>
-  );
-}
-
-function scoreColor(score: number) {
-  if (score >= 75) return "bg-green-500";
-  if (score >= 55) return "bg-blue-500";
-  if (score >= 35) return "bg-yellow-500";
-  return "bg-red-500";
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function NativePeopleExperienceCommandCenter() {
-  const [loading, setLoading]           = useState(true);
-  const [scanning, setScanning]         = useState(false);
-  const [error, setError]               = useState("");
-  const [summary, setSummary]           = useState<Summary[]>([]);
-  const [watchlist, setWatchlist]       = useState<HealthSnapshot[]>([]);
-  const [actions, setActions]           = useState<PEAction[]>([]);
-  const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
-  const [selected, setSelected]         = useState<HealthSnapshot | null>(null);
-  const [tab, setTab]                   = useState<"watchlist" | "actions">("watchlist");
+  const [data, setData] = useState<CommandCenterData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [filters, setFilters] = useState({
+    dateRange: "30",
+    branch_id: "",
+    process_id: "",
+    department_id: "",
+    risk: "all",
+    support_category: "all",
+  });
 
-  // Filters
-  const [filterBranch, setFilterBranch]   = useState("");
-  const [filterProcess, setFilterProcess] = useState("");
-  const [filterDept, setFilterDept]       = useState("");
-  const [filterRisk, setFilterRisk]       = useState("");
-  const [optionsLoading, setOptionsLoading] = useState(false);
-
-  const loadOptions = useCallback(async () => {
-    setOptionsLoading(true);
-    try {
-      const res = await hrmsApi.get<{ success: boolean; data: FilterOptions }>("/api/engagement-intelligence/filter-options");
-      if (res.data?.success) setFilterOptions(res.data.data);
-    } catch { /* non-fatal */ }
-    finally { setOptionsLoading(false); }
-  }, []);
-
-  const load = useCallback(async () => {
+  const load = async () => {
     setLoading(true);
-    setError("");
+    setMessage("");
     try {
       const params = new URLSearchParams();
-      if (filterBranch)  params.set("branch_id",     filterBranch);
-      if (filterProcess) params.set("process_id",    filterProcess);
-      if (filterDept)    params.set("department_id", filterDept);
-      if (filterRisk)    params.set("risk_label",    filterRisk);
-
-      const [ccRes, actRes] = await Promise.all([
-        hrmsApi.get<{ success: boolean; data: { summary: Summary[]; watchlist: HealthSnapshot[] } }>(
-          `/api/engagement-intelligence/command-center?${params}`
-        ),
-        hrmsApi.get<{ success: boolean; data: PEAction[] }>("/api/engagement-intelligence/actions"),
-      ]);
-
-      if (ccRes.data?.success) {
-        setSummary(ccRes.data.data.summary ?? []);
-        setWatchlist(ccRes.data.data.watchlist ?? []);
-      }
-      if (actRes.data?.success) setActions(actRes.data.data ?? []);
-    } catch (e: any) {
-      setError(e.message ?? "Failed to load");
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value && value !== "all") params.set(key, value);
+      });
+      const res = await hrmsApi.get<{ success: boolean; data: CommandCenterData }>(
+        `/api/people-experience/command-center?${params.toString()}`
+      );
+      setData(res.data);
+    } catch (error: any) {
+      setMessage(error?.message || "Unable to load People Experience Command Center");
     } finally {
       setLoading(false);
     }
-  }, [filterBranch, filterProcess, filterDept, filterRisk]);
+  };
 
-  useEffect(() => { loadOptions(); }, [loadOptions]);
-  useEffect(() => { load(); }, [load]);
-
-  const handleScan = useCallback(async () => {
-    setScanning(true);
+  const scan = async () => {
+    setLoading(true);
     try {
-      await hrmsApi.post("/api/engagement-intelligence/scan", { limit: 500 });
+      await hrmsApi.post("/api/people-experience/scan", { limit: 500, filters });
+      setMessage("People Experience scan completed and snapshots refreshed.");
       await load();
-    } catch (e: any) {
-      setError(e.message ?? "Scan failed");
-    } finally {
-      setScanning(false);
+    } catch (error: any) {
+      setMessage(error?.message || "People Experience scan failed");
+      setLoading(false);
     }
-  }, [load]);
+  };
 
-  const summaryTotals = useMemo(() => {
-    const totals = summary.reduce<Record<string, number>>((acc, row) => {
-      acc[row.risk_label] = Number(row.count) || 0;
-      return acc;
-    }, {});
-    return {
-      atRisk: (totals.critical_people_risk ?? 0) + (totals.attrition_risk ?? 0),
-      watchlist: totals.watchlist ?? 0,
-      stable: totals.stable ?? 0,
-      highlyEngaged: totals.highly_engaged ?? 0,
-      openActions: actions.reduce((count, action) => count + (action.status === "open" ? 1 : 0), 0),
-    };
-  }, [summary, actions]);
+  useEffect(() => { void load(); }, []);
+
+  const summary = data?.executive_summary;
+  const filteredWatchlist = useMemo(() => {
+    const rows = data?.watchlist ?? [];
+    if (filters.risk === "all") return rows;
+    return rows.filter((row) => row.risk_label === filters.risk);
+  }, [data, filters.risk]);
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6 max-w-screen-2xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Heart size={24} className="text-pink-500" />
-              People Experience Command Center
-            </h1>
-            <p className="text-sm text-gray-500 mt-0.5">Engagement health, risk watchlist, and action management</p>
+      <main className="space-y-6 p-5 lg:p-8">
+        <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-indigo-950 to-fuchsia-900 p-7 text-white shadow-2xl">
+          <div className="absolute -right-16 -top-16 h-72 w-72 rounded-full bg-fuchsia-400/20 blur-3xl" />
+          <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-bold backdrop-blur">
+                <HeartHandshake className="h-3.5 w-3.5" />
+                People Experience Command Center
+              </div>
+              <h1 className="mt-4 text-3xl font-black tracking-tight lg:text-4xl">
+                Who is unhappy, unsupported, at risk, or waiting for action today?
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-indigo-100">
+                Scoped cockpit for engagement risk, support friction, grievance health, recognition coverage, pulse/eNPS, and accountable action closure.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <ScopeBadge label={data?.scope?.label ?? "Loading scope"} />
+              <Button onClick={load} disabled={loading} className="bg-white/15 text-white hover:bg-white/25">
+                <RefreshCcw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+              <Button onClick={scan} disabled={loading} className="bg-white text-indigo-900 hover:bg-indigo-50">
+                Run Health Scan
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleScan}
-              disabled={scanning}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-60"
-            >
-              {scanning ? <Loader size={14} className="animate-spin" /> : <Zap size={14} />}
-              {scanning ? "Scanning…" : "Run Health Scan"}
-            </button>
-            <button
-              onClick={load}
-              disabled={loading}
-              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-60"
-            >
-              <RefreshCcw size={14} className={loading ? "animate-spin" : ""} />
-              Refresh
-            </button>
+        </section>
+
+        {message ? <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-800">{message}</div> : null}
+
+        <section className="rounded-[1.5rem] border bg-white p-4 shadow-sm">
+          <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-7">
+            <Select value={filters.dateRange} onValueChange={(v) => setFilters((prev) => ({ ...prev, dateRange: v }))}>
+              <SelectTrigger><SelectValue placeholder="Date range" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input placeholder="Branch ID" value={filters.branch_id} onChange={(e) => setFilters((prev) => ({ ...prev, branch_id: e.target.value }))} />
+            <Input placeholder="Process ID" value={filters.process_id} onChange={(e) => setFilters((prev) => ({ ...prev, process_id: e.target.value }))} />
+            <Input placeholder="Department ID" value={filters.department_id} onChange={(e) => setFilters((prev) => ({ ...prev, department_id: e.target.value }))} />
+            <Select value={filters.risk} onValueChange={(v) => setFilters((prev) => ({ ...prev, risk: v }))}>
+              <SelectTrigger><SelectValue placeholder="Risk" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All risk</SelectItem>
+                <SelectItem value="watchlist">Watchlist</SelectItem>
+                <SelectItem value="attrition_risk">Attrition risk</SelectItem>
+                <SelectItem value="critical_people_risk">Critical</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filters.support_category} onValueChange={(v) => setFilters((prev) => ({ ...prev, support_category: v }))}>
+              <SelectTrigger><SelectValue placeholder="Support category" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All support</SelectItem>
+                <SelectItem value="it">IT</SelectItem>
+                <SelectItem value="payroll">Payroll</SelectItem>
+                <SelectItem value="attendance">Attendance</SelectItem>
+                <SelectItem value="hr">HR</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={load} disabled={loading}>Apply</Button>
           </div>
-        </div>
+        </section>
 
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
-        )}
-
-        {/* Filters */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Shield size={14} className="text-gray-400" />
-            <span className="text-sm font-medium text-gray-600">Scoped Filters</span>
-            {optionsLoading && <Loader size={12} className="animate-spin text-gray-400" />}
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Select label="Branch" value={filterBranch} onChange={setFilterBranch}
-              options={filterOptions?.branches ?? []} loading={optionsLoading} />
-            <Select label="Process" value={filterProcess} onChange={setFilterProcess}
-              options={filterOptions?.processes ?? []} loading={optionsLoading} />
-            <Select label="Department" value={filterDept} onChange={setFilterDept}
-              options={filterOptions?.departments ?? []} loading={optionsLoading} />
-            <SelectRaw label="Risk Level" value={filterRisk} onChange={setFilterRisk}
-              options={filterOptions?.risk_labels ?? []} />
-          </div>
-        </div>
-
-        {/* Summary cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <SummaryCard icon={<AlertTriangle size={20} className="text-red-500" />} label="At Risk" value={summaryTotals.atRisk} color="text-red-600" />
-          <SummaryCard icon={<Clock size={20} className="text-yellow-500" />} label="Watchlist" value={summaryTotals.watchlist} color="text-yellow-600" />
-          <SummaryCard icon={<Activity size={20} className="text-blue-500" />} label="Stable" value={summaryTotals.stable} color="text-blue-600" />
-          <SummaryCard icon={<Star size={20} className="text-green-500" />} label="Highly Engaged" value={summaryTotals.highlyEngaged} color="text-green-600" />
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-2 border-b border-gray-200">
-          {(["watchlist", "actions"] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === t
-                ? "border-indigo-600 text-indigo-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"}`}>
-              {t === "watchlist" ? "Employee Watchlist" : `Actions (${summaryTotals.openActions})`}
-            </button>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader size={24} className="animate-spin text-indigo-500" />
-          </div>
-        ) : tab === "watchlist" ? (
-          <WatchlistTable data={watchlist} onSelect={setSelected} selected={selected} />
+        {loading && !data ? (
+          <LoadingGrid />
+        ) : !data || !summary ? (
+          <EmptyPanel title="No People Experience data" text="Run a health scan or adjust filters to populate the command center." />
         ) : (
-          <ActionsTable data={actions} onRefresh={load} />
-        )}
+          <>
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <Metric title="Employees scanned" value={summary.employees_scanned} icon={<Users />} color="from-indigo-500 to-blue-500" />
+              <Metric title="Avg engagement" value={`${summary.average_engagement_score}%`} icon={<Sparkles />} color="from-fuchsia-500 to-purple-500" />
+              <Metric title="Watchlist" value={summary.watchlist_count} icon={<ShieldAlert />} color="from-amber-500 to-orange-500" />
+              <Metric title="Attrition risk" value={summary.attrition_risk_count} icon={<AlertTriangle />} color="from-red-500 to-rose-500" />
+              <Metric title="SLA breached" value={summary.sla_breached_tickets} icon={<Clock />} color="from-slate-700 to-slate-950" />
+              <Metric title="Open support" value={summary.open_support_tickets} icon={<TicketCheck />} color="from-cyan-500 to-sky-500" />
+              <Metric title="Open grievances" value={summary.open_grievances ?? "Restricted"} icon={<MessageSquareWarning />} color="from-rose-500 to-pink-500" />
+              <Metric title="Pending actions" value={summary.pending_manager_actions} icon={<CheckCircle2 />} color="from-violet-500 to-indigo-500" />
+              <Metric title="Pulse participation" value={`${summary.pulse_participation_rate}%`} icon={<Activity />} color="from-emerald-500 to-teal-500" />
+              <Metric title="eNPS" value={summary.enps_score} icon={<BarChart3 />} color="from-blue-500 to-indigo-500" />
+            </section>
 
-        {/* Detail drawer */}
-        {selected && (
-          <DetailDrawer snapshot={selected} onClose={() => setSelected(null)} />
+            <section className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+              <Panel title="People Risk Heatmap" subtitle="Branch, process and manager risk density">
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <HeatmapColumn title="Branch" rows={data.heatmap.branch} />
+                  <HeatmapColumn title="Process" rows={data.heatmap.process} />
+                  <HeatmapColumn title="Manager" rows={data.heatmap.manager} />
+                </div>
+              </Panel>
+              <Panel title="Support Health" subtitle="Open issues, SLA risk and category mix">
+                <MiniStat label="Open tickets" value={data.support_health.total_open} />
+                <MiniStat label="SLA breached" value={data.support_health.sla_breached} intent="danger" />
+                <Breakdown rows={data.support_health.by_category} />
+              </Panel>
+            </section>
+
+            <section className="grid gap-5 xl:grid-cols-[1.4fr_0.6fr]">
+              <Panel title="Engagement Watchlist" subtitle="Scoped employee risks requiring manager or HR action">
+                <div className="max-h-[620px] overflow-auto">
+                  <table className="w-full min-w-[1100px] text-sm">
+                    <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                      <tr>
+                        {["Employee", "Org", "Manager", "Score", "Risk", "Drivers", "Support", "Action", "Owner / Due"].map((h) => (
+                          <th key={h} className="px-4 py-3 font-black">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredWatchlist.map((row) => (
+                        <tr key={row.employee_id} className="border-t hover:bg-slate-50">
+                          <td className="px-4 py-3">
+                            <div className="font-black text-slate-950">{row.employee_name}</div>
+                            <div className="font-mono text-xs text-slate-500">{row.employee_code}</div>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            <div>{row.branch_name ?? "No branch"}</div>
+                            <div className="text-xs">{row.process_name ?? "No process"}</div>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">{row.manager_name ?? "Unassigned"}</td>
+                          <td className="px-4 py-3">
+                            <span className="rounded-full bg-slate-950 px-2.5 py-1 text-xs font-black text-white">{row.engagement_score}%</span>
+                            <div className="mt-1 text-[11px] text-slate-400">confidence {row.data_confidence_score}%</div>
+                          </td>
+                          <td className="px-4 py-3"><RiskPill label={row.risk_label} /></td>
+                          <td className="max-w-[220px] px-4 py-3 text-xs text-slate-600">{row.risk_reason}</td>
+                          <td className="px-4 py-3 text-xs">
+                            <div>{row.support_open_count} open</div>
+                            {row.grievance_flag ? <div className="font-bold text-rose-700">Grievance flag</div> : null}
+                          </td>
+                          <td className="max-w-[220px] px-4 py-3 text-xs font-semibold text-slate-700">{row.recommended_action}</td>
+                          <td className="px-4 py-3 text-xs text-slate-500">
+                            <div>{row.owner}</div>
+                            <div>{row.due_date}</div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {filteredWatchlist.length === 0 ? <EmptyPanel title="No scoped watchlist" text="No employees match the selected risk filters." /> : null}
+                </div>
+              </Panel>
+
+              <div className="space-y-5">
+                <Panel title="Grievance Health" subtitle={data.grievance_health.restricted ? "Identity and detail restricted" : "Confidential HR case overview"}>
+                  {data.grievance_health.restricted ? (
+                    <div className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold text-slate-600">
+                      Managers see aggregate team concern only. Anonymous grievance identity is protected.
+                    </div>
+                  ) : (
+                    <>
+                      <MiniStat label="Open" value={data.grievance_health.open ?? 0} intent="danger" />
+                      <MiniStat label="Anonymous" value={data.grievance_health.anonymous ?? 0} />
+                      <MiniStat label="Critical" value={data.grievance_health.critical ?? 0} intent="danger" />
+                      <Breakdown rows={data.grievance_health.by_category ?? []} />
+                    </>
+                  )}
+                </Panel>
+
+                <Panel title="Recognition + Pulse" subtitle="Coverage, kudos, mood, eNPS">
+                  <MiniStat label="Kudos given" value={data.recognition_health.kudos_given} />
+                  <MiniStat label="Kudos received" value={data.recognition_health.kudos_received} />
+                  <MiniStat label="Zero recognition 90d" value={data.recognition_health.zero_recognition_90d} intent="warning" />
+                  <MiniStat label="Pulse response" value={`${data.pulse_health.response_rate}%`} />
+                  <MiniStat label="Mood avg" value={Number(data.pulse_health.average_mood_score ?? 0).toFixed(1)} />
+                </Panel>
+              </div>
+            </section>
+
+            <Panel title="Action Queue" subtitle="Every risk should convert into owned action">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {(data.action_queue ?? []).slice(0, 12).map((action) => (
+                  <div key={action.id} className="rounded-2xl border bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-black text-slate-950">{action.employee_name}</div>
+                        <div className="text-xs text-slate-500">{action.employee_code} • {action.source_type}</div>
+                      </div>
+                      <RiskPill label={action.priority} />
+                    </div>
+                    <div className="mt-3 text-sm font-semibold text-slate-700">{action.action_type.replace(/_/g, " ")}</div>
+                    <div className="mt-1 text-xs text-slate-500">Due {action.due_date ?? "not set"} • {action.status}</div>
+                  </div>
+                ))}
+                {(data.action_queue ?? []).length === 0 ? <EmptyPanel title="No action items" text="Generated actions will appear here after health scans or HR/manager assignment." /> : null}
+              </div>
+            </Panel>
+
+            <div className="text-xs font-semibold text-slate-400">
+              Generated: {new Date(data.generated_at).toLocaleString()} • Scope: {data.scope.label}
+            </div>
+          </>
         )}
-      </div>
+      </main>
     </DashboardLayout>
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+function ScopeBadge({ label }: { label: string }) {
+  return <span className="inline-flex items-center rounded-full bg-white/15 px-4 py-2 text-sm font-black text-white">{label}</span>;
+}
 
-function SummaryCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
+function Metric({ title, value, icon, color }: { title: string; value: React.ReactNode; icon: React.ReactNode; color: string }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3">
-      <div className="p-2 bg-gray-50 rounded-lg">{icon}</div>
-      <div>
-        <div className={`text-2xl font-bold ${color}`}>{value}</div>
-        <div className="text-xs text-gray-500">{label}</div>
+    <div className="rounded-[1.5rem] border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-slate-500">{title}</p>
+          <div className="mt-2 text-3xl font-black text-slate-950">{value}</div>
+        </div>
+        <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${color} text-white`}>
+          {icon}
+        </div>
       </div>
     </div>
   );
 }
 
-function Select({ label, value, onChange, options, loading }: {
-  label: string; value: string; onChange: (v: string) => void;
-  options: { id: string; name: string }[]; loading: boolean;
-}) {
+function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="block text-xs text-gray-500 mb-1">{label}</label>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        disabled={loading}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      >
-        <option value="">All</option>
-        {options.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-      </select>
-    </div>
-  );
-}
-
-function SelectRaw({ label, value, onChange, options }: {
-  label: string; value: string; onChange: (v: string) => void; options: string[];
-}) {
-  return (
-    <div>
-      <label className="block text-xs text-gray-500 mb-1">{label}</label>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      >
-        <option value="">All</option>
-        {options.map(o => (
-          <option key={o} value={o}>{o.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function WatchlistTable({ data, onSelect, selected }: {
-  data: HealthSnapshot[];
-  onSelect: (s: HealthSnapshot) => void;
-  selected: HealthSnapshot | null;
-}) {
-  if (data.length === 0) return (
-    <div className="text-center py-16 text-gray-400">
-      <Users size={40} className="mx-auto mb-3 opacity-30" />
-      <p>No data. Run a health scan to populate.</p>
-    </div>
-  );
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-            <tr>
-              <th className="px-4 py-3 text-left">Employee</th>
-              <th className="px-4 py-3 text-left">Branch / Process</th>
-              <th className="px-4 py-3 text-center">Risk</th>
-              <th className="px-4 py-3 text-center">Score</th>
-              <th className="px-4 py-3 text-center">Pulse</th>
-              <th className="px-4 py-3 text-center">Attend.</th>
-              <th className="px-4 py-3 text-center">Perf.</th>
-              <th className="px-4 py-3 text-center">Support</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {data.map(row => (
-              <tr
-                key={row.employee_id}
-                onClick={() => onSelect(row)}
-                className={`cursor-pointer hover:bg-indigo-50 transition-colors ${selected?.employee_id === row.employee_id ? "bg-indigo-50" : ""}`}
-              >
-                <td className="px-4 py-3">
-                  <div className="font-medium text-gray-900">{row.employee_name}</div>
-                  <div className="text-xs text-gray-400">{row.employee_code}</div>
-                </td>
-                <td className="px-4 py-3 text-gray-500 text-xs">
-                  {row.branch_name}<br />{row.process_name}
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <RiskBadge label={row.risk_label} />
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <div className="font-bold text-gray-800">{Math.round(row.engagement_score)}</div>
-                  <ScoreBar value={row.engagement_score} colorClass={scoreColor(row.engagement_score)} />
-                </td>
-                <td className="px-4 py-3 text-center text-gray-600">{row.pulse_score != null ? Math.round(row.pulse_score) : "—"}</td>
-                <td className="px-4 py-3 text-center text-gray-600">{row.attendance_score != null ? Math.round(row.attendance_score) : "—"}</td>
-                <td className="px-4 py-3 text-center text-gray-600">{row.performance_score != null ? Math.round(row.performance_score) : "—"}</td>
-                <td className="px-4 py-3 text-center">
-                  {row.support_friction_score != null && row.support_friction_score < 60 ? (
-                    <span className="text-xs text-red-600 font-medium">Friction</span>
-                  ) : (
-                    <span className="text-xs text-gray-400">OK</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <section className="rounded-[1.5rem] border bg-white p-5 shadow-sm">
+      <div className="mb-4">
+        <h2 className="text-xl font-black text-slate-950">{title}</h2>
+        <p className="text-sm text-slate-500">{subtitle}</p>
       </div>
-    </div>
+      {children}
+    </section>
   );
 }
 
-function ActionsTable({ data, onRefresh }: { data: PEAction[]; onRefresh: () => void }) {
-  if (data.length === 0) return (
-    <div className="text-center py-16 text-gray-400">
-      <CheckCircle2 size={40} className="mx-auto mb-3 opacity-30" />
-      <p>No actions yet.</p>
-    </div>
-  );
-
-  const PRIORITY_COLOR: Record<string, string> = {
-    critical: "text-red-600",
-    high:     "text-orange-600",
-    medium:   "text-yellow-600",
-    low:      "text-gray-500",
-  };
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-          <tr>
-            <th className="px-4 py-3 text-left">Action</th>
-            <th className="px-4 py-3 text-left">Employee</th>
-            <th className="px-4 py-3 text-center">Priority</th>
-            <th className="px-4 py-3 text-center">Status</th>
-            <th className="px-4 py-3 text-left">Due</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {data.map(a => (
-            <tr key={a.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3">
-                <div className="font-medium text-gray-800">{a.action_type.replace(/_/g, " ")}</div>
-                {a.notes && <div className="text-xs text-gray-400 truncate max-w-xs">{a.notes}</div>}
-              </td>
-              <td className="px-4 py-3 text-gray-600">{a.employee_name ?? a.employee_id.slice(0, 8)}</td>
-              <td className={`px-4 py-3 text-center font-medium text-xs ${PRIORITY_COLOR[a.priority] ?? "text-gray-500"}`}>
-                {a.priority.toUpperCase()}
-              </td>
-              <td className="px-4 py-3 text-center">
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                  a.status === "completed" ? "bg-green-100 text-green-700" :
-                  a.status === "in_progress" ? "bg-blue-100 text-blue-700" :
-                  a.status === "cancelled" ? "bg-gray-100 text-gray-500" :
-                  "bg-yellow-100 text-yellow-700"
-                }`}>{a.status}</span>
-              </td>
-              <td className="px-4 py-3 text-gray-500 text-xs">
-                {a.due_date ? new Date(a.due_date + "T00:00:00").toLocaleDateString("en-IN") : "—"}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+function RiskPill({ label }: { label: string }) {
+  const cls = RISK_CLASS[label] ?? (label === "critical" || label === "high" ? "bg-red-50 text-red-700 border-red-200" : "bg-slate-50 text-slate-700 border-slate-200");
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black capitalize ${cls}`}>{String(label).replace(/_/g, " ")}</span>;
 }
 
-function DetailDrawer({ snapshot, onClose }: { snapshot: HealthSnapshot; onClose: () => void }) {
-  const drivers = useMemo(() => {
-    try {
-      const parsed = JSON.parse(snapshot.top_risk_drivers_json ?? "[]");
-      return Array.isArray(parsed) ? parsed as string[] : [];
-    } catch {
-      return [];
-    }
-  }, [snapshot.top_risk_drivers_json]);
-
+function HeatmapColumn({ title, rows }: { title: string; rows: Bucket[] }) {
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/30" onClick={onClose} />
-      <div className="w-full max-w-md bg-white shadow-xl overflow-y-auto p-6 space-y-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">{snapshot.employee_name}</h2>
-            <p className="text-sm text-gray-500">{snapshot.employee_code} · {snapshot.branch_name} · {snapshot.process_name}</p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <RiskBadge label={snapshot.risk_label} />
-          <span className="text-2xl font-bold text-gray-800">{Math.round(snapshot.engagement_score)}<span className="text-sm text-gray-400">/100</span></span>
-          {snapshot.data_confidence_score != null && (
-            <span className="text-xs text-gray-400">Confidence: {snapshot.data_confidence_score}%</span>
-          )}
-        </div>
-
-        <div className="space-y-3">
-          {[
-            { label: "Pulse", value: snapshot.pulse_score, color: "bg-pink-400" },
-            { label: "Attendance", value: snapshot.attendance_score, color: "bg-blue-400" },
-            { label: "Performance", value: snapshot.performance_score, color: "bg-purple-400" },
-            { label: "Support", value: snapshot.support_friction_score, color: "bg-orange-400" },
-            { label: "Career Growth", value: snapshot.career_growth_score, color: "bg-teal-400" },
-          ].map(({ label, value, color }) => value != null ? (
-            <div key={label}>
-              <div className="flex justify-between text-sm text-gray-600 mb-1">
-                <span>{label}</span>
-                <span className="font-medium">{Math.round(value)}</span>
-              </div>
-              <ScoreBar value={value} colorClass={color} />
+    <div className="space-y-2">
+      <h3 className="text-sm font-black uppercase tracking-wide text-slate-500">{title}</h3>
+      {rows.length === 0 ? <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No data</div> : rows.map((row) => {
+        const risk = Number(row.risk ?? 0);
+        const watch = Number(row.watchlist ?? 0);
+        const cls = risk > 0 ? "bg-red-50 text-red-800" : watch > 0 ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800";
+        return (
+          <div key={row.label} className={`rounded-xl p-3 ${cls}`}>
+            <div className="flex justify-between gap-3">
+              <span className="truncate font-bold">{row.label}</span>
+              <span className="font-black">{risk + watch}</span>
             </div>
-          ) : null)}
-        </div>
-
-        {drivers.length > 0 && (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-              <AlertTriangle size={14} className="text-orange-500" /> Risk Drivers
-            </h3>
-            <ul className="space-y-1">
-              {drivers.map(d => (
-                <li key={d} className="text-sm text-orange-700 bg-orange-50 rounded px-2 py-1">
-                  {d.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
-                </li>
-              ))}
-            </ul>
+            <div className="mt-1 text-xs">Risk {risk} • Watch {watch} • Total {row.total ?? 0}</div>
           </div>
-        )}
+        );
+      })}
+    </div>
+  );
+}
 
-        <div className="pt-2 text-xs text-gray-400">Last scan: {snapshot.snapshot_date}</div>
-      </div>
+function MiniStat({ label, value, intent = "default" }: { label: string; value: React.ReactNode; intent?: "default" | "danger" | "warning" }) {
+  const cls = intent === "danger" ? "bg-red-50 text-red-800" : intent === "warning" ? "bg-amber-50 text-amber-800" : "bg-slate-50 text-slate-800";
+  return (
+    <div className={`mb-2 flex items-center justify-between rounded-xl px-3 py-2 ${cls}`}>
+      <span className="text-sm font-bold">{label}</span>
+      <span className="text-lg font-black">{value}</span>
+    </div>
+  );
+}
+
+function Breakdown({ rows }: { rows: Bucket[] }) {
+  return (
+    <div className="mt-3 space-y-2">
+      {rows.slice(0, 8).map((row) => (
+        <div key={row.label} className="flex items-center justify-between rounded-xl border px-3 py-2 text-sm">
+          <span className="font-semibold text-slate-600">{row.label ?? "Unassigned"}</span>
+          <span className="font-black text-slate-950">{row.value ?? row.count ?? 0}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LoadingGrid() {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      {Array.from({ length: 10 }).map((_, index) => (
+        <div key={index} className="h-32 animate-pulse rounded-[1.5rem] bg-slate-100" />
+      ))}
+    </div>
+  );
+}
+
+function EmptyPanel({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+      <div className="font-black text-slate-700">{title}</div>
+      <p className="mt-1 text-sm text-slate-500">{text}</p>
     </div>
   );
 }
