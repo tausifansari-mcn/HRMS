@@ -145,6 +145,8 @@ const MIGRATION_MANIFEST: string[] = [
   "213_salary_prep_line_component_columns.sql",
   "214_performance_indexes.sql",
   "217_people_experience_support_hardening.sql",
+  "218_enterprise_foundation_helpers.sql",
+  "219_peopleos_foundation_read_models.sql",
 ];
 
 export type MigrationHealth = {

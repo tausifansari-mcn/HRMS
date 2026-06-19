@@ -93,6 +93,7 @@ const UnifiedPerformanceCommandCenter = lazy(() => import("./pages/UnifiedPerfor
 const UnifiedAccessControl = lazy(() => import("./pages/UnifiedAccessControl"));
 const SuperAdminAccessControl = lazy(() => import("./pages/SuperAdminAccessControl"));
 const NativeManagementDashboard = lazy(() => import("./pages/NativeManagementDashboard"));
+const NativeCEOCommandCenter = lazy(() => import("./pages/NativeCEOCommandCenter"));
 const NativeSecurityCenter = lazy(() => import("./pages/NativeSecurityCenter"));
 
 const NativePerformanceFeedbackMyReports = lazy(() => import("./pages/NativePerformanceFeedbackMyReports"));
@@ -104,6 +105,7 @@ const NativePerformanceFeedbackTeamReports = lazy(() => import("./pages/NativePe
 
 // People
 const NativeEmployeeStatCard        = lazy(() => import("./pages/NativeEmployeeStatCard"));
+const NativeEmployee360             = lazy(() => import("./pages/NativeEmployee360"));
 const NativePeopleExperienceCommandCenter = lazy(() => import("./pages/NativePeopleExperienceCommandCenter"));
 
 // Engagement
@@ -140,6 +142,7 @@ const NativeWorkInbox               = lazy(() => import("./pages/NativeWorkInbox
 const NativeMobilityManagement      = lazy(() => import("./pages/NativeMobilityManagement"));
 const NativeJobsPortal              = lazy(() => import("./pages/NativeJobsPortal"));
 const NativeAdvancedReports         = lazy(() => import("./pages/NativeAdvancedReports"));
+const NativeEnterpriseReports       = lazy(() => import("./pages/NativeEnterpriseReports"));
 const NativeStatutoryCompliance     = lazy(() => import("./pages/NativeStatutoryCompliance"));
 const NativeLabourCompliance        = lazy(() => import("./pages/NativeLabourCompliance"));
 const NativeDPDPCompliance          = lazy(() => import("./pages/NativeDPDPCompliance"));
@@ -182,6 +185,10 @@ const NativeRosterMasterBuilder = lazy(() => import("./pages/NativeRosterMasterB
 const NativeWeekOffPreferences = lazy(() => import("./pages/NativeWeekOffPreferences"));
 const NativeRosterCapacityConfig = lazy(() => import("./pages/NativeRosterCapacityConfig"));
 const NativeWFMAutoRoster = lazy(() => import("./pages/NativeWFMAutoRoster"));
+const NativeAttendanceExceptionEngine = lazy(() => import("./pages/NativeAttendanceExceptionEngine"));
+const NativeCosecSyncMonitoring = lazy(() => import("./pages/NativeCosecSyncMonitoring"));
+const NativePayrollReadiness = lazy(() => import("./pages/NativePayrollReadiness"));
+const NativeWorkforcePlanning = lazy(() => import("./pages/NativeWorkforcePlanning"));
 const NativeITProvisioningTracker = lazy(() => import("./pages/NativeITProvisioningTracker"));
 const NativeControlTower = lazy(() => import("./pages/NativeControlTower"));
 const NativeRTABoard = lazy(() => import("./pages/NativeRTABoard"));
@@ -232,6 +239,7 @@ const App = () => (
               <Route path="/walkin-registration" element={<Navigate to="/interview-registration" replace />} />
               <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/employees" element={<ProtectedRoute><Gate pageCode="EMPLOYEE_MANAGEMENT"><Employees /></Gate></ProtectedRoute>} />
+              <Route path="/employees/:id/360" element={<ProtectedRoute><Gate pageCode="EMPLOYEE_MANAGEMENT"><NativeEmployee360 /></Gate></ProtectedRoute>} />
               <Route path="/employees/:id" element={<ProtectedRoute><Gate pageCode="EMPLOYEE_MANAGEMENT"><NativeEmployeeStatCard /></Gate></ProtectedRoute>} />
               <Route path="/onboarding" element={<ProtectedRoute><Gate pageCode="ATS_ONBOARDING_BRIDGE"><Onboarding /></Gate></ProtectedRoute>} />
               <Route path="/onboarding-requests" element={<Navigate to="/onboarding?tab=requests" replace />} />
@@ -240,6 +248,7 @@ const App = () => (
               <Route path="/assets" element={<ProtectedRoute><Assets /></ProtectedRoute>} />
               <Route path="/payroll" element={<ProtectedRoute><Gate pageCode="PAYROLL"><Payroll /></Gate></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+              <Route path="/reports/enterprise" element={<ProtectedRoute><Gate pageCode="ADVANCED_REPORTS"><NativeEnterpriseReports /></Gate></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/employee-journey" element={<ProtectedRoute><EmployeeJourney /></ProtectedRoute>} />
@@ -292,6 +301,8 @@ const App = () => (
               <Route path="/wfm/live-tracker" element={<ProtectedRoute><Gate pageCode="WFM_LIVE_TRACKER"><NativeBiometricCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/wfm/adherence-command-center" element={<ProtectedRoute><Gate pageCode="WFM_LIVE_TRACKER"><NativeBiometricCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/wfm/agent-attendance-view" element={<ProtectedRoute><Gate pageCode="WFM_LIVE_TRACKER"><NativeBiometricCommandCenter /></Gate></ProtectedRoute>} />
+              <Route path="/wfm/attendance-exceptions" element={<ProtectedRoute><Gate pageCode="WFM_LIVE_TRACKER"><NativeAttendanceExceptionEngine /></Gate></ProtectedRoute>} />
+              <Route path="/wfm/cosec-monitoring" element={<ProtectedRoute><Gate pageCode="WFM_LIVE_TRACKER"><NativeCosecSyncMonitoring /></Gate></ProtectedRoute>} />
               <Route path="/wfm/extensions" element={<ProtectedRoute><Gate pageCode="WFM_EXTENSIONS"><NativeWFMExtensions /></Gate></ProtectedRoute>} />
               <Route path="/wfm-manager-approvals" element={<ProtectedRoute><Gate pageCode="WFM_ROSTER"><NativeWFMManagerApproval /></Gate></ProtectedRoute>} />
               <Route path="/roster-preference" element={<ProtectedRoute><Gate pageCode="WFM_ROSTER"><NativeRosterPreference /></Gate></ProtectedRoute>} />
@@ -337,6 +348,7 @@ const App = () => (
               <Route path="/org-masters/locations-policies" element={<ProtectedRoute><Gate pageCode="ORG_MASTERS"><NativeLocationPolicyMasters /></Gate></ProtectedRoute>} />
               <Route path="/workflow-admin" element={<ProtectedRoute><Gate pageCode="WORKFLOW_ADMIN"><NativeWorkflowAdmin /></Gate></ProtectedRoute>} />
               <Route path="/management/dashboard" element={<ProtectedRoute><Gate pageCode="MANAGEMENT_DASHBOARD"><NativeManagementDashboard /></Gate></ProtectedRoute>} />
+              <Route path="/management/ceo-command-center" element={<ProtectedRoute roles={['admin', 'hr', 'ceo', 'finance', 'process_manager', 'manager']}><NativeCEOCommandCenter /></ProtectedRoute>} />
               <Route path="/benefits" element={<ProtectedRoute><Gate pageCode="BENEFITS"><NativeBenefitsClaims /></Gate></ProtectedRoute>} />
               <Route path="/career-planning" element={<ProtectedRoute><Gate pageCode="CAREER_PLANNING"><NativeCareerPlanning /></Gate></ProtectedRoute>} />
               <Route path="/pip-management" element={<ProtectedRoute><Gate pageCode="PIP_MANAGEMENT"><NativePIPManagement /></Gate></ProtectedRoute>} />
@@ -355,6 +367,7 @@ const App = () => (
               <Route path="/customization/new" element={<ProtectedRoute><Gate pageCode="CUSTOMIZATION_MANAGER"><NativeCustomizationRuleEditor /></Gate></ProtectedRoute>} />
               <Route path="/customization/:id/edit" element={<ProtectedRoute><Gate pageCode="CUSTOMIZATION_MANAGER"><NativeCustomizationRuleEditor /></Gate></ProtectedRoute>} />
               <Route path="/payroll/payslips" element={<ProtectedRoute><Gate pageCode="PAYROLL_PAYSLIPS"><NativePayslipCenter /></Gate></ProtectedRoute>} />
+              <Route path="/payroll/readiness" element={<ProtectedRoute><Gate pageCode="PAYROLL"><NativePayrollReadiness /></Gate></ProtectedRoute>} />
               <Route path="/payroll/tax-declaration" element={<ProtectedRoute><Gate pageCode="TAX_DECLARATION"><NativeTaxDeclaration /></Gate></ProtectedRoute>} />
               <Route path="/payroll/full-final" element={<ProtectedRoute><Gate pageCode="FULL_FINAL"><NativeFullFinal /></Gate></ProtectedRoute>} />
               <Route path="/payroll/statutory-config" element={<ProtectedRoute><Gate pageCode="STATUTORY_CONFIG"><NativeStatutoryConfig /></Gate></ProtectedRoute>} />
@@ -384,6 +397,7 @@ const App = () => (
               <Route path="/week-off-preferences" element={<ProtectedRoute><NativeWeekOffPreferences /></ProtectedRoute>} />
               <Route path="/roster-capacity-config" element={<ProtectedRoute><Gate pageCode="ROSTER_MASTER"><NativeRosterCapacityConfig /></Gate></ProtectedRoute>} />
               <Route path="/wfm/auto-roster" element={<ProtectedRoute><Gate pageCode="WFM_AUTO_ROSTER"><NativeWFMAutoRoster /></Gate></ProtectedRoute>} />
+              <Route path="/workforce-planning" element={<ProtectedRoute><Gate pageCode="WFM_AUTO_ROSTER"><NativeWorkforcePlanning /></Gate></ProtectedRoute>} />
               <Route path="/control-tower" element={<ProtectedRoute><Gate pageCode="CONTROL_TOWER"><NativeControlTower /></Gate></ProtectedRoute>} />
               <Route path="/rta-board" element={<ProtectedRoute><Gate pageCode="RTA_BOARD"><NativeRTABoard /></Gate></ProtectedRoute>} />
               <Route path="/attendance-rules-master" element={<ProtectedRoute roles={['admin', 'hr']}><NativeAttendanceRulesMaster /></ProtectedRoute>} />
