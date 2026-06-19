@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { RatingStars } from "./RatingStars";
 import { performanceStatusColors } from "@/lib/statusStyles";
 import { format } from "date-fns";
+import { parseLocalDate } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface PerformanceReviewsProps {
@@ -113,7 +114,7 @@ export function PerformanceReviews({ employeeId, employeeName = "Employee" }: Pe
                     <div>
                       <h4 className="font-medium">{review.review_period}</h4>
                       <p className="text-sm text-muted-foreground">
-                        {format(new Date(review.review_date), "MMMM d, yyyy")}
+                        {format(parseLocalDate(review.review_date), "MMMM d, yyyy")}
                         {review.reviewer && <> • Reviewed by {review.reviewer.first_name} {review.reviewer.last_name}</>}
                       </p>
                     </div>
@@ -199,7 +200,7 @@ export function PerformanceReviews({ employeeId, employeeName = "Employee" }: Pe
                   {review.acknowledged_at && (
                     <div className="pt-2 border-t text-sm text-muted-foreground">
                       <CheckCircle className="h-4 w-4 inline mr-1 text-emerald-600" />
-                      Acknowledged on {format(new Date(review.acknowledged_at), "MMMM d, yyyy")}
+                      Acknowledged on {format(parseLocalDate(review.acknowledged_at), "MMMM d, yyyy")}
                     </div>
                   )}
                 </div>

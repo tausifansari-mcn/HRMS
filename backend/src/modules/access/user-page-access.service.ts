@@ -41,11 +41,17 @@ export async function listPageCatalog(): Promise<PageCatalogEntry[]> {
 /**
  * Get all users with their email for assignment UI
  */
-export async function listUsersForAccess(): Promise<Array<{ id: string; email: string }>> {
+export async function listUsersForAccess(): Promise<Array<{ id: string; email: string; employee_code: string | null; full_name: string | null }>> {
   const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT id, email FROM auth_user WHERE is_blocked = 0 ORDER BY email`
+    `SELECT u.id, u.email,
+            e.employee_code,
+            TRIM(CONCAT(COALESCE(e.first_name,''), ' ', COALESCE(e.last_name,''))) AS full_name
+       FROM auth_user u
+       LEFT JOIN employees e ON e.user_id = u.id AND e.active_status = 1
+      WHERE u.is_blocked = 0
+      ORDER BY full_name, u.email`
   );
-  return rows as Array<{ id: string; email: string }>;
+  return rows as Array<{ id: string; email: string; employee_code: string | null; full_name: string | null }>;
 }
 
 /**

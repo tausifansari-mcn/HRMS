@@ -91,14 +91,13 @@ export const payrollService = {
       ids
     );
 
-    for (const emp of employees) {
-      const asgId = randomUUID();
-      await db.execute(
-        `INSERT INTO employee_salary_assignment (id, employee_id, structure_id, ctc_annual, effective_from)
-         VALUES (?, ?, ?, ?, ?)`,
-        [asgId, emp.id, input.structureId, input.ctcAnnual, input.effectiveFrom]
-      );
-    }
+    // Bulk INSERT — one round-trip regardless of employee count
+    const insertRows = employees.map(emp => [randomUUID(), emp.id, input.structureId, input.ctcAnnual, input.effectiveFrom]);
+    const insertPh = insertRows.map(() => "(?, ?, ?, ?, ?)").join(", ");
+    await db.execute(
+      `INSERT INTO employee_salary_assignment (id, employee_id, structure_id, ctc_annual, effective_from) VALUES ${insertPh}`,
+      insertRows.flat()
+    );
 
     return { assigned: employees.length, skipped: 0 };
   },
@@ -298,12 +297,14 @@ export const payrollService = {
   },
 
   async listRuns(filters: RunFilters & { scopeFilter?: { sql: string; params: unknown[] } | string }): Promise<PaginatedResult<SalaryPrepRun>> {
-    const { page, limit, runMonth, status, scopeFilter } = filters;
+    const { page, limit, runMonth, status, branchId, processId, scopeFilter } = filters;
     const offset = (page - 1) * limit;
     const conds: string[] = [];
     const params: unknown[] = [];
-    if (runMonth) { conds.push("run_month = ?"); params.push(runMonth); }
-    if (status)   { conds.push("status = ?");    params.push(status); }
+    if (runMonth)   { conds.push("run_month = ?");    params.push(runMonth); }
+    if (status)     { conds.push("status = ?");       params.push(status); }
+    if (branchId)   { conds.push("branch_id = ?");    params.push(branchId); }
+    if (processId)  { conds.push("process_id = ?");   params.push(processId); }
 
     // Apply scope filter from middleware (object {sql, params} or legacy string)
     if (scopeFilter) {
@@ -348,13 +349,22 @@ export const payrollService = {
   },
 
   async listPayrollRecords(filters: RunFilters & { scopeFilter?: { sql: string; params: unknown[] } | string }): Promise<PaginatedResult<RowDataPacket>> {
-    const { page, limit, runMonth, status, scopeFilter } = filters;
+    const { page, limit, runMonth, status, search, departmentId, scopeFilter } = filters;
     const offset = (page - 1) * limit;
     const conds: string[] = [];
     const params: unknown[] = [];
 
     if (runMonth) { conds.push("spr.run_month = ?"); params.push(runMonth); }
     if (status)   { conds.push("spr.status = ?");    params.push(status); }
+    if (search) {
+      const s = `%${search.trim()}%`;
+      conds.push("(COALESCE(spl.employee_code, e.employee_code) LIKE ? OR CONCAT_WS(' ', e.first_name, e.last_name) LIKE ?)");
+      params.push(s, s);
+    }
+    if (departmentId) {
+      conds.push("e.department_id = ?");
+      params.push(departmentId);
+    }
 
     if (scopeFilter) {
       if (typeof scopeFilter === "object" && scopeFilter.sql) {
@@ -393,6 +403,10 @@ export const payrollService = {
                COALESCE(spl.working_days, 0) AS working_days,
                COALESCE(spl.present_days, 0) AS present_days,
                COALESCE(spl.lwp_days, 0) AS lwp_days,
+               COALESCE(bm.branch_name, '-') AS branch_name,
+               COALESCE(pm.process_name, '-') AS process_name,
+               COALESCE(dm.dept_name, '-') AS department_name,
+               COALESCE(cc.cost_centre_name, '-') AS cost_centre_name,
                ROW_NUMBER() OVER (
                  PARTITION BY spr.run_month, spl.employee_id
                  ORDER BY spr.created_at DESC, spl.id DESC
@@ -400,6 +414,10 @@ export const payrollService = {
           FROM salary_prep_line spl
           JOIN salary_prep_run spr ON spr.id = spl.run_id
           LEFT JOIN employees e ON e.id = spl.employee_id
+          LEFT JOIN branch_master bm ON bm.id = e.branch_id
+          LEFT JOIN process_master pm ON pm.id = e.process_id
+          LEFT JOIN department_master dm ON dm.id = e.department_id
+          LEFT JOIN cost_centre_master cc ON cc.id = e.cost_centre_id
           ${where}
       ) ranked
       WHERE ranked.rn = 1`;
@@ -559,6 +577,80 @@ export const payrollService = {
       [employeeId]
     );
     return rows as SalaryAdvance[];
+  },
+
+  // ─── Overtime Management ───────────────────────────────────────────────────
+
+  async updateOvertime(
+    lineId: string,
+    input: { overtimeHours: number; overtimeAmount: number },
+    userId: string
+  ): Promise<SalaryPrepLine> {
+    // Get the prep line with run status
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT spl.*, spr.status AS run_status, e.branch_id, e.employee_code
+       FROM salary_prep_line spl
+       JOIN salary_prep_run spr ON spl.run_id = spr.id
+       JOIN employees e ON spl.employee_id = e.id
+       WHERE spl.id = ? LIMIT 1`,
+      [lineId]
+    );
+
+    const line = rows[0] as any;
+    if (!line) throw new Error("Salary prep line not found");
+
+    // Check if run is editable
+    if (line.run_status === "locked" || line.run_status === "disbursed") {
+      throw new Error(`Cannot update overtime: run is ${line.run_status}`);
+    }
+
+    // Update overtime fields
+    await db.execute(
+      `UPDATE salary_prep_line
+       SET overtime_hours = ?,
+           overtime_amount = ?,
+           net_salary = net_salary - COALESCE(overtime_amount, 0) + ?,
+           gross_salary = gross_salary - COALESCE(overtime_amount, 0) + ?
+       WHERE id = ?`,
+      [input.overtimeHours, input.overtimeAmount, input.overtimeAmount, input.overtimeAmount, lineId]
+    );
+
+    // Log the action
+    await logSensitiveAction({
+      actor_user_id: userId,
+      action_type: "payroll.overtime.update",
+      module_key: "payroll",
+      entity_type: "salary_prep_line",
+      entity_id: lineId,
+      change_summary: {
+        employeeCode: line.employee_code,
+        branchId: line.branch_id,
+        overtimeHours: input.overtimeHours,
+        overtimeAmount: input.overtimeAmount,
+      },
+    });
+
+    // Append to journey log
+    await appendJourneyEvent({
+      employeeId: line.employee_id,
+      eventType: "overtime_updated",
+      eventDate: new Date().toISOString(),
+      description: `Overtime updated: ${input.overtimeHours}h = ₹${input.overtimeAmount}`,
+      module: "payroll",
+      triggeredBy: userId,
+      metadata: {
+        lineId,
+        overtimeHours: input.overtimeHours,
+        overtimeAmount: input.overtimeAmount,
+      },
+    });
+
+    // Return updated line
+    const [updated] = await db.execute<RowDataPacket[]>(
+      "SELECT * FROM salary_prep_line WHERE id = ? LIMIT 1",
+      [lineId]
+    );
+    return (updated as SalaryPrepLine[])[0];
   },
 
   // ─── Statutory Config ──────────────────────────────────────────────────────

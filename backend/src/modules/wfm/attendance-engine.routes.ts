@@ -97,13 +97,20 @@ router.post('/process', requireRole('admin', 'hr', 'wfm'), h(async (req, res) =>
 router.get('/daily', h(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.authUser!.id;
   const isPrivileged = await hasRole(userId, 'admin', 'hr', 'wfm', 'manager');
+  // Validate pagination parameters to prevent NaN/negative values
+  const rawPage = req.query.page ? Number(req.query.page) : 1;
+  const rawLimit = req.query.limit ? Number(req.query.limit) : 50;
+  const safePage = Number.isFinite(rawPage) && rawPage > 0 ? Math.floor(rawPage) : 1;
+  const safeLimit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 200) : 50;
+
   const filters: any = {
     processId:        req.query.processId as string | undefined,
+    branchId:         req.query.branchId as string | undefined,
     fromDate:         req.query.fromDate as string | undefined,
     toDate:           req.query.toDate as string | undefined,
     attendanceStatus: req.query.attendanceStatus as string | undefined,
-    page:             req.query.page ? Number(req.query.page) : undefined,
-    limit:            req.query.limit ? Math.min(Number(req.query.limit), 200) : undefined,
+    page:             safePage,
+    limit:            safeLimit,
   };
   if (isPrivileged) {
     const qEmpId = req.query.employeeId as string | undefined;

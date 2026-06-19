@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import type { RowDataPacket } from "mysql2";
 import { db } from "../../db/mysql.js";
-import { sendSelectedEmail, sendRejectedEmail } from "./ats.email.service.js";
+import { sendSelectedEmail, sendRejectedEmail, sendRejectedEmailProfessional } from "./ats.email.service.js";
 import { sendOnboardingToken } from "./ats.onboarding.service.js";
 import { hasScopedAccess } from "../../shared/scopeAccess.js";
 import type {
@@ -35,6 +35,18 @@ function normalizeSourceChannel(channel: string | null | undefined): string | nu
     "social media": "Social Media",
   };
   return mapping[normalized] || channel; // Return normalized or original if no match
+}
+
+/** Convert Yes/No strings OR integers to boolean (1/0) for TINYINT(1) columns */
+function yesNoToBoolean(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  // Already a number (from frontend integer conversion)
+  if (typeof value === 'number') return value === 1 ? 1 : 0;
+  // String conversion
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'yes' || normalized === '1' || normalized === 'true') return 1;
+  if (normalized === 'no' || normalized === '0' || normalized === 'false') return 0;
+  return null;
 }
 
 export const atsService = {
@@ -155,9 +167,9 @@ export const atsService = {
        input.appliedForRole ?? input.appliedForProcess, normalizedChannel, input.referredBy ?? null,
        input.walkInDate ?? null, input.remarks ?? null, userId,
        input.address ?? null, input.education, input.experience,
-       input.rotationalShift ?? null, input.preferredShift ?? null, input.nightShiftOk ?? null,
-       input.leavesIn3months ?? null, input.ownsTwoWheeler ?? null, input.idProofAvailable ?? null,
-       input.educationProofAvailable ?? null, input.recruiterName ?? null, input.profileStatus ?? 'registered']
+       yesNoToBoolean(input.rotationalShift), input.preferredShift ?? null, input.nightShiftOk ?? null,
+       yesNoToBoolean(input.leavesIn3months), yesNoToBoolean(input.ownsTwoWheeler), yesNoToBoolean(input.idProofAvailable),
+       yesNoToBoolean(input.educationProofAvailable), input.recruiterName ?? null, input.profileStatus ?? 'registered']
     );
 
     await db.execute(
@@ -166,6 +178,33 @@ export const atsService = {
        VALUES (?, ?, NULL, 'Applied', 'Candidate registration completed', ?)`,
       [randomUUID(), id, userId]
     );
+
+    // Auto-create queue token for Walk-In candidates
+    if (normalizedChannel === 'Walk-In') {
+      try {
+        // Generate queue token (format: WI-YYYYMMDD-XXXX)
+        const dateStr = (input.walkInDate || new Date().toISOString().slice(0, 10)).replace(/-/g, '');
+        const targetDate = input.walkInDate || new Date().toISOString().slice(0, 10);
+        const [countRows] = await db.execute<RowDataPacket[]>(
+          `SELECT COUNT(*) as count FROM ats_queue_token
+           WHERE DATE(created_at) = DATE(?)`,
+          [targetDate]
+        );
+        const dailyCount = ((countRows as RowDataPacket[])[0]?.count || 0) + 1;
+        const tokenNumber = `WI-${dateStr}-${String(dailyCount).padStart(4, '0')}`;
+        const branchName = input.appliedForBranch || null;
+
+        await db.execute(
+          `INSERT INTO ats_queue_token
+           (id, candidate_id, token, token_number, branch_name, queue_status, current_stage, status)
+           VALUES (?, ?, ?, ?, ?, 'waiting', 'Arrived', 'active')`,
+          [randomUUID(), id, tokenNumber, tokenNumber, branchName]
+        );
+      } catch (err) {
+        // Log error but don't fail candidate creation
+        console.error('Failed to create queue token:', err);
+      }
+    }
 
     return this.getCandidate(id);
   },
@@ -193,14 +232,31 @@ export const atsService = {
     return this.getCandidate(id);
   },
 
-  async moveStage(candidateId: string, toStage: string, userId: string, remarks?: string): Promise<AtsCandidate> {
+  async moveStage(
+    candidateId: string,
+    toStage: string,
+    userId: string,
+    remarks?: string,
+    extra?: { interviewRating?: number | null; interviewNotes?: string | null }
+  ): Promise<AtsCandidate> {
     const candidate = await this.getCandidate(candidateId);
     await db.execute("UPDATE ats_candidate SET current_stage = ?, updated_at = NOW() WHERE id = ?", [toStage, candidateId]);
-    await db.execute(
-      `INSERT INTO ats_candidate_stage_log (id, candidate_id, from_stage, to_stage, remarks, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [randomUUID(), candidateId, candidate.current_stage, toStage, remarks ?? null, userId]
-    );
+
+    // Store recruiter feedback if provided (migration 202 adds these columns)
+    const hasRatingCols = !!(extra?.interviewRating !== undefined || extra?.interviewNotes !== undefined);
+    if (hasRatingCols) {
+      await db.execute(
+        `INSERT INTO ats_candidate_stage_log (id, candidate_id, from_stage, to_stage, remarks, updated_by, interview_rating, interview_notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [randomUUID(), candidateId, candidate.current_stage, toStage, remarks ?? null, userId, extra?.interviewRating ?? null, extra?.interviewNotes ?? null]
+      );
+    } else {
+      await db.execute(
+        `INSERT INTO ats_candidate_stage_log (id, candidate_id, from_stage, to_stage, remarks, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [randomUUID(), candidateId, candidate.current_stage, toStage, remarks ?? null, userId]
+      );
+    }
 
     // Fire email side-effects after the stage is committed — failure must not break the stage move
     if (toStage === 'Selected' && candidate.email) {
@@ -212,14 +268,30 @@ export const atsService = {
         hrName: 'HR Team',
         hrPhone: '',
       }).catch(() => { /* already logged in ats_email_log */ });
-      sendOnboardingToken(candidateId, userId).catch(() => {});
+      sendOnboardingToken(candidateId, userId).catch((err: unknown) => {
+        console.error('[ats] Onboarding token email failed for candidate', candidateId, ':', err instanceof Error ? err.message : String(err));
+      });
     } else if (toStage === 'Rejected' && candidate.email) {
-      sendRejectedEmail({
+      // Professional rejection email — replaces the old plain-text rejection
+      sendRejectedEmailProfessional({
         candidateId,
         to: candidate.email,
         candidateName: candidate.full_name ?? '',
-        branchName: candidate.applied_for_branch ?? '',
-      }).catch(() => { /* already logged in ats_email_log */ });
+        branchDisplayName: (candidate as any).branch_name ?? candidate.applied_for_branch ?? '',
+        processName: (candidate as any).process_name ?? null,
+        applicationRef: candidate.candidate_code ?? null,
+      }).catch((err: unknown) => {
+        console.error('[ats] Professional rejection email failed for candidate', candidateId, ', trying fallback:', err instanceof Error ? err.message : String(err));
+        // Fallback to legacy rejection email if professional template fails
+        sendRejectedEmail({
+          candidateId,
+          to: candidate.email!,
+          candidateName: candidate.full_name ?? '',
+          branchName: candidate.applied_for_branch ?? '',
+        }).catch((fallbackErr: unknown) => {
+          console.error('[ats] Fallback rejection email also failed for candidate', candidateId, ':', fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr));
+        });
+      });
     }
 
     return this.getCandidate(candidateId);

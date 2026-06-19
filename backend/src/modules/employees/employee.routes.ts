@@ -4,7 +4,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { requireAuth } from "../../middleware/authMiddleware.js";
+import { requireAuth, requireWriteAccess } from "../../middleware/authMiddleware.js";
 import { requireRole } from "../../middleware/requireRole.js";
 import { requireScopedRole } from "../../middleware/scopeMiddleware.js";
 import { buildScopeWhereClause } from "../../shared/scopeAccess.js";
@@ -37,7 +37,7 @@ const photoStorage = multer.diskStorage({
 
 const photoUpload = multer({
   storage: photoStorage,
-  limits: { fileSize: 3 * 1024 * 1024 }, // 3 MB max
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15 MB max
   fileFilter: (_req, file, cb) => {
     const allowed = new Set([".jpg", ".jpeg", ".png", ".webp"]);
     const ext = path.extname(file.originalname).toLowerCase();
@@ -68,7 +68,7 @@ router.get("/me", h(async (req: any, res: any) => {
 }));
 
 // PATCH /api/employees/me — update own profile (employee self-service)
-router.patch("/me", h(async (req: any, res: any) => {
+router.patch("/me", requireWriteAccess, h(async (req: any, res: any) => {
   const parsed = selfProfileUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -85,7 +85,7 @@ router.patch("/me", h(async (req: any, res: any) => {
   return res.json({ success: true, data, message: "Profile updated" });
 }));
 
-router.put("/me/emergency-contact", h(async (req: any, res: any) => {
+router.put("/me/emergency-contact", requireWriteAccess, h(async (req: any, res: any) => {
   const parsed = emergencyContactSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -102,7 +102,7 @@ router.put("/me/emergency-contact", h(async (req: any, res: any) => {
   return res.json({ success: true, data, message: "Emergency contact saved" });
 }));
 
-router.put("/me/nominee", h(async (req: any, res: any) => {
+router.put("/me/nominee", requireWriteAccess, h(async (req: any, res: any) => {
   const parsed = nomineeSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -119,7 +119,7 @@ router.put("/me/nominee", h(async (req: any, res: any) => {
   return res.json({ success: true, data, message: "Nominee details saved" });
 }));
 
-router.put("/me/bank-details", h(async (req: any, res: any) => {
+router.put("/me/bank-details", requireWriteAccess, h(async (req: any, res: any) => {
   const parsed = bankDetailsSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -140,7 +140,7 @@ router.put("/me/bank-details", h(async (req: any, res: any) => {
   });
 }));
 
-router.put("/me/statutory-details", h(async (req: any, res: any) => {
+router.put("/me/statutory-details", requireWriteAccess, h(async (req: any, res: any) => {
   const parsed = statutoryDetailsSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -210,7 +210,7 @@ router.get("/me/transfers", h(async (req: any, res: any) => {
 }));
 
 // POST /api/employees/me/photo — employee uploads their own photo
-router.post("/me/photo", (req: any, res: any, next: any) => {
+router.post("/me/photo", requireWriteAccess, (req: any, res: any, next: any) => {
   photoUpload.single("photo")(req, res, (err: any) => {
     if (err instanceof multer.MulterError) return res.status(400).json({ success: false, error: err.message });
     if (err) return res.status(400).json({ success: false, error: err.message });
@@ -280,6 +280,18 @@ router.delete("/:id/photo", requireRole("admin", "hr"), h(async (req: any, res: 
   return res.json({ success: true });
 }));
 
+// GET /api/employees/all — minimal fields for internal dropdowns (id, code, name, dept only)
+router.get("/all", requireRole("admin", "hr", "manager"), h(async (_req: any, res: any) => {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT e.id, e.employee_code, e.first_name, e.last_name, dept.dept_name AS department_name
+       FROM employees e
+       LEFT JOIN department_master dept ON dept.id = e.department_id AND dept.active_status = 1
+      WHERE e.active_status = 1
+      ORDER BY e.employee_code ASC`
+  );
+  return res.json({ success: true, data: rows });
+}));
+
 // GET /api/employees/stats — aggregate counts (must be before /:id to avoid route collision)
 router.get("/stats", requireRole("admin", "hr", "manager", "ceo"), h(async (_req: any, res: any) => {
   const [rows] = await db.execute<RowDataPacket[]>(
@@ -294,7 +306,7 @@ router.get("/stats", requireRole("admin", "hr", "manager", "ceo"), h(async (_req
 
 router.get("/options/search", requireAuth, h(async (req: any, res: any) => {
   const search = String(req.query.q ?? "").trim();
-  if (search.length < 2) return res.json({ success: true, data: [] });
+  if (search.length < 1) return res.json({ success: true, data: [] });
 
   const limit = Math.min(Math.max(Number(req.query.limit ?? 30), 1), 50);
   const like = `%${search}%`;
@@ -307,10 +319,11 @@ router.get("/options/search", requireAuth, h(async (req: any, res: any) => {
         AND (
           CONCAT(e.first_name, ' ', COALESCE(e.last_name, '')) LIKE ?
           OR e.employee_code LIKE ?
+          OR COALESCE(NULLIF(TRIM(e.official_email), ''), NULLIF(TRIM(e.office_email), ''), e.email, '') LIKE ?
         )
       ORDER BY CASE WHEN e.employee_code = ? THEN 0 ELSE 1 END, name
       LIMIT ${limit}`,
-    [like, like, search]
+    [like, like, like, search]
   );
   return res.json({ success: true, data: rows });
 }));
@@ -390,6 +403,29 @@ router.get("/directory-masters", requireRole("admin", "hr", "manager"), h(async 
 
   return res.json({ success: true, data: { processes, branches } });
 }));
+
+// GET /api/employees/all — lean dropdown payload, single query, no pagination
+router.get("/all", requireRole("admin", "hr", "manager"), h(async (_req: any, res: any) => {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT e.id,
+            e.employee_code,
+            e.first_name,
+            COALESCE(e.last_name, '') AS last_name,
+            COALESCE(dept.dept_name, '') AS department_name
+       FROM employees e
+       LEFT JOIN department_master dept ON dept.id = e.department_id AND dept.active_status = 1
+      WHERE e.active_status = 1
+        AND (e.employment_status IS NULL
+             OR e.employment_status NOT IN (
+               'Inactive','inactive','Terminated','terminated',
+               'Offboarded','offboarded','Absconded','absconded',
+               'Resigned','resigned','Left','left','Separated','separated'
+             ))
+      ORDER BY e.employee_code ASC`
+  );
+  return res.json({ success: true, data: rows });
+}));
+
 router.post("/",
   requireRole("admin", "hr"),
   requireScopedRole(["hr"], async (req) => ({
@@ -537,12 +573,12 @@ router.get("/:id/stat-card", requireAuth, h(async (req: any, res: any) => {
   let leaveBalances: RowDataPacket[] = [];
   try {
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT lbl.leave_code, lt.leave_name,
-              lbl.opening_balance + lbl.accrued_days - lbl.used_days AS available_days,
+      `SELECT lt.leave_code, lt.leave_name,
+              (lbl.allocated_days + COALESCE(lbl.adjusted_days,0) - lbl.used_days) AS available_days,
               lbl.used_days
          FROM leave_balance_ledger lbl
-         LEFT JOIN leave_type_master lt ON lt.leave_code = lbl.leave_code
-        WHERE lbl.employee_id = ? AND YEAR(lbl.valid_for) = YEAR(NOW())`,
+         JOIN leave_type_master lt ON lt.id = lbl.leave_type_id
+        WHERE lbl.employee_id = ? AND lbl.balance_year = YEAR(NOW()) AND lt.active_status = 1`,
       [targetId]
     );
     leaveBalances = rows;
@@ -621,6 +657,20 @@ router.get("/:id/stat-card", requireAuth, h(async (req: any, res: any) => {
     }) as unknown as RowDataPacket[];
   } catch (_e) { /* table may not exist yet */ }
 
+  // Get employee badges
+  let badges: RowDataPacket[] = [];
+  try {
+    const { getEmployeeBadges } = await import('../engagement/badge.service.js');
+    badges = await getEmployeeBadges(targetId) as unknown as RowDataPacket[];
+  } catch (_e) { /* table may not exist yet */ }
+
+  // Get recent kudos
+  let recentKudos: RowDataPacket[] = [];
+  try {
+    const { listKudos } = await import('../engagement/kudos.service.js');
+    recentKudos = await listKudos({ receiver_id: targetId }, 5) as unknown as RowDataPacket[];
+  } catch (_e) { /* table may not exist yet */ }
+
   return res.json({
     data: {
       employee: emp,
@@ -632,7 +682,37 @@ router.get("/:id/stat-card", requireAuth, h(async (req: any, res: any) => {
       gamification_tier: gamificationTier,
       journey,
       salary,
+      badges,
+      recent_kudos: recentKudos,
     }
+  });
+}));
+
+// GET /api/employees/:id/ctc - Fetch employee CTC
+router.get("/:id/ctc", requireAuth, h(async (req: any, res: any) => {
+  const targetId = req.params.id;
+  const isAdminOrHR = await hasRole(req.authUser!.id, "admin", "hr", "ceo", "finance", "payroll");
+  const selfEmp = await getEmployeeForUser(req.authUser!.id);
+
+  // Access check: admin/hr can view all; employees can only view own
+  if (!isAdminOrHR && selfEmp?.id !== targetId) {
+    return res.status(403).json({ success: false, message: "Access denied" });
+  }
+
+  const [[emp]] = await db.execute<RowDataPacket[]>(
+    `SELECT ctc FROM employees WHERE id = ? LIMIT 1`,
+    [targetId]
+  );
+
+  if (!emp) {
+    return res.status(404).json({ success: false, message: "Employee not found" });
+  }
+
+  return res.json({
+    success: true,
+    data: {
+      ctc: emp.ctc ? Number(emp.ctc) : null,
+    },
   });
 }));
 

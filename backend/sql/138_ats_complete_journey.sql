@@ -60,11 +60,11 @@ CREATE TABLE IF NOT EXISTS ats_recruiter_assignment_log (
 );
 
 -- ── 3. Enhance ats_queue_token table ─────────────────────────────────────────
-ALTER TABLE ats_queue_token
-ADD COLUMN IF NOT EXISTS estimated_wait_time INT NULL COMMENT 'Estimated wait time in minutes',
-ADD COLUMN IF NOT EXISTS called_at DATETIME NULL COMMENT 'When candidate was called',
-ADD COLUMN IF NOT EXISTS interview_started_at DATETIME NULL COMMENT 'Interview start time',
-ADD COLUMN IF NOT EXISTS interview_completed_at DATETIME NULL COMMENT 'Interview completion time';
+-- NOTE: Migration runner handles "Duplicate column" errors as idempotent
+ALTER TABLE ats_queue_token ADD COLUMN estimated_wait_time INT NULL COMMENT 'Estimated wait time in minutes';
+ALTER TABLE ats_queue_token ADD COLUMN called_at DATETIME NULL COMMENT 'When candidate was called';
+ALTER TABLE ats_queue_token ADD COLUMN interview_started_at DATETIME NULL COMMENT 'Interview start time';
+ALTER TABLE ats_queue_token ADD COLUMN interview_completed_at DATETIME NULL COMMENT 'Interview completion time';
 
 -- ── 4. Create interview_result table ──────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ats_interview_result (
@@ -112,39 +112,39 @@ CREATE TABLE IF NOT EXISTS ats_candidate_portal_login (
 );
 
 -- ── 6. Enhance candidate_onboarding_profile ───────────────────────────────────
-ALTER TABLE candidate_onboarding_profile
-ADD COLUMN IF NOT EXISTS full_name_aadhaar VARCHAR(255) NULL COMMENT 'Name as per Aadhaar',
-ADD COLUMN IF NOT EXISTS father_name VARCHAR(255) NULL,
-ADD COLUMN IF NOT EXISTS mother_name VARCHAR(255) NULL,
-ADD COLUMN IF NOT EXISTS date_of_birth DATE NULL,
-ADD COLUMN IF NOT EXISTS gender ENUM('male','female','other') NULL,
-ADD COLUMN IF NOT EXISTS marital_status ENUM('single','married','divorced','widowed') NULL,
-ADD COLUMN IF NOT EXISTS blood_group VARCHAR(10) NULL,
-ADD COLUMN IF NOT EXISTS alternate_mobile VARCHAR(20) NULL,
-ADD COLUMN IF NOT EXISTS current_address TEXT NULL,
-ADD COLUMN IF NOT EXISTS permanent_address TEXT NULL,
-ADD COLUMN IF NOT EXISTS city VARCHAR(100) NULL,
-ADD COLUMN IF NOT EXISTS state VARCHAR(100) NULL,
-ADD COLUMN IF NOT EXISTS pin_code VARCHAR(10) NULL,
-ADD COLUMN IF NOT EXISTS voter_id VARCHAR(50) NULL,
-ADD COLUMN IF NOT EXISTS driving_license VARCHAR(50) NULL,
-ADD COLUMN IF NOT EXISTS passport_number VARCHAR(50) NULL,
-ADD COLUMN IF NOT EXISTS uan_number VARCHAR(50) NULL,
-ADD COLUMN IF NOT EXISTS esic_number VARCHAR(50) NULL,
-ADD COLUMN IF NOT EXISTS emergency_contact_name VARCHAR(255) NULL,
-ADD COLUMN IF NOT EXISTS emergency_contact_relation VARCHAR(50) NULL,
-ADD COLUMN IF NOT EXISTS emergency_contact_number VARCHAR(20) NULL,
-ADD COLUMN IF NOT EXISTS emergency_contact_address TEXT NULL,
-ADD COLUMN IF NOT EXISTS nominee_name VARCHAR(255) NULL,
-ADD COLUMN IF NOT EXISTS nominee_relation VARCHAR(50) NULL,
-ADD COLUMN IF NOT EXISTS nominee_dob DATE NULL,
-ADD COLUMN IF NOT EXISTS nominee_contact VARCHAR(20) NULL,
-ADD COLUMN IF NOT EXISTS declaration_accepted TINYINT(1) DEFAULT 0,
-ADD COLUMN IF NOT EXISTS bgv_consent TINYINT(1) DEFAULT 0,
-ADD COLUMN IF NOT EXISTS doc_verification_consent TINYINT(1) DEFAULT 0,
-ADD COLUMN IF NOT EXISTS policy_acknowledgement TINYINT(1) DEFAULT 0,
-ADD COLUMN IF NOT EXISTS draft_saved_at DATETIME NULL,
-ADD COLUMN IF NOT EXISTS submitted_at DATETIME NULL;
+-- NOTE: Migration runner handles "Duplicate column" errors as idempotent
+ALTER TABLE candidate_onboarding_profile ADD COLUMN full_name_aadhaar VARCHAR(255) NULL COMMENT 'Name as per Aadhaar';
+ALTER TABLE candidate_onboarding_profile ADD COLUMN father_name VARCHAR(255) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN mother_name VARCHAR(255) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN date_of_birth DATE NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN gender ENUM('male','female','other') NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN marital_status ENUM('single','married','divorced','widowed') NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN blood_group VARCHAR(10) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN alternate_mobile VARCHAR(20) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN current_address TEXT NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN permanent_address TEXT NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN city VARCHAR(100) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN state VARCHAR(100) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN pin_code VARCHAR(10) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN voter_id VARCHAR(50) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN driving_license VARCHAR(50) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN passport_number VARCHAR(50) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN uan_number VARCHAR(50) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN esic_number VARCHAR(50) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN emergency_contact_name VARCHAR(255) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN emergency_contact_relation VARCHAR(50) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN emergency_contact_number VARCHAR(20) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN emergency_contact_address TEXT NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN nominee_name VARCHAR(255) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN nominee_relation VARCHAR(50) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN nominee_dob DATE NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN nominee_contact VARCHAR(20) NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN declaration_accepted TINYINT(1) DEFAULT 0;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN bgv_consent TINYINT(1) DEFAULT 0;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN doc_verification_consent TINYINT(1) DEFAULT 0;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN policy_acknowledgement TINYINT(1) DEFAULT 0;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN draft_saved_at DATETIME NULL;
+ALTER TABLE candidate_onboarding_profile ADD COLUMN submitted_at DATETIME NULL;
 
 -- ── 7. Create bgv_initiation table ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ats_bgv_initiation (

@@ -25,7 +25,7 @@ import {
   Activity, BarChart3, Bell, Briefcase, Building2, Calendar,
   CalendarDays, ClipboardList, Clock, CreditCard, FileCheck,
   FileText, GraduationCap, Heart, Home, Landmark, Menu,
-  Network, Package, Settings, Settings2, ShieldCheck, Sparkles,
+  Network, Package, Receipt, Server, Settings, Settings2, ShieldCheck, Sparkles,
   Target, TrendingUp, User, UserMinus, UserPlus, Users, Wallet,
   X, Zap,
 } from "lucide-react";
@@ -34,6 +34,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { SidebarNav, type NavGroup } from "@/components/layout/SidebarNav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { ReadOnlyBanner } from "@/components/ReadOnlyBanner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdminOrHR, useWorkforceAccess } from "@/hooks/useUserRole";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
@@ -63,6 +64,7 @@ const navGroups: NavGroup[] = [
       { label: "Attendance",       href: "/attendance",           icon: <Clock className="h-[15px] w-[15px]" />,         description: "Attendance" },
       { label: "Leaves",           href: "/leaves",               icon: <CalendarDays className="h-[15px] w-[15px]" />,  description: "Leave" },
       { label: "My Roster",        href: "/my-roster",            icon: <Calendar className="h-[15px] w-[15px]" />,      description: "Roster" },
+      { label: "Week-off Preference", href: "/week-off-preferences", icon: <CalendarDays className="h-[15px] w-[15px]" />, description: "Week-off" },
       { label: "Payslips",         href: "/profile?tab=payslips", icon: <CreditCard className="h-[15px] w-[15px]" />,    description: "Payslips" },
       { label: "Tax Declaration",  href: "/payroll/tax-declaration", icon: <Landmark className="h-[15px] w-[15px]" />,  description: "Tax" },
       { label: "Engagement",       href: "/engagement",           icon: <Sparkles className="h-[15px] w-[15px]" />,      description: "Engagement" },
@@ -75,6 +77,7 @@ const navGroups: NavGroup[] = [
       { label: "Departments",           href: "/departments",                    icon: <Building2 className="h-[15px] w-[15px]" />,    roles: ["admin","hr","manager","ceo","branch_head"], description: "Departments" },
       { label: "Onboarding",            href: "/onboarding",                     icon: <UserPlus className="h-[15px] w-[15px]" />,     roles: ["admin","hr"], description: "Onboarding" },
       { label: "Document Verification", href: "/document-verification",          icon: <FileCheck className="h-[15px] w-[15px]" />,    roles: ["admin","hr"], description: "Documents" },
+      { label: "BGV Reports",           href: "/ats/bgv-report",                 icon: <FileCheck className="h-[15px] w-[15px]" />,    roles: ["admin","hr"], description: "BGV" },
       { label: "Employee Journey",      href: "/employee-stat-card",             icon: <Users className="h-[15px] w-[15px]" />,        description: "Journey" },
       { label: "ATS Command",           href: "/ats/command-center",             icon: <Briefcase className="h-[15px] w-[15px]" />,    pageCode: "ATS_DASHBOARD", description: "ATS" },
       { label: "Walk-in Queue",         href: "/ats/walkin-queue",               icon: <Users className="h-[15px] w-[15px]" />,        pageCode: "ATS_WAITING_QUEUE", description: "Queue" },
@@ -110,6 +113,9 @@ const navGroups: NavGroup[] = [
       { label: "My KPIs",          href: "/my-kpi",                  icon: <Activity className="h-[15px] w-[15px]" />,    description: "Live KPI" },
       { label: "Management",       href: "/management/dashboard",    icon: <BarChart3 className="h-[15px] w-[15px]" />,   pageCode: "MANAGEMENT_DASHBOARD", description: "Management" },
       { label: "Control Tower",    href: "/control-tower",           icon: <Activity className="h-[15px] w-[15px]" />,    pageCode: "CONTROL_TOWER", description: "Control tower" },
+      { label: "Operations Dashboard", href: "/operations/dashboard", icon: <Target className="h-[15px] w-[15px]" />,     pageCode: "OPERATIONS_DASHBOARD", description: "Ops dashboard" },
+      { label: "Quality Dashboard", href: "/quality/dashboard",      icon: <BarChart3 className="h-[15px] w-[15px]" />,   pageCode: "QUALITY_DASHBOARD", description: "Quality dashboard" },
+      { label: "Agent Performance", href: "/agent-performance",      icon: <Activity className="h-[15px] w-[15px]" />,    roles: ["admin","hr","ceo","qa","analyst","manager","process_manager","branch_head"], description: "Cross-source KPI" },
     ],
   },
   {
@@ -121,6 +127,15 @@ const navGroups: NavGroup[] = [
       { label: "Helpdesk",         href: "/helpdesk",                      icon: <ShieldCheck className="h-[15px] w-[15px]" />,  description: "Helpdesk" },
       { label: "Benefits & Claims",href: "/benefits",                      icon: <ShieldCheck className="h-[15px] w-[15px]" />,  description: "Benefits" },
       { label: "Feedback",         href: "/performance-feedback/my-reports", icon: <FileText className="h-[15px] w-[15px]" />,  description: "Feedback" },
+    ],
+  },
+  {
+    title: "Expenses",
+    items: [
+      { label: "My Expenses",         href: "/expenses",              icon: <Receipt className="h-[15px] w-[15px]" />,      description: "My expense claims" },
+      { label: "Expense Approvals",   href: "/expenses/approvals",    icon: <ClipboardList className="h-[15px] w-[15px]" />, roles: ["admin","hr","manager","branch_head"], description: "Approve expenses" },
+      { label: "Finance Queue",       href: "/expenses/finance",      icon: <Wallet className="h-[15px] w-[15px]" />,        roles: ["admin","finance"], description: "Finance processing" },
+      { label: "Expense Reports",     href: "/expenses/reports",      icon: <BarChart3 className="h-[15px] w-[15px]" />,     roles: ["admin","finance","hr"], description: "Expense analytics" },
     ],
   },
   {
@@ -138,6 +153,7 @@ const navGroups: NavGroup[] = [
       { label: "Client Master",    href: "/client-master",                 icon: <Users className="h-[15px] w-[15px]" />,       roles: ["admin","hr"], description: "Clients" },
       { label: "Integration Hub",  href: "/integration-hub",               icon: <Network className="h-[15px] w-[15px]" />,     roles: ["admin"], description: "Integration" },
       { label: "Exit Management",  href: "/exit-management",               icon: <UserMinus className="h-[15px] w-[15px]" />,   roles: ["admin","hr"], description: "Exit" },
+      { label: "IT Provisioning",  href: "/it-provisioning",               icon: <Server className="h-[15px] w-[15px]" />,       pageCode: "IT_PROVISIONING_TRACKER", roles: ["admin","branch_it","hr"], description: "IT Provisioning" },
     ],
   },
 ];
@@ -185,16 +201,18 @@ export function DashboardLayout({ children }: Props) {
       .filter((g) => g.items.length > 0);
   }, [visiblePageCodes, canViewPage, hasAnyRole, isAdminOrHR]);
 
-  const searchableItems = filteredGroups.flatMap((g) =>
-    g.items.map((item) => ({ ...item, groupTitle: g.title }))
+  const searchableItems = useMemo(
+    () => filteredGroups.flatMap((g) => g.items.map((item) => ({ ...item, groupTitle: g.title }))),
+    [filteredGroups]
   );
-  const searchResults = searchQuery.trim()
-    ? searchableItems.filter((item) =>
-        `${item.label} ${item.description ?? ""} ${item.groupTitle}`
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase())
-      )
-    : [];
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return searchableItems.filter((item) =>
+      `${item.label} ${item.description ?? ""} ${item.groupTitle}`.toLowerCase().includes(q)
+    );
+  }, [searchQuery, searchableItems]);
 
   const handleSearchSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -233,7 +251,7 @@ export function DashboardLayout({ children }: Props) {
   const userInitials = (user?.email ?? "MC").slice(0, 2).toUpperCase();
 
   /* ─── Sidebar content (shared between desktop fixed + mobile drawer) ─── */
-  const SidebarContent = () => (
+  const SidebarContent = useMemo(() => (
     <div
       className="flex h-full flex-col"
       style={{ background: "var(--sidebar-canvas)" }}
@@ -326,7 +344,8 @@ export function DashboardLayout({ children }: Props) {
         </Link>
       </div>
     </div>
-  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [filteredGroups, logoError, companyLogo, myProfile, userInitials, displayVersion]);
 
   return (
     <div className="min-h-dvh" style={{ background: "var(--surface-page)" }}>
@@ -350,7 +369,7 @@ export function DashboardLayout({ children }: Props) {
           borderRight: "1px solid var(--sidebar-hairline)",
         }}
       >
-        <SidebarContent />
+        {SidebarContent}
       </aside>
 
       {/* Mobile slide-in sidebar */}
@@ -375,7 +394,7 @@ export function DashboardLayout({ children }: Props) {
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <SidebarContent />
+        {SidebarContent}
       </aside>
 
       {/* Main content area */}
@@ -394,6 +413,9 @@ export function DashboardLayout({ children }: Props) {
             setSearchQuery("");
           }}
         />
+
+        {/* Read-only banner for inactive employees */}
+        <ReadOnlyBanner />
 
         {/* Page content */}
         <main className="flex-1 px-4 py-5 sm:px-5 lg:px-6 lg:py-6">

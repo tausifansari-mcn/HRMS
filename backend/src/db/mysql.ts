@@ -9,7 +9,8 @@ const _pool: Pool = mysql.createPool({
   database:           env.DB_NAME,
   connectionLimit:    env.DB_POOL_MAX,
   waitForConnections: true,
-  queueLimit:         0,
+  queueLimit:         200,   // reject after 200 queued — prevents unbounded memory growth under spike
+  connectTimeout:     10000,
   timezone:           "local",
   decimalNumbers:     true,
 });

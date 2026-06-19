@@ -135,86 +135,95 @@ export async function getAggregatedQualityData(
 }
 
 /**
- * Upload Excel file and parse quality data
+ * Upload CSV file and parse quality data
  * Returns parsed records ready for storage
+ * Note: xlsx package not installed — CSV-only. Excel users: File → Save As → CSV.
  */
 export async function uploadExcelQualityData(
   file: Express.Multer.File,
   processName: string
 ): Promise<{ success: boolean; records: number; message: string }> {
   try {
-    // TODO: Implement Excel parsing with xlsx library
-    // Expected columns: Employee_Code, Call_Date, Quality_Score, etc.
+    // Support CSV files (no library needed) — Excel users can Save As CSV
+    const content = file.buffer.toString('utf-8');
+    const ext = (file.originalname || '').toLowerCase();
+
+    if (!ext.endsWith('.csv')) {
+      return {
+        success: false,
+        records: 0,
+        message: 'Only CSV files are supported for bulk upload. In Excel, use File → Save As → CSV.'
+      };
+    }
+
+    const lines = content.split('\n').map((l: string) => l.trim()).filter(Boolean);
+    if (lines.length < 2) {
+      return { success: false, records: 0, message: 'File is empty or has no data rows.' };
+    }
+
+    const headers = lines[0].split(',').map((h: string) => h.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_'));
+    const records: any[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map((v: string) => v.trim().replace(/^"|"$/g, ''));
+      const row: Record<string, string> = {};
+      headers.forEach((h: string, idx: number) => { row[h] = values[idx] ?? ''; });
+      if (row.employee_code || row.emp_code || row.employeecode) {
+        records.push(row);
+      }
+    }
 
     return {
       success: true,
-      records: 0,
-      message: 'Excel upload feature coming soon. Use Integration Hub to upload files.'
+      records: records.length,
+      message: `Parsed ${records.length} records from CSV. Data preview available. Use Integration Hub to commit to database.`
     };
   } catch (error: any) {
-    return {
-      success: false,
-      records: 0,
-      message: error.message || 'Failed to parse Excel file'
-    };
+    return { success: false, records: 0, message: error.message || 'Failed to parse file' };
   }
 }
 
 /**
  * Connect to Google Sheet and validate structure
  * Returns preview of data
+ * Note: googleapis package not installed — directs user to Integration Hub instead.
  */
 export async function connectGoogleSheet(
   sheetId: string,
-  sheetName: string,
-  credentialsJson: string
+  _sheetName: string,
+  _credentialsJson: string
 ): Promise<{ success: boolean; preview: any[]; message: string }> {
-  try {
-    // TODO: Implement Google Sheets API connection
-    // Use googleapis package
-    // Validate sheet structure and return first 5 rows as preview
-
-    return {
-      success: true,
-      preview: [],
-      message: 'Google Sheets integration coming soon. Use Integration Hub to configure.'
-    };
-  } catch (error: any) {
-    return {
-      success: false,
-      preview: [],
-      message: error.message || 'Failed to connect to Google Sheet'
-    };
+  if (!sheetId) {
+    return { success: false, preview: [], message: 'Sheet ID is required.' };
   }
+  // Google Sheets API requires googleapis package which is not installed.
+  // Direct the user to use Integration Hub → External DB connector instead.
+  return {
+    success: false,
+    preview: [],
+    message: 'Google Sheets direct integration requires the googleapis package. Use Integration Hub → External Connector to map your Google Sheet data, or export the sheet as CSV and use the CSV upload feature.'
+  };
 }
 
 /**
  * Sync quality data from configured source
  * Reads from source and stores in mas_hrms for unified access
+ * Note: google_sheet requires googleapis (not installed); excel requires CSV upload path.
  */
 export async function syncQualityDataFromSource(
   sourceType: 'google_sheet' | 'excel',
   sourceId: string,
   processName: string
 ): Promise<{ success: boolean; records_synced: number; errors: number }> {
-  try {
-    // TODO: Implement sync logic
-    // 1. Fetch data from source
-    // 2. Transform to standard format
-    // 3. Insert into quality_data_staging table
-    // 4. Return sync stats
-
-    return {
-      success: true,
-      records_synced: 0,
-      errors: 0
-    };
-  } catch (error) {
-    console.error('Error syncing quality data:', error);
-    return {
-      success: false,
-      records_synced: 0,
-      errors: 1
-    };
+  if (sourceType === 'google_sheet') {
+    console.warn('[quality-aggregator] Google Sheets sync not available — googleapis package not installed. Use Integration Hub.');
+    return { success: false, records_synced: 0, errors: 1 };
   }
+
+  if (sourceType === 'excel') {
+    console.warn('[quality-aggregator] Direct Excel sync not supported. Use CSV upload via uploadExcelQualityData().');
+    return { success: false, records_synced: 0, errors: 1 };
+  }
+
+  return { success: false, records_synced: 0, errors: 1 };
 }

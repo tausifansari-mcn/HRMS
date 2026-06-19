@@ -23,6 +23,7 @@ import {
   isAfter,
   isBefore,
 } from "date-fns";
+import { normalizeDate } from "@/lib/utils";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
@@ -31,6 +32,7 @@ import {
 } from "@/components/leaves/LeaveRequestCard";
 import { LeaveRequestForm } from "@/components/profile/LeaveRequestForm";
 import { LeaveCalendarView } from "@/components/leaves/LeaveCalendarView";
+import { LeaveTrends } from "@/components/leaves/LeaveTrends";
 import { DateRangeExportDialog } from "@/components/export/DateRangeExportDialog";
 
 import { usePagination } from "@/hooks/usePagination";
@@ -321,7 +323,7 @@ const Leaves = () => {
     if (!startDate && !endDate) return items;
 
     return items.filter((request) => {
-      const leaveStartDate = parseISO(request.startDate);
+      const leaveStartDate = parseISO(normalizeDate(request.startDate));
 
       if (startDate && endDate) {
         return isWithinInterval(leaveStartDate, {
@@ -360,7 +362,7 @@ const Leaves = () => {
   const uniqueYears = [
     ...new Set(
       allProcessedRequests
-        .map((request) => parseISO(request.startDate).getFullYear())
+        .map((request) => parseISO(normalizeDate(request.startDate)).getFullYear())
         .filter((year) => Number.isFinite(year))
     ),
   ].sort((a, b) => b - a);
@@ -372,7 +374,7 @@ const Leaves = () => {
     const typeMatch =
       processedTypeFilter === "all" || request.type === processedTypeFilter;
 
-    const leaveDate = parseISO(request.startDate);
+    const leaveDate = parseISO(normalizeDate(request.startDate));
 
     const monthMatch =
       processedMonthFilter === "all" ||
@@ -836,8 +838,9 @@ const Leaves = () => {
             </div>
           </div>
 
-          <Tabs defaultValue="pending" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 lg:w-[520px]">
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList className="grid w-full grid-cols-4 lg:w-[680px]">
+              <TabsTrigger value="overview">My Overview</TabsTrigger>
               <TabsTrigger value="pending">
                 Pending
                 <Badge variant="secondary" className="ml-2">
@@ -849,6 +852,10 @@ const Leaves = () => {
 
               <TabsTrigger value="calendar">Calendar View</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="overview" className="mt-5">
+              <LeaveTrends employeeId={myEmployeeId ?? undefined} />
+            </TabsContent>
 
             <TabsContent value="pending" className="mt-5 space-y-4">
               {isLoading ? (
@@ -1086,8 +1093,8 @@ const Leaves = () => {
                   </p>
 
                   <p className="text-sm text-slate-500">
-                    {selectedRequest.startDate ? format(parseISO(selectedRequest.startDate), "PPP") : "—"} -{" "}
-                    {selectedRequest.endDate ? format(parseISO(selectedRequest.endDate), "PPP") : "—"}
+                    {selectedRequest.startDate ? format(parseISO(normalizeDate(selectedRequest.startDate)), "PPP") : "—"} -{" "}
+                    {selectedRequest.endDate ? format(parseISO(normalizeDate(selectedRequest.endDate)), "PPP") : "—"}
                   </p>
 
                   {selectedRequest.reason && (

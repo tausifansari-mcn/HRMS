@@ -11,13 +11,16 @@ import {
   CircleGauge,
   Clock3,
   Database,
+  DollarSign,
   GraduationCap,
+  IndianRupee,
   ShieldAlert,
   TrendingDown,
   TrendingUp,
   UserMinus,
   UserPlus,
   Users,
+  Wallet,
 } from "lucide-react";
 import {
   Bar,
@@ -53,6 +56,55 @@ type MovementPoint = {
   headcount: number;
   joins: number;
   exits: number;
+};
+
+type CeoMetricsData = {
+  payroll_liability: {
+    run_month: string | null;
+    total_gross: number;
+    total_net: number;
+    employer_statutory: number;
+    employee_count: number;
+  };
+  hc_gap: {
+    total_gap: number;
+    processes_understaffed: number;
+    by_process: Array<{
+      process_name: string;
+      mandated_hc: number;
+      required_hc: number;
+      active_hc: number;
+      gap: number;
+    }>;
+  };
+  revenue_at_risk: {
+    total_daily_estimate: number;
+    by_process: Array<{
+      process_name: string;
+      shrinkage_pct: number;
+      absent_hc: number;
+      daily_revenue_at_risk: number;
+      snapshot_date: string | null;
+    }>;
+  };
+  billing: {
+    last_month_billed: number;
+    billing_month: string | null;
+    process_count: number;
+  };
+  attrition_cost: {
+    exits_30d: number;
+    replacement_cost_estimate: number;
+  };
+  hiring_pipeline: {
+    open_candidates: number;
+    offers_pending_joining: number;
+    in_pipeline: number;
+  };
+  ff_liability: {
+    pending_count: number;
+    pending_amount: number;
+  };
 };
 
 type WorkforceDashboardData = {
@@ -176,6 +228,45 @@ function formatMonth(period: string): string {
   return new Intl.DateTimeFormat("en-IN", { month: "short" }).format(new Date(year, month - 1, 1));
 }
 
+function inr(value: number): string {
+  if (value >= 10_000_000) return `₹${(value / 10_000_000).toFixed(2)} Cr`;
+  if (value >= 100_000) return `₹${(value / 100_000).toFixed(2)} L`;
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
+}
+
+type ImpactCardProps = {
+  label: string;
+  value: string;
+  sub: string;
+  icon: ReactNode;
+  tone: "rose" | "amber" | "blue" | "violet";
+};
+
+const impactTone: Record<ImpactCardProps["tone"], { panel: string; icon: string }> = {
+  rose:   { panel: "border-rose-800/40 bg-rose-950/60",   icon: "bg-rose-700 text-white" },
+  amber:  { panel: "border-amber-700/40 bg-amber-950/60", icon: "bg-amber-600 text-white" },
+  blue:   { panel: "border-blue-700/40 bg-blue-950/60",   icon: "bg-blue-700 text-white" },
+  violet: { panel: "border-violet-700/40 bg-violet-950/60", icon: "bg-violet-700 text-white" },
+};
+
+function BusinessImpactCard({ label, value, sub, icon, tone }: ImpactCardProps) {
+  const s = impactTone[tone];
+  return (
+    <div className={cn("rounded-2xl border p-4", s.panel)}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+          <p className="mt-2 text-2xl font-bold tabular-nums text-white">{value}</p>
+        </div>
+        <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", s.icon)}>
+          {icon}
+        </div>
+      </div>
+      <p className="mt-3 text-xs text-slate-400">{sub}</p>
+    </div>
+  );
+}
+
 function SummaryCard({ label, value, helper, icon, href, tone }: SummaryCardProps) {
   const styles = toneClasses[tone];
 
@@ -271,6 +362,16 @@ export function AdminWorkforceDashboard() {
     },
     refetchInterval: 60_000,
     staleTime: 30_000,
+  });
+
+  const ceoQuery = useQuery({
+    queryKey: ["ceo-metrics"],
+    queryFn: async () => {
+      const response = await hrmsApi.get<{ data: CeoMetricsData }>("/api/management/ceo-metrics");
+      return response.data;
+    },
+    refetchInterval: 120_000,
+    staleTime: 60_000,
   });
 
   if (query.isLoading) return <AdminDashboardSkeleton />;
@@ -477,6 +578,88 @@ export function AdminWorkforceDashboard() {
           tone="indigo"
         />
       </section>
+
+      {/* ── Business Impact ─────────────────────────────────────────── */}
+      {ceoQuery.data && (
+        <section aria-label="Business impact indicators">
+          <div className="mb-3 flex items-center gap-2">
+            <IndianRupee className="size-4 text-slate-400" />
+            <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">Business Impact</h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <BusinessImpactCard
+              label="Daily Revenue at Risk"
+              value={inr(ceoQuery.data.revenue_at_risk.total_daily_estimate)}
+              sub={`${ceoQuery.data.hc_gap.processes_understaffed} process(es) with absent HC today`}
+              icon={<TrendingDown className="size-5" />}
+              tone="rose"
+            />
+            <BusinessImpactCard
+              label="HC Shortfall"
+              value={`${ceoQuery.data.hc_gap.total_gap} heads`}
+              sub={`Across ${ceoQuery.data.hc_gap.processes_understaffed} understaffed process(es)`}
+              icon={<Users className="size-5" />}
+              tone="amber"
+            />
+            <BusinessImpactCard
+              label="Payroll Liability"
+              value={inr(ceoQuery.data.payroll_liability.total_gross)}
+              sub={
+                ceoQuery.data.payroll_liability.run_month
+                  ? `${ceoQuery.data.payroll_liability.employee_count} employees · ${ceoQuery.data.payroll_liability.run_month}`
+                  : "Latest draft run"
+              }
+              icon={<Wallet className="size-5" />}
+              tone="blue"
+            />
+            <BusinessImpactCard
+              label="Attrition Cost (30d)"
+              value={inr(ceoQuery.data.attrition_cost.replacement_cost_estimate)}
+              sub={`${ceoQuery.data.attrition_cost.exits_30d} exits · est. replacement cost`}
+              icon={<DollarSign className="size-5" />}
+              tone="violet"
+            />
+          </div>
+
+          {ceoQuery.data.hc_gap.by_process.filter(p => p.gap > 0).length > 0 && (
+            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+              <div className="flex items-center justify-between gap-4 px-5 py-3">
+                <p className="text-sm font-bold text-slate-200">HC Gap by Process</p>
+                <Badge className="border-rose-500/30 bg-rose-500/10 text-rose-300">
+                  {ceoQuery.data.hc_gap.total_gap} heads short
+                </Badge>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-t border-slate-800 text-left text-slate-400">
+                      <th className="px-5 py-2 font-semibold">Process</th>
+                      <th className="px-4 py-2 text-right font-semibold">Mandated</th>
+                      <th className="px-4 py-2 text-right font-semibold">Required</th>
+                      <th className="px-4 py-2 text-right font-semibold">Active</th>
+                      <th className="px-4 py-2 text-right font-semibold">Gap</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ceoQuery.data.hc_gap.by_process
+                      .filter(p => p.gap > 0)
+                      .slice(0, 8)
+                      .map(p => (
+                        <tr key={p.process_name} className="border-t border-slate-800/60 hover:bg-slate-800/40">
+                          <td className="px-5 py-2.5 font-medium text-slate-200">{p.process_name}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-slate-400">{p.mandated_hc}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-slate-400">{p.required_hc}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-slate-400">{p.active_hc}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums font-bold text-rose-400">{p.gap}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
         <ChartCard

@@ -10,6 +10,7 @@ import {
   sendOnboardingTokenEmail,
   sendOfferReviewEmail,
   sendWelcomeEmail,
+  sendRejectedEmail,
 } from './ats.email.service.js';
 
 // ── PII Helpers ───────────────────────────────────────────────────────────────
@@ -422,16 +423,63 @@ export async function approveOffer(offerId: string, approverId: string, remarks?
   try {
     await conn.beginTransaction();
 
-    // Employee code — lock via FOR UPDATE to prevent concurrent duplicates
-    const [codeRows] = await conn.execute<RowDataPacket[]>(
-      `SELECT CAST(SUBSTRING(employee_code, 4) AS UNSIGNED) AS last_seq
-       FROM employees
-       WHERE employee_code REGEXP '^MAS[0-9]+$'
-       ORDER BY CAST(SUBSTRING(employee_code, 4) AS UNSIGNED) DESC
+    // Employee code — 4-format logic based on entity (branch) + emp_type
+    // MAS+ONROLL  → MAS#####   e.g. MAS62857
+    // IDC+ONROLL  → IDC#####   e.g. IDC62857
+    // MAS+TRAINEE → #####C     e.g. 62857C  (no prefix)
+    // IDC+TRAINEE → IDC#####C  e.g. IDC62857C
+    // All share one global sequential counter.
+    const empTypeLower = String(offer.emp_type ?? 'OnRoll').toLowerCase().trim();
+    const isTrainee = empTypeLower.includes('mgmt') || empTypeLower.includes('trainee');
+
+    // Detect entity from branch name (IDC / ISPARK branches belong to IDC entity)
+    let branchNameForCode = '';
+    if (offer.resolved_branch_id) {
+      const [brRows] = await conn.execute<RowDataPacket[]>(
+        `SELECT branch_name FROM branch_master WHERE id = ? LIMIT 1`,
+        [offer.resolved_branch_id],
+      );
+      branchNameForCode = String((brRows as RowDataPacket[])[0]?.branch_name ?? '').toUpperCase();
+    }
+    const isIDC = branchNameForCode.includes('IDC') || branchNameForCode.includes('ISPARK');
+    const entityPrefix = isIDC ? 'IDC' : 'MAS';
+
+    // Lock the shared sequence row to prevent concurrent duplicate codes
+    const [seqRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT current_sequence FROM employee_code_sequence
+       WHERE company_prefix = ? AND is_offrole = FALSE
        LIMIT 1 FOR UPDATE`,
+      [entityPrefix],
     );
-    const lastSeq: number = (codeRows as RowDataPacket[])[0]?.last_seq ?? 0;
-    employeeCode = `MAS${String(lastSeq + 1).padStart(5, '0')}`;
+    // If sequence row missing, fall back to reading max from live employees
+    let nextSeq: number;
+    if ((seqRows as RowDataPacket[]).length > 0) {
+      nextSeq = ((seqRows as RowDataPacket[])[0].current_sequence as number) + 1;
+    } else {
+      const [maxRows] = await conn.execute<RowDataPacket[]>(
+        `SELECT GREATEST(
+           IFNULL((SELECT MAX(CAST(SUBSTRING(employee_code,4) AS UNSIGNED)) FROM employees WHERE employee_code REGEXP '^MAS[0-9]+$'),0),
+           IFNULL((SELECT MAX(CAST(SUBSTRING(employee_code,4) AS UNSIGNED)) FROM employees WHERE employee_code REGEXP '^IDC[0-9]+$'),0),
+           IFNULL((SELECT MAX(CAST(SUBSTRING(employee_code,1,CHAR_LENGTH(employee_code)-1) AS UNSIGNED)) FROM employees WHERE employee_code REGEXP '^[0-9]+C$'),0),
+           IFNULL((SELECT MAX(CAST(SUBSTRING(employee_code,4,CHAR_LENGTH(employee_code)-4) AS UNSIGNED)) FROM employees WHERE employee_code REGEXP '^IDC[0-9]+C$'),0)
+         ) AS global_max`,
+      );
+      nextSeq = ((maxRows as RowDataPacket[])[0]?.global_max as number ?? 0) + 1;
+    }
+
+    // Advance ALL four sequence rows so they stay in sync regardless of which path runs next
+    await conn.execute(
+      `UPDATE employee_code_sequence SET current_sequence = ?, last_generated_at = NOW()
+       WHERE current_sequence < ?`,
+      [nextSeq, nextSeq],
+    );
+
+    // Build the code in the correct format
+    if (isTrainee) {
+      employeeCode = isIDC ? `IDC${nextSeq}C` : `${nextSeq}C`;
+    } else {
+      employeeCode = `${entityPrefix}${nextSeq}`;
+    }
 
     await conn.execute(
       `INSERT INTO auth_user (id, email, password_hash, must_change_password)
@@ -444,19 +492,22 @@ export async function approveOffer(offerId: string, approverId: string, remarks?
     );
     resolvedAuthUserId = (existingAuth as RowDataPacket[])[0]?.id ?? authUserId;
 
+    // salary_start_date: use date_of_salary if set (some processes have unpaid training post-joining)
+    const salaryStartDate: string | null = (offer.date_of_salary as string | null) ?? (offer.date_of_joining as string | null) ?? null;
+
     await conn.execute(
       `INSERT INTO employees
          (id, employee_code, first_name, last_name, email, mobile,
           branch_id, process_id, department_id, designation_id,
-          date_of_joining, employment_type, reporting_manager_id,
+          date_of_joining, salary_start_date, employment_type, reporting_manager_id,
           user_id, active_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
       [
         employeeId, employeeCode, firstName, lastName,
         offer.email, offer.mobile,
         offer.resolved_branch_id ?? null, offer.resolved_process_id ?? null,
         offer.department_id ?? null, offer.designation_id ?? null,
-        offer.date_of_joining, offer.emp_type,
+        offer.date_of_joining, salaryStartDate, offer.emp_type,
         offer.reporting_manager_id ?? null,
         resolvedAuthUserId,
       ],
@@ -477,6 +528,37 @@ export async function approveOffer(offerId: string, approverId: string, remarks?
         offer.professional_tax, offer.gratuity, offer.admin_charges, offer.net_in_hand,
       ],
     );
+
+    // Create payroll salary assignment so monthly payroll can run immediately.
+    // Requires a valid structure_id — use the first available structure as default.
+    const [structRows] = await conn.execute<RowDataPacket[]>(
+      `SELECT id FROM salary_structure_master ORDER BY created_at ASC LIMIT 1`,
+    );
+    if ((structRows as RowDataPacket[]).length > 0) {
+      const defaultStructureId = (structRows as RowDataPacket[])[0].id;
+      await conn.execute(
+        `INSERT IGNORE INTO employee_salary_assignment
+           (id, employee_id, structure_id, ctc_annual, effective_from, active_status)
+         VALUES (UUID(), ?, ?, ?, ?, 1)`,
+        [employeeId, defaultStructureId, offer.offered_ctc ?? 0, salaryStartDate ?? new Date().toISOString().slice(0, 10)],
+      );
+    }
+
+    // Initialize leave balance ledger for the joining year (allocated_days = 0; HR can top-up later)
+    const joiningYear = offer.date_of_joining
+      ? new Date(offer.date_of_joining as string).getFullYear()
+      : new Date().getFullYear();
+    const [leaveTypes] = await conn.execute<RowDataPacket[]>(
+      `SELECT id FROM leave_type_master WHERE active_status = 1`,
+    );
+    for (const lt of leaveTypes as RowDataPacket[]) {
+      await conn.execute(
+        `INSERT IGNORE INTO leave_balance_ledger
+           (id, employee_id, leave_type_id, balance_year, allocated_days, used_days, adjusted_days)
+         VALUES (UUID(), ?, ?, ?, 0, 0, 0)`,
+        [employeeId, lt.id, joiningYear],
+      );
+    }
 
     await conn.execute(
       `INSERT INTO ats_offer_approval (id, offer_id, approver_id, action, remarks)
@@ -532,9 +614,23 @@ export async function approveOffer(offerId: string, approverId: string, remarks?
     module: 'ATS',
     triggeredBy: approverId,
     metadata: { candidate_id: candidateId, offer_id: offerId },
-  }).catch(() => {
+  }).catch((err: unknown) => {
     // Employee creation is already committed; journey logging can be retried independently.
+    console.error('[onboarding] Journey log failed for employee', employeeId, ':', err instanceof Error ? err.message : String(err));
   });
+
+  // Fire IT provisioning tasks — runs after transaction commits, fire-and-forget
+  const branchIdForProvisioning: string | null = (offer.resolved_branch_id ?? offer.applied_for_branch) || null;
+  import('../it-provisioning/it-provisioning.service.js').then(({ dispatchJoinProvisioningTasks }) => {
+    dispatchJoinProvisioningTasks({
+      employeeId,
+      employeeCode,
+      employeeName: offer.full_name,
+      branchId: branchIdForProvisioning,
+      actorUserId: approverId,
+      triggerEventId: offerId,
+    }).catch((err: unknown) => console.error('[it-provisioning] join dispatch failed:', err));
+  }).catch((err: unknown) => console.error('[it-provisioning] module load failed:', err));
 
   // Send welcome email after transaction commits — email failure should not roll back employee creation
   const baseUrl = env.FRONTEND_URL || 'http://localhost:5173';
@@ -558,7 +654,7 @@ export async function approveOffer(offerId: string, approverId: string, remarks?
 export async function rejectOffer(offerId: string, approverId: string, remarks: string) {
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT o.onboarding_request_id, r.candidate_id,
-            c.applied_for_branch, c.applied_for_process
+            c.full_name, c.email, c.applied_for_branch, c.applied_for_process
      FROM ats_employment_offer o
      JOIN ats_onboarding_request r ON r.id = o.onboarding_request_id
      JOIN ats_candidate c ON c.id = r.candidate_id
@@ -600,4 +696,14 @@ export async function rejectOffer(offerId: string, approverId: string, remarks: 
      VALUES (UUID(), ?, 'Offer Submitted', 'Offer Rejected', ?, ?)`,
     [row.candidate_id, remarks, approverId],
   );
+
+  // Fire-and-forget: notify candidate and HR of rejection
+  if (row.email) {
+    sendRejectedEmail({
+      candidateId: row.candidate_id,
+      to: row.email,
+      candidateName: row.full_name ?? 'Candidate',
+      branchName: row.applied_for_branch ?? '',
+    }).catch((err: unknown) => console.error('[rejectOffer] email failed:', err));
+  }
 }

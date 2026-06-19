@@ -38,6 +38,8 @@ interface PageCatalogEntry {
 interface UserForAccess {
   id: string;
   email: string;
+  employee_code: string | null;
+  full_name: string | null;
 }
 
 interface UserPageAccess {
@@ -280,7 +282,9 @@ export default function SuperAdminAccessControl() {
                   <SelectContent>
                     {users.map(user => (
                       <SelectItem key={user.id} value={user.id}>
-                        {user.email}
+                        {user.full_name?.trim()
+                          ? `${user.full_name}${user.employee_code ? ` (${user.employee_code})` : ""}`
+                          : user.email}
                       </SelectItem>
                     ))}
                   </SelectContent>

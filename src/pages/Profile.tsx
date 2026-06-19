@@ -27,8 +27,9 @@ import {
 } from "lucide-react";
 import { PhotoUpload } from "@/components/employee/PhotoUpload";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, useIsReadOnly } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useIsAdminOrHR } from "@/hooks/useUserRole";
 import { EmployeeDocuments } from "@/components/documents/EmployeeDocuments";
 import { LeaveBalanceCard } from "@/components/profile/LeaveBalanceCard";
 import { LeaveRequestForm } from "@/components/profile/LeaveRequestForm";
@@ -48,7 +49,10 @@ import {
 interface ProfileForm {
   email: string;
   phone: string;
+  personal_email: string;
+  personal_phone: string;
   alternate_mobile: string;
+  personal_mobile: string;
   address: string;
   city: string;
   country: string;
@@ -68,17 +72,19 @@ const formatDate = (dateStr: string | null) => {
   const datePart = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/)?.slice(1);
   if (!datePart) return "—";
   const [year, month, day] = datePart.map(Number);
-  const date = new Date(year, month - 1, day);
+  // Use UTC to avoid timezone offset issues
+  const date = new Date(Date.UTC(year, month - 1, day));
   if (
     Number.isNaN(date.getTime()) ||
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
   ) {
     return "—";
   }
   return date.toLocaleDateString("en-IN", {
     year: "numeric", month: "long", day: "numeric",
+    timeZone: "UTC",
   });
 };
 
@@ -93,11 +99,11 @@ function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label:
   return (
     <div className="flex items-start gap-3 py-3">
       <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100">
-        <Icon className="h-4 w-4 text-slate-600" />
+        <Icon className="h-4 w-4 text-slate-700" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">{label}</p>
-        <p className="mt-1 break-words text-base font-bold leading-6 text-slate-900">{value || "—"}</p>
+        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{label}</p>
+        <p className="mt-1 break-words text-base font-extrabold leading-6 text-slate-950 uppercase">{value || "—"}</p>
       </div>
     </div>
   );
@@ -118,6 +124,8 @@ const Profile = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isAdminOrHR } = useIsAdminOrHR();
+  const isReadOnly = useIsReadOnly();
 
   const tabParam = (searchParams.get("tab") || "").toLowerCase();
   const allowedTabs = ["profile", "statutory", "emergency", "journey", "leaves", "attendance", "assets", "reviews", "payslips", "documents"] as const;
@@ -129,10 +137,10 @@ const Profile = () => {
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState<ProfileForm>({
-    email: "", phone: "", alternate_mobile: "", address: "", city: "", country: "",
+    email: "", phone: "", personal_email: "", personal_mobile: "", personal_phone: "", alternate_mobile: "", address: "", city: "", country: "",
     date_of_birth: "", gender: "", marital_status: "", blood_group: "",
     working_hours_start: "09:00", working_hours_end: "18:00",
-    working_days: [1, 2, 3, 4, 5],
+    working_days: [1, 2, 3, 4, 5, 6], // Default: Mon-Sat (Sunday off)
   });
 
   useEffect(() => {
@@ -166,7 +174,10 @@ const Profile = () => {
       setFormData({
         email: employee.email || "",
         phone: employee.phone || "",
+        personal_email: employee.personal_email || "",
+        personal_phone: employee.personal_phone || "",
         alternate_mobile: employee.alternate_mobile || "",
+        personal_mobile: employee.personal_mobile || "",
         address: employee.address || "",
         city: employee.city || "",
         country: employee.country || "",
@@ -178,7 +189,7 @@ const Profile = () => {
         blood_group: employee.blood_group || "",
         working_hours_start: fmt(employee.working_hours_start) || "09:00",
         working_hours_end: fmt(employee.working_hours_end) || "18:00",
-        working_days: employee.working_days || [1, 2, 3, 4, 5],
+        working_days: employee.working_days || [1, 2, 3, 4, 5, 6], // Default: Mon-Sat
       });
     }
   }, [employee]);
@@ -208,7 +219,10 @@ const Profile = () => {
     if (employee) setFormData({
       email: employee.email || "",
       phone: employee.phone || "",
+      personal_email: employee.personal_email || "",
+      personal_phone: employee.personal_phone || "",
       alternate_mobile: employee.alternate_mobile || "",
+      personal_mobile: employee.personal_mobile || "",
       address: employee.address || "",
       city: employee.city || "",
       country: employee.country || "",
@@ -218,7 +232,7 @@ const Profile = () => {
       blood_group: employee.blood_group || "",
       working_hours_start: fmt(employee.working_hours_start) || "09:00",
       working_hours_end: fmt(employee.working_hours_end) || "18:00",
-      working_days: employee.working_days || [1, 2, 3, 4, 5],
+      working_days: employee.working_days || [1, 2, 3, 4, 5, 6],
     });
   };
 
@@ -264,7 +278,11 @@ const Profile = () => {
                   <PhotoUpload
                     currentUrl={avatarUrl}
                     displayName={`${employee.first_name} ${employee.last_name}`}
-                    onSuccess={(url) => setAvatarUrl(url || null)}
+                    onSuccess={(url) => {
+                      setAvatarUrl(url || null);
+                      queryClient.invalidateQueries({ queryKey: ["my-profile"] });
+                      queryClient.invalidateQueries({ queryKey: ["employee-profile"] });
+                    }}
                     size="2xl"
                   />
                 </div>
@@ -418,9 +436,11 @@ const Profile = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => setIsEditing(true)}
+                          disabled={isReadOnly}
                           className="gap-1.5 rounded-xl text-xs font-bold"
+                          title={isReadOnly ? "Cannot edit in read-only mode" : ""}
                         >
-                          <Edit3 className="h-3.5 w-3.5" /> Edit
+                          <Edit3 className="h-3.5 w-3.5" /> {isReadOnly ? "Read-Only" : "Edit"}
                         </Button>
                       ) : (
                         <div className="flex gap-2">
@@ -495,6 +515,28 @@ const Profile = () => {
                             />
                           </div>
                           <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Personal Email</Label>
+                            <Input
+                              type="email"
+                              value={formData.personal_email}
+                              onChange={(e) => setFormData(p => ({ ...p, personal_email: e.target.value.toLowerCase() }))}
+                              disabled={!isEditing}
+                              placeholder="personal@gmail.com"
+                              className="rounded-xl"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Personal Phone</Label>
+                            <Input
+                              type="tel"
+                              value={formData.personal_phone}
+                              onChange={(e) => setFormData(p => ({ ...p, personal_phone: e.target.value }))}
+                              disabled={!isEditing}
+                              placeholder="Personal mobile number"
+                              className="rounded-xl"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
                             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Alternate Number</Label>
                             <Input
                               type="tel"
@@ -502,6 +544,28 @@ const Profile = () => {
                               onChange={(e) => setFormData(p => ({ ...p, alternate_mobile: e.target.value }))}
                               disabled={!isEditing}
                               placeholder="Alternate contact number"
+                              className="rounded-xl"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Personal Email</Label>
+                            <Input
+                              type="email"
+                              value={formData.personal_email}
+                              onChange={(e) => setFormData(p => ({ ...p, personal_email: e.target.value.toLowerCase() }))}
+                              disabled={!isEditing}
+                              placeholder="personal@example.com"
+                              className="rounded-xl"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Personal Mobile</Label>
+                            <Input
+                              type="tel"
+                              value={formData.personal_mobile}
+                              onChange={(e) => setFormData(p => ({ ...p, personal_mobile: e.target.value }))}
+                              disabled={!isEditing}
+                              placeholder="+91 98765 43210"
                               className="rounded-xl"
                             />
                           </div>
@@ -739,7 +803,11 @@ const Profile = () => {
 
               <TabsContent value="documents" className="space-y-6">
                 <TaxDocumentsViewer employeeId={employee.id} />
-                <EmployeeDocuments employeeId={employee.id} />
+                <EmployeeDocuments
+                  employeeId={employee.id}
+                  canUpload={isAdminOrHR}
+                  canDelete={isAdminOrHR}
+                />
               </TabsContent>
             </Tabs>
           </>

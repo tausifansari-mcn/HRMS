@@ -10,8 +10,9 @@ const legacyConfig: sql.config = {
   database: env.NCOSEC_DB_NAME,
   options: {
     encrypt: env.NCOSEC_DB_ENCRYPT === 'true',
-    trustServerCertificate: true,
+    trustServerCertificate: env.NCOSEC_DB_TRUST_CERT === 'true',
     enableArithAbort: true,
+    readOnlyIntent: true,
   },
   connectionTimeout: 15000,
   requestTimeout: 60000,
@@ -42,7 +43,9 @@ export async function testNcosecConnection(): Promise<{ ok: boolean; error?: str
   try {
     const result = await testPoolForKey('cosec_biometric');
     if (result.ok) return result;
-  } catch {}
+  } catch (err: unknown) {
+    console.error('[ncosecDb] Config-based pool test failed:', err instanceof Error ? err.message : String(err));
+  }
   // fallback to env-var pool
   try {
     const p = await getLegacyPool();

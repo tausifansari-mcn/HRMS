@@ -20,6 +20,10 @@ const optionalPhone = z
 export const selfProfileUpdateSchema = z.object({
   email: z.string().trim().email().refine(isOfficialEmail, OFFICIAL_EMAIL_MESSAGE).optional(),
   phone: optionalPhone,
+  personal_email: z.union([z.string().trim().email("Enter a valid email"), z.literal(""), z.null()])
+    .optional()
+    .transform((v) => v === "" ? null : v),
+  personal_phone: optionalPhone,
   alternate_mobile: optionalPhone,
   address: optionalText(500),
   address2: optionalText(500),
