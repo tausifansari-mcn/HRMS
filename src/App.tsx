@@ -104,6 +104,7 @@ const NativePerformanceFeedbackTeamReports = lazy(() => import("./pages/NativePe
 
 // People
 const NativeEmployeeStatCard        = lazy(() => import("./pages/NativeEmployeeStatCard"));
+const NativePeopleExperienceCommandCenter = lazy(() => import("./pages/NativePeopleExperienceCommandCenter"));
 
 // Engagement
 const NativeEngagement                = lazy(() => import("./pages/NativeEngagement"));
@@ -123,6 +124,8 @@ const NativeMasterReports           = lazy(() => import("./pages/NativeMasterRep
 // HR Ops
 const NativeAssetsManager           = lazy(() => import("./pages/NativeAssetsManager"));
 const NativeHelpdesk                = lazy(() => import("./pages/NativeHelpdesk"));
+const NativeSupportCommandCenter    = lazy(() => import("./pages/NativeSupportCommandCenter"));
+const NativeGrievanceCommandCenter  = lazy(() => import("./pages/NativeGrievanceCommandCenter"));
 const NativeLetters                 = lazy(() => import("./pages/NativeLetters"));
 const NativeLifecycle               = lazy(() => import("./pages/NativeLifecycle"));
 const NativeEmployeeLifecycle       = lazy(() => import("./pages/NativeEmployeeLifecycle"));
@@ -313,6 +316,7 @@ const App = () => (
               <Route path="/engagement/surveys" element={<ProtectedRoute><NativeSurveys /></ProtectedRoute>} />
               <Route path="/engagement/leaderboard" element={<ProtectedRoute><NativeLeaderboard /></ProtectedRoute>} />
               <Route path="/engagement/command-center" element={<ProtectedRoute><Gate pageCode="ENGAGEMENT_COMMAND_CENTER"><NativeEngagementCommandCenter /></Gate></ProtectedRoute>} />
+              <Route path="/people-experience/command-center" element={<ProtectedRoute><Gate pageCode="PEOPLE_EXPERIENCE_COMMAND_CENTER"><NativePeopleExperienceCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/employee-stat-card" element={<ProtectedRoute><NativeEmployeeStatCard /></ProtectedRoute>} />
               <Route path="/employee-stat-card/:id" element={<ProtectedRoute><NativeEmployeeStatCard /></ProtectedRoute>} />
               <Route path="/portal/login" element={<PortalLogin />} />
@@ -323,6 +327,8 @@ const App = () => (
               <Route path="/document-verification" element={<ProtectedRoute><Gate pageCode="EMPLOYEE_MANAGEMENT"><NativeDocumentVerification /></Gate></ProtectedRoute>} />
               <Route path="/assets-manager" element={<ProtectedRoute><Gate pageCode="ASSETS_MANAGER"><NativeAssetsManager /></Gate></ProtectedRoute>} />
               <Route path="/helpdesk" element={<ProtectedRoute><Gate pageCode="HELPDESK"><NativeHelpdesk /></Gate></ProtectedRoute>} />
+              <Route path="/support/command-center" element={<ProtectedRoute><Gate pageCode="SUPPORT_COMMAND_CENTER"><NativeSupportCommandCenter /></Gate></ProtectedRoute>} />
+              <Route path="/support/grievance-command-center" element={<ProtectedRoute><Gate pageCode="GRIEVANCE_COMMAND_CENTER"><NativeGrievanceCommandCenter /></Gate></ProtectedRoute>} />
               <Route path="/letters" element={<ProtectedRoute><Gate pageCode="LETTERS"><NativeLetters /></Gate></ProtectedRoute>} />
               <Route path="/maternity-leave" element={<ProtectedRoute roles={['admin', 'hr']}><NativeMaternityLeave /></ProtectedRoute>} />
               <Route path="/employee-lifecycle" element={<ProtectedRoute><Gate pageCode="EMPLOYEE_LIFECYCLE"><NativeLifecycle /></Gate></ProtectedRoute>} />
